@@ -1,0 +1,310 @@
+2025-12-19 15:21:29,510 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:21:29,550 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:21:29,550 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:21:29,550 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:21:29,666 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:21:31,178 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:21:31,247 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:21:31,262 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:21:52,023 - ui.controllers.company_controllers - DEBUG - Đã chọn ảnh mới: H:/myapp/assets/images/weekend.svg
+2025-12-19 15:22:00,171 - ui.controllers.company_controllers - DEBUG - Đã chọn ảnh mới: H:/myapp/assets/icons/app.ico
+2025-12-19 15:22:06,333 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:22:06,333 - ui.controllers.company_controllers - INFO - Lưu thông tin công ty thành công
+2025-12-19 15:23:14,887 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:23:14,932 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:23:14,932 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:23:14,932 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:23:15,048 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:23:16,528 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:23:16,611 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:23:16,611 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:23:36,428 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:23:36,467 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:23:36,467 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:23:36,467 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:23:36,581 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:23:37,715 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:23:37,762 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:23:37,768 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:24:59,247 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:24:59,293 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:24:59,293 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:24:59,293 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:24:59,411 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:25:00,475 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:25:00,553 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:25:00,553 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:25:02,745 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:25:02,760 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:25:02,760 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:25:37,416 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:25:37,449 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:25:37,449 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:25:37,449 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:25:37,564 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:25:39,066 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:25:39,114 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:25:39,114 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:36:34,780 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:36:34,816 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:36:34,816 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:36:34,816 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:36:34,935 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:36:36,789 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:36:36,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:36:36,875 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:36:39,934 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-19 15:36:39,934 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-19 15:37:15,344 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:37:15,382 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:37:15,382 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:37:15,382 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:37:15,487 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:38:16,934 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:38:16,971 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:38:16,971 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:38:16,971 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:38:17,076 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:38:21,122 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-19 15:38:21,122 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-19 15:38:21,472 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-19 15:38:21,472 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-19 15:38:21,885 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-19 15:38:21,885 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-19 15:38:22,171 - ui.controllers.header_controllers - INFO - Chuyển tab header: cong_cu
+2025-12-19 15:38:22,171 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 3
+2025-12-19 15:38:22,811 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-19 15:38:22,811 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-19 15:38:23,493 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-19 15:38:23,493 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-19 15:38:23,874 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:38:23,874 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:38:24,416 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:38:24,495 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:38:24,508 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:38:38,848 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:38:38,881 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:38:38,881 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:38:38,881 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:38:38,995 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:38:40,255 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:38:40,286 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:38:40,286 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:39:36,841 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:39:36,882 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:39:36,882 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:39:36,882 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:39:36,999 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:39:37,948 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 15:39:37,996 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:39:38,011 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 15:39:47,080 - ui.controllers.company_controllers - DEBUG - Đã chọn ảnh mới: H:/myapp/assets/icons/app.ico
+2025-12-19 15:39:50,439 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 15:39:50,439 - ui.controllers.company_controllers - INFO - Lưu thông tin công ty thành công
+2025-12-19 15:56:10,342 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:56:10,389 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:56:10,390 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:56:10,390 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:56:10,517 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:58:18,597 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:58:18,629 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:58:18,629 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:58:18,629 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:58:18,758 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:58:30,223 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:58:30,262 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:58:30,262 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:58:30,262 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:58:30,380 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 15:59:20,273 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 15:59:20,316 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 15:59:20,317 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 15:59:20,317 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 15:59:20,432 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:00:55,792 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:00:55,838 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:00:55,838 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:00:55,838 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:00:55,965 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:04:53,225 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:04:53,268 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:04:53,268 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:04:53,268 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:04:53,385 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:05:28,367 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:05:28,415 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:05:28,415 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:05:28,415 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:05:28,529 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:06:39,795 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 16:06:39,888 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:06:39,888 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 16:07:14,270 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:07:14,311 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:07:14,311 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:07:14,311 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:07:14,428 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:07:35,856 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:07:35,892 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:07:35,892 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:07:35,892 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:07:36,031 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:08:25,798 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:08:25,831 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:08:25,831 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:08:25,831 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:08:25,959 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:08:44,184 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:08:44,226 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:08:44,226 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:08:44,226 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:08:44,342 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:09:03,792 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:09:03,831 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:09:03,831 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:09:03,831 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:09:03,947 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:09:46,592 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:09:46,631 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:09:46,631 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:09:46,631 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:09:46,747 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:10:41,148 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:10:41,188 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:10:41,188 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:10:41,188 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:10:41,303 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:13:30,931 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:13:30,973 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:13:30,973 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:13:30,973 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:13:31,090 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:15:46,475 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:15:46,521 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:15:46,521 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:15:46,521 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:15:46,642 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:16:27,101 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:16:27,132 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:16:27,132 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:16:27,132 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:16:27,253 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:17:29,753 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:17:29,795 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:17:29,795 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:17:29,795 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:17:29,904 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:28:50,769 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:28:50,820 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:28:50,820 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:28:50,820 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:28:50,938 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:30:02,356 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:30:02,392 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:30:02,392 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:30:02,392 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:30:02,506 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:30:29,491 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:30:29,523 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:30:29,523 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:30:29,523 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:30:29,653 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:34:31,669 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:34:31,711 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:34:31,711 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:34:31,711 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:34:31,830 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:35:11,647 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:35:11,674 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:35:11,674 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:35:11,674 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:35:11,802 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:35:49,047 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:35:49,087 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:35:49,087 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:35:49,087 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:35:49,195 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:36:29,542 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:36:29,592 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:36:29,592 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:36:29,592 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:36:29,711 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:37:08,020 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:37:08,060 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:37:08,060 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:37:08,060 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:37:08,183 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:38:22,987 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:38:23,027 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:38:23,027 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:38:23,027 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:38:23,146 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:42:07,197 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:42:07,237 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:42:07,237 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:42:07,237 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:42:07,357 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:42:12,468 - ui.controllers.company_controllers - INFO - Mở dialog Thông tin công ty
+2025-12-19 16:42:12,552 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:42:12,552 - ui.controllers.company_controllers - DEBUG - Load company thành công
+2025-12-19 16:42:48,947 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:42:48,992 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:42:48,992 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:42:48,992 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:42:49,109 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:43:06,055 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:43:06,103 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:43:06,103 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:43:06,103 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:43:06,213 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:43:34,576 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:43:34,622 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:43:34,622 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:43:34,622 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:43:34,739 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:43:46,161 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:43:46,200 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:43:46,200 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:43:46,200 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:43:46,316 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:44:13,294 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:44:13,341 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:44:13,341 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:44:13,341 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:44:13,455 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:51:13,038 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-19 16:51:13,077 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-19 16:51:13,077 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-19 16:51:13,077 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-19 16:51:13,203 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-19 16:51:35,755 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:42,273 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:42,273 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:44,390 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:44,390 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:46,974 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:46,985 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:49,241 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:49,241 - repository.title_repository - ERROR - Lỗi create_title
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Duplicate entry '111111' for key 'uq_job_titles_title_name'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\title_repository.py", line 64, in create_title
+    cursor.execute(query, (title_name,))
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.IntegrityError: 1062 (23000): Duplicate entry '111111' for key 'uq_job_titles_title_name'
+2025-12-19 16:51:50,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:50,791 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:52,458 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-19 16:51:52,458 - core.database - INFO - ✅ Kết nối MySQL thành công
