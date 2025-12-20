@@ -278,3 +278,676 @@ mysql.connector.errors.IntegrityError: 1062 (23000): Duplicate entry 'Â' for ke
 2025-12-20 11:23:16,201 - core.database - INFO - ✅ Kết nối MySQL thành công
 2025-12-20 11:23:16,711 - core.database - INFO - ✅ Kết nối MySQL thành công
 2025-12-20 11:23:17,772 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 13:58:32,748 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 13:58:32,786 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 13:58:32,786 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 13:58:32,786 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 13:58:32,913 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 13:58:34,335 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:14:30,777 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:14:30,820 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:14:30,820 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:14:30,821 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:14:30,938 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:14:32,369 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:14:32,369 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:14:33,224 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:14:33,224 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Table 'hr_attendance.devices' doesn't exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1146 (42S02): Table 'hr_attendance.devices' doesn't exist
+2025-12-20 14:14:33,228 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Table 'hr_attendance.devices' doesn't exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 45, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 50, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1146 (42S02): Table 'hr_attendance.devices' doesn't exist
+2025-12-20 14:16:44,663 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:16:44,663 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Table 'hr_attendance.devices' doesn't exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1146 (42S02): Table 'hr_attendance.devices' doesn't exist
+2025-12-20 14:16:44,669 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Table 'hr_attendance.devices' doesn't exist
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 45, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 50, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1146 (42S02): Table 'hr_attendance.devices' doesn't exist
+2025-12-20 14:21:05,586 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:21:05,586 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:22:16,729 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:22:16,782 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:22:16,782 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:22:16,782 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:22:16,904 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:22:18,464 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:22:18,464 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:22:19,497 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:22:19,497 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:22:20,241 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:22:21,081 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:22:22,091 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:22:22,534 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:22:22,534 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:22:23,650 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:22:28,418 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:22:31,002 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:04,439 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:04,439 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:04,455 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:06,185 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:31,915 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:40,092 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:41,917 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:23:41,917 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:23:42,409 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:23:42,409 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:23:43,269 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:44,297 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:23:44,297 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:23:44,709 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:45,933 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:23:45,933 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:23:46,757 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:23:47,431 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:28:50,245 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:28:50,287 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:28:50,287 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:28:50,287 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:28:50,408 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:28:52,055 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:28:52,055 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:28:52,725 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:28:52,725 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:28:52,732 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 50, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 51, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:13,993 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:30:14,034 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:30:14,034 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:30:14,034 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:30:14,151 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:30:15,271 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:30:15,271 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:30:16,497 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:16,497 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:16,497 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 50, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 51, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:30,468 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:30:30,521 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:30:30,521 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:30:30,521 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:30:30,635 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:30:32,629 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:30:32,629 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:30:33,387 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:33,403 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:33,403 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 50, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 51, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:36,685 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:30:36,685 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:30:37,323 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:38,455 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:41,228 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:45,325 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:30:45,325 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:30:46,433 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:30:46,433 - repository.device_repository - ERROR - Lỗi list_devices
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:30:46,433 - ui.controllers.device_controllers - ERROR - Không thể tải danh sách thiết bị
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\device_controllers.py", line 50, in refresh
+    models = self._service.list_devices()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\device_services.py", line 51, in list_devices
+    rows = self._repo.list_devices()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 40, in list_devices
+    cursor.execute(query)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:31:09,665 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:31:09,665 - repository.device_repository - ERROR - Lỗi create_device
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 86, in create_device
+    cursor.execute(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:31:09,665 - services.device_services - ERROR - Service create_device thất bại
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\services\device_services.py", line 91, in create_device
+    new_id = self._repo.create_device(**parsed)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 86, in create_device
+    cursor.execute(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:31:12,697 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:31:12,697 - repository.device_repository - ERROR - Lỗi create_device
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\device_repository.py", line 86, in create_device
+    cursor.execute(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:31:12,697 - services.device_services - ERROR - Service create_device thất bại
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 772, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'device_model' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\services\device_services.py", line 91, in create_device
+    new_id = self._repo.create_device(**parsed)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\device_repository.py", line 86, in create_device
+    cursor.execute(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\cursor_cext.py", line 353, in execute
+    self._connection.cmd_query(
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 781, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'device_model' in 'field list'
+2025-12-20 14:32:07,646 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:32:07,678 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:32:07,678 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:32:07,678 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:32:07,807 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:32:08,940 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:32:08,940 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:32:09,579 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:32:43,038 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:32:43,038 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:32:43,048 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:32:46,757 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:32:50,557 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:33:17,833 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:33:17,883 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:33:17,883 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:33:17,884 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:33:18,007 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:33:19,655 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:33:19,655 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:33:20,236 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:34:10,836 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:34:14,362 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:34:15,562 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:34:15,562 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:34:19,296 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:34:21,597 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:35:55,895 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:35:55,935 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:35:55,935 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:35:55,935 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:35:56,056 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:35:57,266 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:35:57,266 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:35:58,112 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:00,562 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:01,830 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:04,751 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:05,864 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:10,947 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:10,947 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:10,947 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:13,260 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:14,374 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:14,549 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:16,531 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:17,786 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:18,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:18,435 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:20,988 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:23,052 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:23,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:23,435 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:23,643 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:35,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:39,440 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:39,440 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:36:53,213 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:36:53,213 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:36:58,650 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:36:58,692 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:36:58,692 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:36:58,692 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:36:58,799 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:37:00,031 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:00,933 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:37:00,933 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:37:03,346 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:04,202 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:06,171 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:06,187 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:06,187 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:06,842 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:11,090 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:11,090 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:12,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:15,332 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:15,332 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:19,349 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:19,349 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:37:24,077 - services.device_services - WARNING - Kết nối ZK thất bại: can't reach device (ping 192.168.1.18)
+2025-12-20 14:40:52,048 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:40:52,239 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:40:52,239 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:40:52,246 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:40:52,246 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:40:52,246 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:40:52,246 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,350 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:41:06,468 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,471 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,473 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,476 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,479 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:41:06,479 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,520 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:42:36,686 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,689 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,689 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,689 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,700 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:42:36,702 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,741 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:43:11,844 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,845 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,846 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,848 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,849 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:11,850 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,258 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:43:46,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,363 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,365 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,366 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,368 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:43:46,370 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,761 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:44:10,865 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,866 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,868 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,870 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,871 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:10,873 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:44:59,952 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:45:00,054 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:00,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:00,058 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:00,060 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:00,061 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:00,062 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:32,041 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:45:32,079 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:45:32,079 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:45:32,079 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:45:32,204 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:45:34,410 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:45:34,410 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:45:35,559 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:36,689 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:41,087 - services.device_services - WARNING - Kết nối ZK thất bại: can't reach device (ping 192.168.1.18)
+2025-12-20 14:45:48,197 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:48,198 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:51,122 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:45:51,122 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:45:55,670 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:45:55,723 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:45:55,723 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:45:55,723 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:45:55,848 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:45:56,944 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:45:56,944 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:45:57,845 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:45:58,817 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:46:54,437 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:46:54,471 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:46:54,471 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:46:54,471 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:46:54,608 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:46:55,935 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:46:55,935 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:46:56,552 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:48:05,985 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:48:06,043 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:48:06,043 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:48:06,043 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:48:06,161 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:48:07,211 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:48:07,211 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:48:08,116 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:50:08,915 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:50:08,960 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:50:08,962 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:50:08,962 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:50:09,081 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:50:10,010 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:50:10,010 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:50:10,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:51:04,933 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:51:05,714 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:51:05,714 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:51:05,714 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:51:05,855 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:51:07,053 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:51:07,356 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:51:07,356 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:51:08,213 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:51:29,301 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:51:29,332 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:51:29,332 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:51:29,332 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:51:29,457 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:51:30,578 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:51:30,578 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:51:31,577 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:51:52,556 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:51:52,594 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:51:52,594 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:51:52,594 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:51:52,712 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:51:53,900 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:51:53,900 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:51:54,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:52:10,105 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:52:10,136 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:52:10,136 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:52:10,136 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:52:10,260 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:52:11,591 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:52:11,591 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:52:12,237 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:52:56,852 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:52:56,884 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:52:56,884 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:52:56,884 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:52:57,003 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:52:58,295 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:52:58,295 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:52:59,164 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:54:15,214 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:54:15,267 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:54:15,267 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:54:15,267 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:54:15,378 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:54:16,423 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:54:16,423 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:54:42,250 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:54:42,282 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:54:42,282 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:54:42,282 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:54:42,416 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:54:43,710 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:54:43,710 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:54:44,228 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-20 14:55:11,206 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-20 14:55:11,253 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-20 14:55:11,253 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-20 14:55:11,253 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-20 14:55:11,371 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-20 14:55:12,748 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-20 14:55:12,748 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-20 14:55:13,199 - core.database - INFO - ✅ Kết nối MySQL thành công

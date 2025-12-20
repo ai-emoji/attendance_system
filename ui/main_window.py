@@ -27,6 +27,7 @@ from core.resource import (
     set_window_icon,
 )
 from ui.controllers.company_controllers import CompanyController
+from ui.controllers.device_controllers import DeviceController
 from ui.controllers.department_controllers import DepartmentController
 from ui.controllers.holiday_controllers import HolidayController
 from ui.controllers.title_controllers import TitleController
@@ -39,6 +40,11 @@ from ui.widgets.holiday_widgets import MainContent as HolidayContent
 from ui.widgets.holiday_widgets import TitleBar1 as HolidayTitleBar1
 from ui.widgets.holiday_widgets import TitleBar2 as HolidayTitleBar2
 from ui.widgets.title_widgets import MainContent, TitleBar1, TitleBar2
+from ui.widgets.device_widgets import (
+    MainContent as DeviceContent,
+    TitleBar1 as DeviceTitleBar1,
+    TitleBar2 as DeviceTitleBar2,
+)
 
 
 class Header(CommonHeader):
@@ -56,6 +62,7 @@ class Container(QWidget):
         self._title_controller: TitleController | None = None
         self._department_controller: DepartmentController | None = None
         self._holiday_controller: HolidayController | None = None
+        self._device_controller: DeviceController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -121,6 +128,16 @@ class Container(QWidget):
 
         self._holiday_controller = HolidayController(self.window(), title2, content)
         self._holiday_controller.bind()
+
+    def show_device_view(self) -> None:
+        """Hiển thị màn hình Thêm Máy chấm công."""
+        title1 = DeviceTitleBar1("Thêm Máy chấm công", "assets/images/device.svg", self)
+        title2 = DeviceTitleBar2("Tổng: 0", self)
+        content = DeviceContent(self)
+        self.set_container_widgets([title1, title2, content])
+
+        self._device_controller = DeviceController(self.window(), title2, content)
+        self._device_controller.bind()
 
 
 class Footer(CommonFooter):
@@ -202,6 +219,14 @@ class MainWindow(QMainWindow):
 
         if action_text == "Khai báo\nNgày lễ":
             self.container.show_holiday_view()
+            return
+
+        # HeaderController currently has a space before newline in this label.
+        if (
+            action_text == "Thêm Máy \nchấm công"
+            or action_text == "Thêm Máy\nchấm công"
+        ):
+            self.container.show_device_view()
             return
 
         if action_text == "Thoát\nỨng dụng":

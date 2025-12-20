@@ -97,6 +97,7 @@ class Database:
         Example:
             result = Database.execute_query("SELECT * FROM users WHERE id = %s", (1,), "one")
         """
+        cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn, dictionary=True)
@@ -117,7 +118,11 @@ class Database:
             )
             raise
         finally:
-            cursor.close()
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def execute_update(query: str, params: Optional[tuple] = None) -> int:
@@ -134,6 +139,7 @@ class Database:
         Example:
             affected = Database.execute_update("DELETE FROM users WHERE id = %s", (1,))
         """
+        cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn)
@@ -153,7 +159,11 @@ class Database:
             )
             raise
         finally:
-            cursor.close()
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def execute_insert(query: str, params: Optional[tuple] = None) -> int:
@@ -170,6 +180,7 @@ class Database:
         Example:
             new_id = Database.execute_insert("INSERT INTO users (name, email) VALUES (%s, %s)", ("John", "john@example.com"))
         """
+        cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn)
@@ -187,7 +198,11 @@ class Database:
             )
             raise
         finally:
-            cursor.close()
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def test_connection() -> bool:

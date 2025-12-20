@@ -102,7 +102,7 @@ COLOR_BG_FOOTER = "#8CA9FF"
 # Màu chữ
 COLOR_TEXT_PRIMARY = "#000000"
 COLOR_TEXT_SECONDARY = "#666666"
-COLOR_TEXT_LIGHT = "#CCCCCC"
+COLOR_TEXT_LIGHT = "#FFFFFF"
 
 
 # Gợi ý màu cho các button chức năng phụ (Save, Cancel, v.v.)

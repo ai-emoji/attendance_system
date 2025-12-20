@@ -51,6 +51,21 @@ CREATE TABLE IF NOT EXISTS holidays (
     UNIQUE KEY uq_holidays_date_info (holiday_date, holiday_info)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
+-- Tạo bảng devices (Máy chấm công)
+CREATE TABLE IF NOT EXISTS devices (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_no INT NOT NULL,
+    device_name VARCHAR(255) NOT NULL,
+    ip_address VARCHAR(50) NOT NULL,
+    password VARCHAR(50) NULL,
+    port INT NOT NULL DEFAULT 4370,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_devices_ip_address (ip_address),
+    KEY idx_devices_device_no (device_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Nếu bảng holidays đã tồn tại với unique theo holiday_date, chạy thủ công:
 -- ALTER TABLE holidays DROP INDEX uq_holidays_holiday_date;
 -- ALTER TABLE holidays ADD UNIQUE KEY uq_holidays_date_info (holiday_date, holiday_info);
