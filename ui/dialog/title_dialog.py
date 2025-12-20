@@ -34,6 +34,7 @@ from core.resource import (
     COLOR_SUCCESS,
     CONTENT_FONT,
     FONT_WEIGHT_NORMAL,
+    FONT_WEIGHT_SEMIBOLD,
     INPUT_COLOR_BG,
     INPUT_COLOR_BORDER,
     INPUT_COLOR_BORDER_FOCUS,
@@ -54,6 +55,7 @@ class TitleDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._mode = mode
+        self._is_formatting_text = False
         self._init_ui()
         self.set_title_name(title_name)
 
@@ -70,6 +72,10 @@ class TitleDialog(QDialog):
         if FONT_WEIGHT_NORMAL >= 400:
             font_normal.setWeight(QFont.Weight.Normal)
 
+        font_button = QFont(UI_FONT, CONTENT_FONT)
+        if FONT_WEIGHT_SEMIBOLD >= 500:
+            font_button.setWeight(QFont.Weight.DemiBold)
+
         form_widget = QWidget(self)
         form_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -82,6 +88,10 @@ class TitleDialog(QDialog):
         self.input_title_name.setFont(font_normal)
         self.input_title_name.setFixedHeight(INPUT_HEIGHT_DEFAULT)
         self.input_title_name.setMinimumWidth(INPUT_WIDTH_DEFAULT)
+        self.input_title_name.setPlaceholderText("(ví dụ: Trưởng Phòng)")
+        self.input_title_name.setToolTip(
+            "Tên chức danh sẽ tự viết hoa chữ cái đầu mỗi từ"
+        )
         self.input_title_name.setCursor(Qt.CursorShape.IBeamCursor)
         self.input_title_name.setStyleSheet(
             "\n".join(
@@ -90,6 +100,11 @@ class TitleDialog(QDialog):
                     f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )
+        )
+
+        # Auto viết hoa chữ cái đầu mỗi từ (ví dụ: "xin chào" -> "Xin Chào")
+        self.input_title_name.textEdited.connect(
+            lambda _t: self._ensure_title_case(self.input_title_name)
         )
 
         form.addRow("Tên Chức Danh", self.input_title_name)
@@ -102,9 +117,9 @@ class TitleDialog(QDialog):
         btn_layout = QHBoxLayout(btn_row)
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(10)
-        btn_layout.addStretch(1)
 
         self.btn_save = QPushButton("Lưu")
+        self.btn_save.setFont(font_button)
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.setFixedHeight(36)
         self.btn_save.setMinimumWidth(120)
@@ -121,6 +136,7 @@ class TitleDialog(QDialog):
         )
 
         self.btn_cancel = QPushButton("Hủy")
+        self.btn_cancel.setFont(font_button)
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.setFixedHeight(36)
         self.btn_cancel.setMinimumWidth(120)
@@ -136,8 +152,15 @@ class TitleDialog(QDialog):
             )
         )
 
-        btn_layout.addWidget(self.btn_save)
-        btn_layout.addWidget(self.btn_cancel)
+        # 2 nút chiếm 100% chiều ngang (mỗi nút ~50%)
+        self.btn_save.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.btn_cancel.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        btn_layout.addWidget(self.btn_save, 1)
+        btn_layout.addWidget(self.btn_cancel, 1)
 
         root.addWidget(form_widget)
         root.addWidget(self.label_status)
@@ -162,3 +185,192 @@ class TitleDialog(QDialog):
     def set_title_name(self, value: str) -> None:
         self.input_title_name.setText(value or "")
         self.input_title_name.setCursorPosition(len(self.input_title_name.text()))
+
+    def _ensure_title_case(self, line_edit: QLineEdit) -> None:
+        if self._is_formatting_text:
+            return
+
+        text = line_edit.text()
+        if not text:
+            return
+
+        def title_case_keep_spaces(value: str) -> str:
+            parts: list[str] = []
+            current: list[str] = []
+            for ch in value:
+                if ch.isspace():
+                    if current:
+                        word = "".join(current)
+                        parts.append(word[:1].upper() + word[1:].lower())
+                        current = []
+                    parts.append(ch)
+                else:
+                    current.append(ch)
+            if current:
+                word = "".join(current)
+                parts.append(word[:1].upper() + word[1:].lower())
+            return "".join(parts)
+
+        new_text = title_case_keep_spaces(text)
+        if new_text == text:
+            return
+
+        self._is_formatting_text = True
+        try:
+            cursor_pos = line_edit.cursorPosition()
+            line_edit.setText(new_text)
+            line_edit.setCursorPosition(min(cursor_pos, len(new_text)))
+        finally:
+            self._is_formatting_text = False
+
+
+class MessageDialog(QDialog):
+    """Dialog dùng chung để hiển thị thông báo / xác nhận.
+
+    - Không dùng QMessageBox
+    - 1 nút (info) hoặc 2 nút (confirm)
+    """
+
+    def __init__(
+        self,
+        title: str,
+        message: str,
+        ok_text: str = "OK",
+        cancel_text: str | None = None,
+        destructive: bool = False,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self._ok_clicked = False
+
+        self.setModal(True)
+        self.setFixedSize(TITLE_DIALOG_WIDTH, TITLE_DIALOG_HEIGHT)
+        self.setWindowTitle(title or "")
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
+
+        font_normal = QFont(UI_FONT, CONTENT_FONT)
+        if FONT_WEIGHT_NORMAL >= 400:
+            font_normal.setWeight(QFont.Weight.Normal)
+
+        font_title = QFont(UI_FONT, CONTENT_FONT)
+        if FONT_WEIGHT_SEMIBOLD >= 500:
+            font_title.setWeight(QFont.Weight.DemiBold)
+
+        font_button = QFont(UI_FONT, CONTENT_FONT)
+        if FONT_WEIGHT_SEMIBOLD >= 500:
+            font_button.setWeight(QFont.Weight.DemiBold)
+
+        header = QLabel(title or "")
+        header.setFont(font_title)
+
+        msg = QLabel(message or "")
+        msg.setFont(font_normal)
+        msg.setWordWrap(True)
+
+        # Nút
+        btn_row = QWidget(self)
+        btn_layout = QHBoxLayout(btn_row)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(10)
+
+        self.btn_ok = QPushButton(ok_text or "OK")
+        self.btn_ok.setFont(font_button)
+        self.btn_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ok.setFixedHeight(36)
+        self.btn_ok.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.btn_ok.setAutoDefault(True)
+        self.btn_ok.setDefault(True)
+
+        ok_bg = COLOR_BUTTON_CANCEL if destructive else COLOR_BUTTON_PRIMARY
+        ok_hover = (
+            COLOR_BUTTON_CANCEL_HOVER if destructive else COLOR_BUTTON_PRIMARY_HOVER
+        )
+        self.btn_ok.setStyleSheet(
+            "\n".join(
+                [
+                    f"QPushButton {{ background-color: {ok_bg}; color: {COLOR_BG_HEADER}; border: 1px solid {COLOR_BORDER}; border-radius: 8px; padding: 0 14px; }}",
+                    f"QPushButton:hover {{ background-color: {ok_hover}; }}",
+                    "QPushButton:pressed { opacity: 0.85; }",
+                ]
+            )
+        )
+
+        self.btn_ok.clicked.connect(self._on_ok)
+
+        if cancel_text is None:
+            # 1 nút: full width
+            btn_layout.addWidget(self.btn_ok, 1)
+        else:
+            self.btn_cancel = QPushButton(cancel_text)
+            self.btn_cancel.setFont(font_button)
+            self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.btn_cancel.setFixedHeight(36)
+            self.btn_cancel.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+            )
+            self.btn_cancel.setAutoDefault(False)
+            self.btn_cancel.setDefault(False)
+            self.btn_cancel.setStyleSheet(
+                "\n".join(
+                    [
+                        f"QPushButton {{ background-color: {COLOR_BG_HEADER}; color: #000000; border: 1px solid {COLOR_BORDER}; border-radius: 8px; padding: 0 14px; }}",
+                        f"QPushButton:hover {{ background-color: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_BG_HEADER}; }}",
+                        "QPushButton:pressed { opacity: 0.85; }",
+                    ]
+                )
+            )
+            self.btn_cancel.clicked.connect(self.reject)
+
+            # 2 nút: tổng 100%, mỗi nút ~50%
+            btn_layout.addWidget(self.btn_ok, 1)
+            btn_layout.addWidget(self.btn_cancel, 1)
+
+        root.addWidget(header)
+        root.addWidget(msg)
+        root.addStretch(1)
+        root.addWidget(btn_row)
+
+    def _on_ok(self) -> None:
+        self._ok_clicked = True
+        self.accept()
+
+    @property
+    def ok_clicked(self) -> bool:
+        return self._ok_clicked
+
+    @classmethod
+    def info(cls, parent, title: str, message: str, ok_text: str = "OK") -> None:
+        dlg = cls(
+            title=title,
+            message=message,
+            ok_text=ok_text,
+            cancel_text=None,
+            parent=parent,
+        )
+        dlg.exec()
+
+    @classmethod
+    def confirm(
+        cls,
+        parent,
+        title: str,
+        message: str,
+        ok_text: str = "Đồng ý",
+        cancel_text: str = "Hủy",
+        destructive: bool = False,
+    ) -> bool:
+        dlg = cls(
+            title=title,
+            message=message,
+            ok_text=ok_text,
+            cancel_text=cancel_text,
+            destructive=destructive,
+            parent=parent,
+        )
+        dlg.exec()
+        return dlg.ok_clicked

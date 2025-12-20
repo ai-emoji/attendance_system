@@ -104,6 +104,18 @@ class CompanyDialog(QDialog):
         self.input_company_address = QLineEdit()
         self.input_company_phone = QLineEdit()
 
+        self.input_company_name.setPlaceholderText("Nhập tên công ty")
+        self.input_company_address.setPlaceholderText("Nhập địa chỉ")
+        self.input_company_phone.setPlaceholderText("Nhập số điện thoại")
+
+        self.input_company_name.setToolTip(
+            "Tên công ty sẽ tự viết hoa chữ cái đầu mỗi từ"
+        )
+        self.input_company_address.setToolTip(
+            "Địa chỉ sẽ tự viết hoa chữ cái đầu mỗi từ"
+        )
+        self.input_company_phone.setToolTip("Chỉ cho nhập số")
+
         for w in (
             self.input_company_name,
             self.input_company_address,

@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from services.title_services import TitleService
-from ui.dialog.title_dialog import TitleDialog
+from ui.dialog.title_dialog import MessageDialog, TitleDialog
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,11 @@ class TitleController:
     def on_edit(self) -> None:
         selected = self._content.get_selected_title()
         if not selected:
+            MessageDialog.info(
+                self._parent_window,
+                "Thông báo",
+                "Hãy chọn 1 dòng trong bảng trước khi Sửa đổi.",
+            )
             return
 
         title_id, current_name = selected
@@ -84,12 +89,32 @@ class TitleController:
     def on_delete(self) -> None:
         selected = self._content.get_selected_title()
         if not selected:
+            MessageDialog.info(
+                self._parent_window,
+                "Thông báo",
+                "Hãy chọn 1 dòng trong bảng trước khi Xóa.",
+            )
             return
 
-        title_id, _name = selected
-        ok, _msg = self._service.delete_title(title_id)
+        title_id, name = selected
+
+        if not MessageDialog.confirm(
+            self._parent_window,
+            "Xác nhận xóa",
+            f"Bạn có chắc muốn xóa chức danh: {name}?",
+            ok_text="Xóa",
+            cancel_text="Hủy",
+            destructive=True,
+        ):
+            return
+
+        ok, msg = self._service.delete_title(title_id)
         if ok:
             self.refresh()
         else:
-            # Không có vùng status ở view -> chỉ log
             logger.warning("Xóa thất bại cho id=%s", title_id)
+            MessageDialog.info(
+                self._parent_window,
+                "Không thể xóa",
+                msg or "Xóa thất bại.",
+            )

@@ -1,16 +1,14 @@
-"""ui.widgets.title_widgets
+"""ui.widgets.holiday_widgets
 
-Các widget dùng cho layout phần tiêu đề và nội dung trong Container.
+Các widget cho màn "Khai báo Ngày lễ".
 
-Spec:
-- TITLE_HEIGHT = 40
-- COLOR_BUTTON_PRIMARY_HOVER = "#E6E6E6"  (tên biến theo yêu cầu; thực chất là màu nền)
-- TITLE_2_HEIGHT = 40
-- BG_TITLE_2_HEIGHT = "#F4F4F4"  (tên biến theo yêu cầu; thực chất là màu nền)
-- MAIN_CONTENT_MIN_HEIGHT = 588
-- MAIN_CONTENT_BG_COLOR = "#FFFFFF"
-
-Tạo 3 class tương ứng 3 phần.
+Yêu cầu:
+- Sao chép cấu trúc từ title_widgets.py
+- Bảng gồm 4 cột: ID, STT, Ngày Tháng Năm, Thông tin ngày nghỉ
+- Ẩn cột ID
+- Cột STT width = 120
+- Cột Ngày Tháng Năm width = 120
+- Cột Thông tin ngày nghỉ chiếm phần còn lại
 """
 
 from __future__ import annotations
@@ -122,7 +120,6 @@ class TitleBar2(QWidget):
         layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(8)
 
-        # 3 nút: Thêm mới / Sửa đổi / Xóa
         self.btn_add = QPushButton("Thêm mới")
         self.btn_edit = QPushButton("Sửa đổi")
         self.btn_delete = QPushButton("Xóa")
@@ -140,7 +137,6 @@ class TitleBar2(QWidget):
                 "\n".join(
                     [
                         f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
-                        # Tăng khoảng cách giữa icon và nội dung
                         "QPushButton::icon { margin-right: 10px; }",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: #FFFFFF; }}",
                     ]
@@ -151,7 +147,6 @@ class TitleBar2(QWidget):
         self.btn_edit.clicked.connect(self.edit_clicked.emit)
         self.btn_delete.clicked.connect(self.delete_clicked.emit)
 
-        # Label tổng (bên phải)
         self.total_icon = QLabel("")
         self.total_icon.setFixedSize(18, 18)
         self.total_icon.setPixmap(
@@ -193,11 +188,12 @@ class MainContent(QWidget):
 
         self.table = QTableWidget(self)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["ID", "STT", "Tên Chức Danh / Chức Vụ"])
-        self.table.setColumnHidden(0, True)  # Ẩn cột ID
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(
+            ["ID", "STT", "Ngày Tháng Năm", "Thông tin ngày nghỉ"]
+        )
+        self.table.setColumnHidden(0, True)
 
-        # Hành vi bảng
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -207,19 +203,16 @@ class MainContent(QWidget):
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        # Header
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setMinimumSectionSize(40)
         header.setSectionsMovable(False)
 
-        # Font header: SEMIBOLD
         header_font = QFont(UI_FONT, CONTENT_FONT)
         if FONT_WEIGHT_SEMIBOLD >= 500:
             header_font.setWeight(QFont.Weight.DemiBold)
         header.setFont(header_font)
 
-        # Fonts cho nội dung
         self._font_normal = QFont(UI_FONT, CONTENT_FONT)
         if FONT_WEIGHT_NORMAL >= 400:
             self._font_normal.setWeight(QFont.Weight.Normal)
@@ -228,17 +221,16 @@ class MainContent(QWidget):
         if FONT_WEIGHT_SEMIBOLD >= 500:
             self._font_semibold.setWeight(QFont.Weight.DemiBold)
 
-        self._last_selected_row: int = -1
         self.table.currentCellChanged.connect(self._on_current_cell_changed)
 
-        # Kích thước cột
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # ID (ẩn)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)  # STT
-        header.setSectionResizeMode(
-            2, QHeaderView.ResizeMode.Stretch
-        )  # Chức danh chiếm phần còn lại
-        self._min_column_widths: dict[int, int] = {1: 120}
-        self.table.setColumnWidth(1, self._min_column_widths[1])  # STT = 120
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)  # Ngày
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Thông tin
+
+        self._min_column_widths: dict[int, int] = {1: 120, 2: 200}
+        self.table.setColumnWidth(1, self._min_column_widths[1])
+        self.table.setColumnWidth(2, self._min_column_widths[2])
 
         def _enforce_min_width(logical_index: int, _old: int, new: int) -> None:
             min_w = self._min_column_widths.get(int(logical_index))
@@ -247,12 +239,9 @@ class MainContent(QWidget):
 
         header.sectionResized.connect(_enforce_min_width)
 
-        # Không cho người dùng resize cột bằng tay
         header.setSectionsClickable(False)
-
         self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
 
-        # Style theo resource
         self.table.setStyleSheet(
             "\n".join(
                 [
@@ -260,7 +249,6 @@ class MainContent(QWidget):
                     f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; }}",
                     f"QTableWidget::item {{ padding-left: 8px; padding-right: 8px; }}",
                     f"QTableWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
-                    # Selected row: đổi màu phủ 100% chiều ngang, không bo góc, không viền focus
                     f"QTableWidget::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border-radius: 0px; border: 0px; }}",
                     "QTableWidget::item:focus { outline: none; }",
                     "QTableWidget:focus { outline: none; }",
@@ -270,7 +258,6 @@ class MainContent(QWidget):
 
         self._rows_data_count = 0
 
-        # Tạo bảng trống ban đầu, sau đó tự canh theo kích thước thực tế
         self.table.setRowCount(1)
         self._init_row_items(0)
         layout.addWidget(self.table, 1)
@@ -280,36 +267,22 @@ class MainContent(QWidget):
     def _on_current_cell_changed(
         self, current_row: int, _current_col: int, previous_row: int, _previous_col: int
     ) -> None:
-        # Reset font cho row trước đó
         if previous_row is not None and previous_row >= 0:
             self._apply_row_font(previous_row, self._font_normal)
-
-        # Set semibold cho row hiện tại
         if current_row is not None and current_row >= 0:
             self._apply_row_font(current_row, self._font_semibold)
 
-        self._last_selected_row = current_row
-
     def _apply_row_font(self, row: int, font: QFont) -> None:
-        # Cột 0 ẩn, nhưng vẫn set để đồng nhất nếu có item
-        for col in (0, 1, 2):
+        for col in (0, 1, 2, 3):
             item = self.table.item(row, col)
             if item is not None:
                 item.setFont(font)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        # Khi mở rộng vùng bảng, tự thêm dòng để đủ chiều cao
         QTimer.singleShot(0, self._ensure_rows_fit_viewport)
 
     def _ensure_rows_fit_viewport(self) -> None:
-        """Tự động tạo thêm dòng trống để đủ kích thước hiển thị.
-
-        - Không tạo STT trước (để trống).
-        - Chỉ thêm khi bảng được mở rộng; không xóa dòng khi thu nhỏ.
-        - Tính theo viewport để tránh dòng cuối bị cắt/ẩn.
-        """
-
         viewport_h = self.table.viewport().height()
         if viewport_h <= 0:
             return
@@ -320,18 +293,11 @@ class MainContent(QWidget):
         self._ensure_row_count(needed)
 
     def _ensure_row_count(self, needed: int) -> None:
-        """Đảm bảo số dòng đúng nhu cầu.
-
-        - Phóng to: thêm dòng trống.
-        - Thu nhỏ: cắt bớt dòng trống (không xóa dữ liệu).
-        """
-
         needed = max(1, int(needed))
         current = self.table.rowCount()
         if current == needed:
             return
 
-        # Nếu đang shrink, lưu row đang chọn để tránh currentRow out-of-range
         selected_row = self.table.currentRow()
 
         if current < needed:
@@ -339,47 +305,37 @@ class MainContent(QWidget):
             for row in range(current, needed):
                 self._init_row_items(row)
         else:
-            # Chỉ cắt bớt phần trống ở cuối.
             self.table.setRowCount(needed)
 
-        # Điều chỉnh selection nếu bị vượt phạm vi sau khi shrink
         if selected_row >= needed:
             self.table.clearSelection()
-            self.table.setCurrentCell(needed - 1, 2)
+            self.table.setCurrentCell(needed - 1, 3)
 
-    def set_titles(self, rows: list[tuple[int, str]]) -> None:
-        """Nạp dữ liệu chức danh vào bảng.
-
-        - Giữ phần rows trống để fill chiều cao.
-        - STT chỉ hiện với dòng có dữ liệu.
-        """
+    def set_holidays(self, rows: list[tuple[int, str, str]]) -> None:
+        """rows: (id, date_display, info)"""
 
         self._rows_data_count = len(rows or [])
 
-        # Đảm bảo đủ số dòng cho cả dữ liệu và viewport
         viewport_h = self.table.viewport().height()
         desired = max(1, int(viewport_h // ROW_HEIGHT)) if viewport_h > 0 else 1
         needed = max(desired, self._rows_data_count, 1)
-
         self._ensure_row_count(needed)
 
-        # Fill data + clear the rest
         for r in range(self.table.rowCount()):
             if r < self._rows_data_count:
-                title_id, title_name = rows[r]
-                self._set_row_data(r, title_id, r + 1, title_name)
+                holiday_id, date_display, info = rows[r]
+                self._set_row_data(r, holiday_id, r + 1, date_display, info)
             else:
-                self._set_row_data(r, None, None, "")
+                self._set_row_data(r, None, None, "", "")
 
-    def get_selected_title(self) -> tuple[int, str] | None:
-        """Trả về (id, title_name) của dòng đang chọn."""
-
+    def get_selected_holiday(self) -> tuple[int, str, str] | None:
         row = self.table.currentRow()
         if row < 0:
             return None
 
         id_item = self.table.item(row, 0)
-        name_item = self.table.item(row, 2)
+        date_item = self.table.item(row, 2)
+        info_item = self.table.item(row, 3)
         if id_item is None:
             return None
 
@@ -388,25 +344,33 @@ class MainContent(QWidget):
             return None
 
         try:
-            title_id = int(raw_id)
+            holiday_id = int(raw_id)
         except Exception:
             return None
 
-        return title_id, (name_item.text() if name_item is not None else "")
+        return (
+            holiday_id,
+            (date_item.text() if date_item is not None else ""),
+            (info_item.text() if info_item is not None else ""),
+        )
 
     def _set_row_data(
         self,
         row: int,
-        title_id: int | None,
+        holiday_id: int | None,
         stt: int | None,
-        title_name: str,
+        date_display: str,
+        info: str,
     ) -> None:
         if self.table.item(row, 0) is None:
             self._init_row_items(row)
 
-        self.table.item(row, 0).setText("" if title_id is None else str(int(title_id)))
+        self.table.item(row, 0).setText(
+            "" if holiday_id is None else str(int(holiday_id))
+        )
         self.table.item(row, 1).setText("" if stt is None else str(int(stt)))
-        self.table.item(row, 2).setText(title_name or "")
+        self.table.item(row, 2).setText(date_display or "")
+        self.table.item(row, 3).setText(info or "")
 
     def _init_row_items(self, row: int) -> None:
         normal_font = getattr(self, "_font_normal", None)
@@ -415,20 +379,20 @@ class MainContent(QWidget):
             if FONT_WEIGHT_NORMAL >= 400:
                 normal_font.setWeight(QFont.Weight.Normal)
 
-        # ID (ẩn)
         id_item = QTableWidgetItem("")
         id_item.setFont(normal_font)
         self.table.setItem(row, 0, id_item)
 
-        # STT (không tạo sẵn)
         stt_item = QTableWidgetItem("")
         stt_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         stt_item.setFont(normal_font)
         self.table.setItem(row, 1, stt_item)
 
-        # Tên chức danh (trống)
-        name_item = QTableWidgetItem("")
-        name_item.setFont(normal_font)
-        self.table.setItem(row, 2, name_item)
+        date_item = QTableWidgetItem("")
+        date_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        date_item.setFont(normal_font)
+        self.table.setItem(row, 2, date_item)
 
-        self.table.setRowHeight(row, ROW_HEIGHT)
+        info_item = QTableWidgetItem("")
+        info_item.setFont(normal_font)
+        self.table.setItem(row, 3, info_item)

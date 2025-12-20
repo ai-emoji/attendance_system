@@ -34,7 +34,7 @@ def setup_logging() -> None:
     )
 
     # Ghi đầy đủ DEBUG/INFO/... vào file
-    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 

@@ -1,11 +1,6 @@
-"""repository.title_repository
+"""repository.holiday_repository
 
-Repository layer: SQL thuần cho bảng job_titles.
-
-Quy ước:
-- Dùng query parameter %s (MySQL)
-- Không validate, không nghiệp vụ
-- Mở kết nối ngắn, đóng ngay
+Repository layer: SQL thuần cho bảng holidays.
 """
 
 from __future__ import annotations
@@ -31,11 +26,9 @@ def _is_duplicate_key(exc: Exception) -> bool:
         return "Duplicate" in str(exc) or "1062" in str(exc)
 
 
-class TitleRepository:
-    """SQL CRUD cho bảng job_titles."""
-
-    def list_titles(self) -> list[dict[str, Any]]:
-        query = "SELECT id, title_name FROM job_titles ORDER BY id ASC"
+class HolidayRepository:
+    def list_holidays(self) -> list[dict[str, Any]]:
+        query = "SELECT id, holiday_date, holiday_info FROM holidays ORDER BY holiday_date ASC, id ASC"
 
         cursor = None
         try:
@@ -44,83 +37,75 @@ class TitleRepository:
                 cursor.execute(query)
                 return list(cursor.fetchall() or [])
         except Exception:
-            logger.exception("Lỗi list_titles")
+            logger.exception("Lỗi list_holidays")
             raise
         finally:
             if cursor is not None:
                 cursor.close()
 
-    def get_title(self, title_id: int) -> dict[str, Any] | None:
-        query = "SELECT id, title_name FROM job_titles WHERE id = %s LIMIT 1"
-
-        cursor = None
-        try:
-            with Database.connect() as conn:
-                cursor = Database.get_cursor(conn, dictionary=True)
-                cursor.execute(query, (int(title_id),))
-                return cursor.fetchone()
-        except Exception:
-            logger.exception("Lỗi get_title")
-            raise
-        finally:
-            if cursor is not None:
-                cursor.close()
-
-    def create_title(self, title_name: str) -> int:
-        query = "INSERT INTO job_titles (title_name) VALUES (%s)"
+    def create_holiday(self, holiday_date: str, holiday_info: str) -> int:
+        query = "INSERT INTO holidays (holiday_date, holiday_info) VALUES (%s, %s)"
 
         cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn, dictionary=False)
-                cursor.execute(query, (title_name,))
+                cursor.execute(query, (holiday_date, holiday_info))
                 conn.commit()
                 return int(cursor.lastrowid)
         except Exception as exc:
-            # Duplicate là case nghiệp vụ dự kiến (service sẽ trả message thân thiện)
             if _is_duplicate_key(exc):
-                logger.warning("create_title duplicate: %s", title_name)
+                logger.warning(
+                    "create_holiday duplicate: date=%s info=%s",
+                    holiday_date,
+                    holiday_info,
+                )
                 raise
-            logger.exception("Lỗi create_title")
+            logger.exception("Lỗi create_holiday")
             raise
         finally:
             if cursor is not None:
                 cursor.close()
 
-    def update_title(self, title_id: int, title_name: str) -> int:
-        query = "UPDATE job_titles SET title_name = %s WHERE id = %s"
+    def update_holiday(
+        self, holiday_id: int, holiday_date: str, holiday_info: str
+    ) -> int:
+        query = "UPDATE holidays SET holiday_date = %s, holiday_info = %s WHERE id = %s"
 
         cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn, dictionary=False)
-                cursor.execute(query, (title_name, int(title_id)))
+                cursor.execute(query, (holiday_date, holiday_info, int(holiday_id)))
                 conn.commit()
                 return int(cursor.rowcount)
         except Exception as exc:
             if _is_duplicate_key(exc):
                 logger.warning(
-                    "update_title duplicate: id=%s name=%s", title_id, title_name
+                    "update_holiday duplicate: id=%s date=%s info=%s",
+                    holiday_id,
+                    holiday_date,
+                    holiday_info,
                 )
                 raise
-            logger.exception("Lỗi update_title")
+            logger.exception("Lỗi update_holiday")
             raise
         finally:
             if cursor is not None:
                 cursor.close()
 
-    def delete_title(self, title_id: int) -> int:
-        query = "DELETE FROM job_titles WHERE id = %s"
+    def delete_holiday(self, holiday_id: int) -> int:
+        query = "DELETE FROM holidays WHERE id = %s"
 
         cursor = None
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn, dictionary=False)
-                cursor.execute(query, (int(title_id),))
+                cursor.execute(query, (int(holiday_id),))
                 conn.commit()
                 return int(cursor.rowcount)
         except Exception:
-            logger.exception("Lỗi delete_title")
+            logger.exception("Lỗi delete_holiday")
             raise
         finally:
             if cursor is not None:
