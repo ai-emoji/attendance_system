@@ -11,6 +11,51 @@ from core.database import Database
 
 
 class EmployeeRepository:
+    def get_employee_by_code(self, employee_code: str) -> dict[str, Any] | None:
+        sql = """
+            SELECT
+                id,
+                employee_code,
+                full_name,
+                start_date,
+                title_id,
+                department_id,
+                date_of_birth,
+                gender,
+                national_id,
+                id_issue_date,
+                id_issue_place,
+                address,
+                phone,
+                insurance_no,
+                tax_code,
+                degree,
+                major,
+                contract1_signed,
+                contract1_no,
+                contract1_sign_date,
+                contract1_expire_date,
+                contract2_indefinite,
+                contract2_no,
+                contract2_sign_date,
+                children_count,
+                child_dob_1,
+                child_dob_2,
+                child_dob_3,
+                child_dob_4,
+                note
+            FROM employees
+            WHERE employee_code = %s
+            LIMIT 1
+        """
+        code = str(employee_code or "").strip()
+        if not code:
+            return None
+        with Database.connect() as conn:
+            cursor = Database.get_cursor(conn, dictionary=True)
+            cursor.execute(sql, (code,))
+            return cursor.fetchone()
+
     def get_employee(self, employee_id: int) -> dict[str, Any] | None:
         sql = """
             SELECT

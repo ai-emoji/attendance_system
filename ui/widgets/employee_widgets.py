@@ -5,19 +5,18 @@ Màn "Thông tin Nhân viên".
 Yêu cầu:
 - Sao chép style/structure từ title_widgets.py (TitleBar1 + MainContent)
 - MainContent chia 2 phần:
-  - Trái: cây phòng ban (preview nguyên cấu trúc), min width ~30%
-  - Phải: min width ~70%, người dùng co kéo 2 bên
+    - Trái: cây phòng ban (preview nguyên cấu trúc), min width ~30%
+    - Phải: min width ~70%, người dùng co kéo 2 bên
 - Bên phải gồm header tìm kiếm + nút Xuất danh sách + nút Nhập nhân viên + label Tổng
 - Bên dưới header là bảng nhiều cột; cột ID ẩn
-- Freeze: STT và Mã NV
-
-Ghi chú:
-- Freeze được mô phỏng bằng 2 QTableWidget: bảng trái (ID+STT+Mã NV) và bảng phải (các cột còn lại)
+- Bên dưới header là bảng nhiều cột; cột ID ẩn
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date as _date
+from datetime import datetime as _datetime
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -322,8 +321,8 @@ class _EmployeeTableModel(QAbstractTableModel):
     COLUMNS: list[tuple[str, str]] = [
         ("id", "ID"),
         ("stt", "STT"),
-        ("employee_code", "Mã NV"),
-        ("full_name", "Họ và tên"),
+        ("employee_code", "MÃ NV"),
+        ("full_name", "HỌ VÀ TÊN"),
         ("start_date", "Ngày vào làm"),
         ("title_name", "Chức Vụ"),
         ("department_name", "Phòng Ban"),
@@ -357,6 +356,63 @@ class _EmployeeTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._df: pd.DataFrame = pd.DataFrame(columns=[k for k, _ in self.COLUMNS])
         self._placeholder_rows: int = 0
+
+        self._date_keys: set[str] = {
+            "start_date",
+            "date_of_birth",
+            "id_issue_date",
+            "contract1_sign_date",
+            "contract1_expire_date",
+            "contract2_sign_date",
+            "child_dob_1",
+            "child_dob_2",
+            "child_dob_3",
+            "child_dob_4",
+        }
+
+    def _format_vn_date(self, value) -> str:
+        if value is None:
+            return ""
+
+        # pandas Timestamp support
+        if hasattr(value, "to_pydatetime"):
+            try:
+                value = value.to_pydatetime()
+            except Exception:
+                pass
+
+        if isinstance(value, _datetime):
+            d = value.date()
+            return f"{d.day:02d}/{d.month:02d}/{d.year:04d}"
+        if isinstance(value, _date):
+            return f"{value.day:02d}/{value.month:02d}/{value.year:04d}"
+
+        s = str(value or "").strip()
+        if not s:
+            return ""
+
+        # accept YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
+        head = s.split(" ", 1)[0].strip()
+        if "-" in head:
+            parts = head.split("-")
+            if len(parts) == 3:
+                try:
+                    y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+                    return f"{d:02d}/{m:02d}/{y:04d}"
+                except Exception:
+                    return s
+
+        # accept DD/MM/YYYY
+        if "/" in head:
+            parts2 = head.split("/")
+            if len(parts2) == 3:
+                try:
+                    d, m, y = int(parts2[0]), int(parts2[1]), int(parts2[2])
+                    return f"{d:02d}/{m:02d}/{y:04d}"
+                except Exception:
+                    return s
+
+        return s
 
     def set_placeholder_rows(self, n: int) -> None:
         self._placeholder_rows = max(0, int(n))
@@ -433,6 +489,8 @@ class _EmployeeTableModel(QAbstractTableModel):
         v = self._df.iloc[row].get(key)
         if v is None:
             return ""
+        if key in self._date_keys:
+            return self._format_vn_date(v)
         return str(v)
 
     def get_row_dict(self, row: int) -> dict | None:
@@ -492,10 +550,10 @@ class _FilterHeaderView(QHeaderView):
 
 
 class EmployeeTable(QTableView):
-    """Single table (one widget) with frozen columns overlay.
+    """Unified table (single QTableView).
 
-    Externally this is ONE table. Internally it uses a child QTableView overlay to
-    freeze: STT, Mã NV, Họ và tên.
+    - Column ID is hidden.
+    - No frozen columns.
     """
 
     _EMPTY_MIN_ROWS: int = 8
@@ -504,10 +562,6 @@ class EmployeeTable(QTableView):
         super().__init__(parent)
 
         self._is_placeholder: bool = True
-
-        # QTableView can call updateGeometries() during init when setting certain
-        # properties; make sure frozen view exists early.
-        self._frozen_view = QTableView(self)
 
         self._model = _EmployeeTableModel(self)
         self._proxy = _EmployeeFilterProxy(self)
@@ -543,101 +597,17 @@ class EmployeeTable(QTableView):
         # Delegate for main (padding-left 10px)
         self.setItemDelegate(_LeftPaddingDelegate(10, self))
 
-        # Frozen overlay view (child)
-        self._frozen_view.setModel(self._proxy)
-        self._frozen_view.setSelectionModel(self.selectionModel())
-        self._frozen_view.setFrameShape(QFrame.Shape.NoFrame)
-        self._frozen_view.setLineWidth(0)
-        self._frozen_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._frozen_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._frozen_view.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows
-        )
-        self._frozen_view.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self._frozen_view.setAlternatingRowColors(True)
-        self._frozen_view.setWordWrap(False)
-        self._frozen_view.verticalHeader().setVisible(False)
-        self._frozen_view.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
-        self._frozen_view.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Fixed
-        )
-        self._frozen_view.setVerticalScrollMode(
-            QAbstractItemView.ScrollMode.ScrollPerPixel
-        )
-        self._frozen_view.setHorizontalScrollMode(
-            QAbstractItemView.ScrollMode.ScrollPerPixel
-        )
-        self._frozen_view.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self._frozen_view.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-
-        frozen_header = QHeaderView(Qt.Orientation.Horizontal, self._frozen_view)
-        frozen_header.setFont(header_font)
-        frozen_header.setSectionsClickable(False)
-        frozen_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
-        self._frozen_view.setHorizontalHeader(frozen_header)
-        self._frozen_view.horizontalHeader().setVisible(True)
-        self._frozen_view.horizontalHeader().setFixedHeight(ROW_HEIGHT)
-
-        # Delegate for frozen (no left padding)
-        self._frozen_view.setItemDelegate(_LeftPaddingDelegate(0, self._frozen_view))
-
-        # Mouse wheel on frozen should scroll main
-        self._frozen_view.viewport().installEventFilter(self)
-
-        # Unified style: main draws outer border; frozen has no border
+        # Unified style (single table)
         self._apply_table_style_main()
-        self._apply_table_style_frozen()
 
         self._configure_columns()
 
-        # Make sure frozen overlay stays on top (so frozen column titles are visible)
-        self._frozen_view.show()
-        self._frozen_view.raise_()
-
-        # Sync vertical scroll
-        self.verticalScrollBar().valueChanged.connect(
-            self._frozen_view.verticalScrollBar().setValue
-        )
-
-        # Keep frozen geometry up-to-date when columns resize
-        self.horizontalHeader().sectionResized.connect(self._on_section_resized)
-
         self._update_placeholder_rows_to_viewport()
-        self._update_frozen_geometry()
-
-    def _on_section_resized(self, logical_index: int, old: int, new: int) -> None:
-        if int(logical_index) in {1, 2, 3}:
-            self._update_frozen_geometry()
-
-    def updateGeometries(self) -> None:
-        super().updateGeometries()
-        if not hasattr(self, "_frozen_view"):
-            return
-        self._update_frozen_geometry()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         if self._is_placeholder:
             self._update_placeholder_rows_to_viewport()
-        if not hasattr(self, "_frozen_view"):
-            return
-        self._update_frozen_geometry()
-
-    def eventFilter(self, obj, event) -> bool:
-        if (
-            hasattr(self, "_frozen_view")
-            and obj is self._frozen_view.viewport()
-            and event.type() == QEvent.Type.Wheel
-        ):
-            QCoreApplication.sendEvent(self.viewport(), event)
-            return True
-        return super().eventFilter(obj, event)
 
     def _update_placeholder_rows_to_viewport(self) -> None:
         vh = int(self.viewport().height() or 0)
@@ -670,39 +640,14 @@ class EmployeeTable(QTableView):
             )
         )
 
-    def _apply_table_style_frozen(self) -> None:
-        self._frozen_view.setStyleSheet(
-            "\n".join(
-                [
-                    f"QTableView {{ background-color: {ODD_ROW_BG_COLOR}; alternate-background-color: {EVEN_ROW_BG_COLOR}; gridline-color: {GRID_LINES_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
-                    f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 1px solid {GRID_LINES_COLOR}; border-right: 0px; height: {ROW_HEIGHT}px; }}",
-                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
-                    f"QTableView::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
-                    f"QTableView::item:selected:active {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
-                    "QTableView::item { padding: 0px; border: 0px; }",
-                    "QTableView::item:focus { outline: none; }",
-                    "QTableView:focus { outline: none; }",
-                ]
-            )
-        )
-
     def _configure_columns(self) -> None:
-        # Hide ID everywhere
+        # Hide ID
         self.setColumnHidden(0, True)
-        self._frozen_view.setColumnHidden(0, True)
 
-        # Frozen overlay shows only 3 columns
-        for c in range(1, self._model.columnCount()):
-            self._frozen_view.setColumnHidden(c, c not in {1, 2, 3})
-
-        # Main view hides frozen columns (they are drawn by overlay)
-        for c in (1, 2, 3):
-            self.setColumnHidden(c, True)
-
-        # Column widths for frozen
-        self._frozen_view.setColumnWidth(1, 70)
-        self._frozen_view.setColumnWidth(2, 120)
-        self._frozen_view.setColumnWidth(3, 220)
+        # Column widths
+        self.setColumnWidth(1, 70)   # STT
+        self.setColumnWidth(2, 120)  # MÃ NV
+        self.setColumnWidth(3, 220)  # HỌ VÀ TÊN
 
         # Main columns sizing
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -712,41 +657,6 @@ class EmployeeTable(QTableView):
         self.setColumnWidth(30, 260)  # note
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-
-        self._update_frozen_geometry()
-
-    def _frozen_width(self) -> int:
-        w = 2
-        for c in (1, 2, 3):
-            w += int(self._frozen_view.columnWidth(c))
-        return int(w)
-
-    def _update_frozen_geometry(self) -> None:
-        w = self._frozen_width()
-        # Shift main viewport to the right to make room for frozen columns
-        self.setViewportMargins(w, 0, 0, 0)
-
-        # The header does NOT automatically respect viewport margins; without this,
-        # the first non-frozen header section gets painted under the frozen overlay.
-        # Reserve the same left space on the main header.
-        self.horizontalHeader().setViewportMargins(w, 0, 0, 0)
-
-        # Place frozen overlay starting at the same top as the main header.
-        # Use viewport().pos() to avoid negative coordinates when layout isn't settled.
-        header_h = int(self.horizontalHeader().height() or ROW_HEIGHT)
-        vp_pos = self.viewport().pos()
-        vp_h = int(self.viewport().height() or 0)
-        x = int(vp_pos.x() - w)
-        y = int(max(0, vp_pos.y() - header_h))
-        h = int(vp_h + header_h)
-
-        self._frozen_view.setGeometry(x, y, int(w), h)
-
-        # Keep overlay on top so its header isn't hidden.
-        self._frozen_view.raise_()
-
-        # Keep row heights in sync
-        self._frozen_view.verticalScrollBar().setValue(self.verticalScrollBar().value())
 
     def clear(self) -> None:
         self._is_placeholder = True

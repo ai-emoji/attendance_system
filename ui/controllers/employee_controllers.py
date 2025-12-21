@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QFileDialog
 
 from services.employee_services import EmployeeService
 from ui.dialog.employee_dialog import EmployeeDialog
+from ui.dialog.import_employee_dialog import ImportEmployeeDialog
 from ui.dialog.title_dialog import MessageDialog
 
 
@@ -71,17 +72,8 @@ class EmployeeController:
         MessageDialog.info(self._parent_window, "Xuất danh sách", msg)
 
     def on_import(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self._parent_window,
-            "Nhập nhân viên từ CSV",
-            "",
-            "CSV (*.csv)",
-        )
-        if not file_path:
-            return
-        ok, msg = self._service.import_csv(file_path)
-        MessageDialog.info(self._parent_window, "Nhập nhân viên", msg)
-        if ok:
+        dlg = ImportEmployeeDialog(service=self._service, parent=self._parent_window)
+        if dlg.exec() == ImportEmployeeDialog.Accepted:
             self.refresh()
 
     def on_add(self) -> None:

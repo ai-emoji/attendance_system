@@ -1,138 +1,616 @@
-2025-12-21 16:47:56,536 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:47:56,565 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:47:56,565 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:47:56,565 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:47:56,698 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:48:18,649 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:48:18,687 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:48:18,698 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:48:18,698 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:48:18,807 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:48:19,931 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:20,331 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:55,121 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:48:55,159 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:48:55,159 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:48:55,159 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:48:55,271 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:48:56,480 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:56,719 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:57,733 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:57,733 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:48:57,733 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:49:19,506 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:49:19,539 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:49:19,539 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:49:19,554 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:49:19,666 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:49:20,684 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:49:20,923 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:50:05,601 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:50:05,629 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:50:05,629 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:50:05,629 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:50:05,752 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:50:10,567 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:50:10,795 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:51:55,659 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:51:55,705 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:51:55,705 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:51:55,705 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:51:55,818 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:51:56,957 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:51:57,190 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:52:32,230 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:52:32,274 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:52:32,274 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:52:32,274 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:52:32,383 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:52:33,184 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:52:33,423 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:37,583 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:40,543 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:40,545 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:40,546 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:40,548 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:41,319 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:41,325 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:43,879 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:43,880 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:43,882 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:43,883 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:44,735 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:44,739 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:46,655 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:48,894 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:50,270 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:53:59,543 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:53:59,575 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:53:59,575 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:53:59,575 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:53:59,690 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:54:00,724 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:00,957 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:02,456 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:07,216 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:10,992 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:11,392 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:12,009 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:12,459 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:12,759 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:15,011 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:15,575 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:15,760 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:18,360 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:18,860 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:20,827 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:21,094 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:22,794 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:24,277 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:24,561 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:24,781 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:24,961 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:25,128 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:25,278 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:25,411 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:26,777 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:26,960 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:27,128 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:27,261 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:27,410 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:28,961 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:29,345 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:44,551 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:44,735 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:45,142 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:45,633 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:45,703 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:45,912 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:46,118 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:46,255 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:46,461 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:54:46,532 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:56:01,206 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:56:01,257 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:56:01,258 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:56:01,258 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:56:01,372 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:56:02,505 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:56:02,743 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:56:31,942 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 16:56:31,979 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 16:56:31,980 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 16:56:31,980 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 16:56:32,077 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 16:56:33,450 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:56:33,704 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:57:59,088 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:57:59,088 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:57:59,088 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:58:03,077 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 16:58:03,077 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 17:00:40,110 - __main__ - INFO - Khởi động ứng dụng...
-2025-12-21 17:00:40,146 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
-2025-12-21 17:00:40,146 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
-2025-12-21 17:00:40,146 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
-2025-12-21 17:00:40,279 - __main__ - INFO - Ứng dụng đã sẵn sàng.
-2025-12-21 17:00:41,494 - core.database - INFO - ✅ Kết nối MySQL thành công
-2025-12-21 17:00:41,723 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:03:26,148 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:03:26,178 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:03:26,178 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:03:26,180 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:03:26,575 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:03:27,980 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:03:27,980 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:03:27,980 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:03:27,980 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:03:27,982 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:03:27,983 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:03:27,983 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:03:27,986 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:03:27,986 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:03:27,986 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:03:27,987 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:08:12,889 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:08:12,915 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:08:12,915 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:08:12,916 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:08:13,302 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:08:14,491 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:08:14,491 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:08:14,491 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:08:14,492 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:08:14,494 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:08:14,495 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:08:14,495 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:08:14,497 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:08:14,497 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:08:14,498 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:08:14,498 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:07,433 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:09:07,460 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:09:07,461 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:09:07,461 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:09:07,844 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:09:09,243 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:09,243 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:09,243 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:09:09,243 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:09:09,246 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:09:09,247 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:09,247 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:09,250 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:09,250 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:09,250 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:09,250 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:21,414 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:21,414 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:21,415 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:21,415 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:21,416 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:21,416 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:21,417 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:21,417 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:21,418 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:21,418 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:21,418 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:21,419 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:51,662 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:51,662 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:51,663 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:51,663 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:09:51,668 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:09:51,668 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:09:51,668 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:09:51,669 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:10:53,583 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:10:53,610 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:10:53,610 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:10:53,610 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:10:53,999 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:10:54,877 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:10:54,877 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:10:54,877 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:10:54,877 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:10:54,879 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:10:54,879 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:10:54,879 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:10:54,883 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:10:54,883 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:10:54,883 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:10:54,883 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:01,147 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:18:01,174 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:18:01,175 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:18:01,175 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:18:01,558 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:18:08,985 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:08,985 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:08,985 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:18:08,985 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:18:08,989 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:18:08,989 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:08,990 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:08,991 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:08,991 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:08,991 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:08,991 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:08,993 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:08,993 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:08,994 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:08,994 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:12,390 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:12,390 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:12,390 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:12,391 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:44,464 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:18:44,491 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:18:44,491 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:18:44,491 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:18:44,874 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:18:45,794 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:45,794 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:45,795 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:18:45,795 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:18:45,797 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:18:45,798 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:45,798 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:18:45,801 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:18:45,801 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:18:45,801 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:18:45,801 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:22:10,961 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:22:10,991 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:22:10,991 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:22:10,991 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:22:11,378 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:22:12,285 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:22:12,285 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:22:12,285 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:22:12,285 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:22:12,287 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:22:12,288 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:22:12,288 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:22:12,291 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:22:12,292 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:22:12,292 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:22:12,292 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:22:31,488 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:22:31,517 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:22:31,517 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:22:31,517 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:22:31,895 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:22:33,738 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:22:33,738 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:22:33,738 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:22:33,738 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:22:33,741 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:22:33,741 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:22:33,741 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:22:33,744 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:22:33,744 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:22:33,744 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:22:33,744 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:25:46,851 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:25:46,879 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:25:46,880 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:25:46,880 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:25:47,268 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:25:48,451 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:25:48,451 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:25:48,451 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:25:48,451 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:25:48,453 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:25:48,453 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:25:48,453 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:25:48,457 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:25:48,457 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:25:48,457 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:25:48,458 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:26:26,075 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:26:26,103 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:26:26,103 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:26:26,103 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:26:26,487 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:26:27,499 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:26:27,499 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:26:27,499 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:26:27,499 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:26:27,501 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:26:27,501 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:26:27,501 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:26:27,504 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:26:27,504 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:26:27,505 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:26:27,505 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:28:52,161 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:28:52,192 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:28:52,192 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:28:52,192 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:28:52,572 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:28:53,512 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:28:53,512 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:28:53,512 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:28:53,512 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:28:53,514 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:28:53,515 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:28:53,515 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:28:53,518 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:28:53,518 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:28:53,518 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:28:53,519 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:29:58,500 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:29:58,529 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:29:58,529 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:29:58,529 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:29:58,926 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:29:59,879 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:29:59,879 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:29:59,879 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:29:59,880 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:29:59,881 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:29:59,882 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:29:59,882 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:29:59,885 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:29:59,885 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:29:59,885 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:29:59,886 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:00,733 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:00,733 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:00,733 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:00,733 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:00,735 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:00,735 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:00,735 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:00,735 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:00,737 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:00,737 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:00,737 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:00,738 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:27,826 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:30:27,854 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:30:27,854 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:30:27,854 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:30:28,254 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:30:29,855 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:29,855 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:29,855 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:30:29,855 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:30:29,858 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:30:29,858 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:29,858 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:29,862 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:29,862 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:29,862 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:29,862 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:30,853 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:30,853 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:30,853 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:30,853 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:30,855 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:30,855 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:30,855 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:30,855 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:30:30,856 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:30:30,856 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:30:30,856 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:30:30,857 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:32:49,861 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:32:49,890 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:32:49,891 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:32:49,891 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:32:50,291 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:32:53,039 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:32:53,039 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:32:53,040 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:32:53,040 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:32:53,041 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:32:53,042 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:32:53,042 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:32:53,045 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:32:53,045 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:32:53,045 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:32:53,045 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:32:57,013 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:32:57,013 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:32:57,013 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:32:57,013 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:32:57,015 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:32:57,015 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:32:57,015 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:32:57,015 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:32:57,017 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:32:57,017 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:32:57,017 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:32:57,017 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:33:28,648 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:33:28,676 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:33:28,676 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:33:28,676 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:33:29,059 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:33:29,879 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:33:29,879 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:33:29,879 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:33:29,880 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:33:29,881 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:33:29,882 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:33:29,882 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:33:29,885 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:33:29,885 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:33:29,885 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:33:29,885 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:33:30,892 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:33:30,892 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:33:30,892 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:33:30,892 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:33:30,895 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:33:30,895 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:33:30,895 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:33:30,896 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:33:30,897 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:33:30,897 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:33:30,897 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:33:30,897 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:35:00,768 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:35:00,800 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:35:00,800 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:35:00,801 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:35:01,205 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:35:02,169 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:35:02,169 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:35:02,169 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:35:02,169 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:35:02,171 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:35:02,172 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:35:02,172 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:35:02,174 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:35:02,174 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:35:02,175 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:35:02,175 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:35:02,885 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:35:02,885 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:35:02,885 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:35:02,885 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:35:02,887 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:35:02,887 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:35:02,887 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:35:02,888 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:35:02,889 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:35:02,889 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:35:02,889 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:35:02,889 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:29,766 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:36:29,795 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:36:29,795 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:36:29,795 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:36:30,219 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:36:31,159 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:36:31,159 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:36:31,160 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:36:31,160 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:36:31,162 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:36:31,163 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:36:31,163 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:31,166 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:36:31,166 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:36:31,166 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:36:31,166 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:32,045 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:36:32,045 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:36:32,045 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:36:32,045 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:32,046 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:36:32,046 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:36:32,046 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:36:32,047 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:32,048 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:36:32,048 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:36:32,048 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:36:32,048 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:36:59,998 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:37:00,027 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:37:00,027 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:37:00,027 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:37:00,411 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:37:01,554 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:01,554 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:01,554 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:37:01,555 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:37:01,556 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:37:01,557 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:01,557 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:01,882 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:01,882 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:01,882 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:01,882 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:01,884 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:01,885 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:01,885 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:01,885 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:03,068 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:03,068 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:03,068 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:03,069 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:03,070 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:03,070 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:03,070 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:03,070 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:03,071 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:03,071 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:03,071 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:03,071 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:13,892 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:13,893 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:13,893 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:13,893 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:13,895 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:13,895 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:13,895 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:13,895 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:13,896 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:13,896 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:13,896 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:13,897 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:28,370 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:37:28,397 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:37:28,397 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:37:28,398 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:37:28,780 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:37:29,920 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:29,920 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:29,920 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:37:29,920 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:37:29,922 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:37:29,922 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:29,922 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:29,926 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:29,926 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:29,926 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:29,926 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:35,012 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:35,012 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:35,013 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:35,013 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:35,014 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:35,014 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:35,014 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:35,015 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:37:35,017 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:37:35,017 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:37:35,017 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:37:35,017 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:52:41,462 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:52:41,499 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:52:41,500 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:52:41,500 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:52:41,866 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:52:42,998 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:52:42,998 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:52:42,998 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:52:42,999 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:52:43,001 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:52:43,001 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:52:43,001 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:52:43,006 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:52:43,006 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:52:43,006 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:52:43,006 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:53:26,906 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:53:26,935 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:53:26,935 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:53:26,935 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:53:27,321 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:53:41,377 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:53:41,378 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:53:41,378 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:53:41,378 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:53:41,379 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:53:41,379 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:53:41,379 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:53:41,383 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:53:41,383 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:53:41,383 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:53:41,384 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:53:43,163 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:53:43,163 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:53:43,163 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:53:43,163 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:58:44,106 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:58:44,133 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:58:44,134 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:58:44,134 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:58:44,521 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:58:45,781 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:58:45,781 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:58:45,781 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:58:45,781 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:58:45,784 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:58:45,784 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:58:45,784 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:58:45,787 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:58:45,787 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:58:45,787 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:58:45,788 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,027 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,027 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,028 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,028 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,030 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,030 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,030 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,031 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,032 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,032 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,032 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,033 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,033 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,033 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,034 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,034 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,827 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,827 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,827 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,827 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:08,832 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:08,832 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:08,832 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:08,833 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:10,395 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:10,395 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:10,395 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:10,395 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:13,675 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:13,675 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:13,675 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:13,675 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:17,442 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:17,442 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:17,442 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:17,442 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:17,843 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:17,843 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:17,843 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:17,844 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:27,969 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 20:59:27,997 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 20:59:27,997 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 20:59:27,997 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 20:59:28,377 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 20:59:29,141 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:29,141 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:29,141 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 20:59:29,141 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 20:59:29,143 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 20:59:29,143 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:29,144 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 20:59:29,147 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 20:59:29,147 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 20:59:29,147 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 20:59:29,147 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:02:44,225 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 21:02:44,252 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 21:02:44,252 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 21:02:44,252 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 21:02:44,634 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 21:02:45,622 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:02:45,622 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:02:45,622 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 21:02:45,622 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 21:02:45,624 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 21:02:45,625 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:02:45,625 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:02:45,628 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:02:45,628 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:02:45,628 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:02:45,628 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:04:07,229 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 21:04:07,257 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 21:04:07,258 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 21:04:07,258 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 21:04:07,653 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 21:04:08,637 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:04:08,637 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:04:08,637 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 21:04:08,638 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 21:04:08,640 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 21:04:08,640 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:04:08,640 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:04:08,643 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:04:08,643 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:04:08,643 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:04:08,643 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:10:24,161 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-21 21:10:24,189 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-21 21:10:24,189 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-21 21:10:24,189 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-21 21:10:24,569 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-21 21:10:26,021 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:10:26,021 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:10:26,021 - mysql.connector - INFO - package: mysql.connector.plugins
+2025-12-21 21:10:26,021 - mysql.connector - INFO - plugin_name: mysql_native_password
+2025-12-21 21:10:26,023 - mysql.connector - INFO - AUTHENTICATION_PLUGIN_CLASS: MySQLNativePasswordAuthPlugin
+2025-12-21 21:10:26,024 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:10:26,024 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:10:26,027 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:10:26,027 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:10:26,027 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:10:26,028 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:13:13,771 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:13:13,771 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:13:13,771 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:13:13,773 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:13:13,774 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:13:13,774 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:13:13,774 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:13:13,775 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:13:13,800 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:13:13,800 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:13:13,800 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:13:13,800 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-21 21:13:16,346 - mysql.connector - DEBUG - Starting authorization phase
+2025-12-21 21:13:16,346 - mysql.connector - DEBUG - The provided initial strategy is mysql_native_password
+2025-12-21 21:13:16,346 - mysql.connector - DEBUG - mysql_native_password completed succesfully
+2025-12-21 21:13:16,346 - core.database - INFO - ✅ Kết nối MySQL thành công

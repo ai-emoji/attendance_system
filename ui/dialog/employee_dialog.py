@@ -13,7 +13,7 @@ Ghi chú:
 
 from __future__ import annotations
 
-from PySide6.QtCore import QDate, QLocale, Qt, QRegularExpression
+from PySide6.QtCore import QDate, QEvent, QLocale, QObject, Qt, QRegularExpression
 from PySide6.QtGui import QFont, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -461,7 +461,6 @@ class EmployeeDialog(QDialog):
         w.setCalendarPopup(True)
         w.setDisplayFormat("dd/MM/yyyy")
         w.setStyleSheet(style)
-        w.setMinimumDate(QDate(1900, 1, 1))
         w.setSpecialValueText("Chưa chọn ngày")
         w.setDate(w.minimumDate())
 
@@ -470,7 +469,28 @@ class EmployeeDialog(QDialog):
         cal = w.calendarWidget()
         if cal is not None:
             cal.setLocale(vi)
+            cal.installEventFilter(EmployeeDialog._CalendarPopupMonthFix(w, cal))
         return w
+
+
+    class _CalendarPopupMonthFix(QObject):
+        def __init__(self, date_edit: QDateEdit, calendar_widget: QWidget) -> None:
+            super().__init__(calendar_widget)
+            self._date_edit = date_edit
+
+        def eventFilter(self, obj, event) -> bool:
+            if event.type() == QEvent.Type.Show:
+                try:
+                    # If field is "not selected" (minimumDate), show current month.
+                    if self._date_edit.date() == self._date_edit.minimumDate():
+                        today = QDate.currentDate()
+                        cal = self._date_edit.calendarWidget()
+                        if cal is not None:
+                            cal.setSelectedDate(self._date_edit.minimumDate())
+                            cal.setCurrentPage(int(today.year()), int(today.month()))
+                except Exception:
+                    pass
+            return super().eventFilter(obj, event)
 
     def _set_read_only(self, value: bool) -> None:
         for w in (

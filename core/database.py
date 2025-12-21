@@ -7,9 +7,14 @@ Cung cấp:
 - Logging chi tiết
 """
 
-import mysql.connector
+import json
 import logging
+from pathlib import Path
 from typing import Optional
+
+import mysql.connector
+
+from core.resource import resource_path
 
 
 # Cấu hình logging
@@ -26,15 +31,59 @@ class Database:
             cursor.execute(...)
     """
 
-    # Cấu hình kết nối - có thể thay đổi
-    CONFIG = {
-        "host": "192.168.1.64",
-        "user": "duongduong",
-        "password": "duongphuc123",
-        "database": "hr_attendance",
+    # Cấu hình kết nối (không hard-code thông tin nhạy cảm).
+    # Sẽ được load từ database/db_config.json khi khởi động,
+    # và có thể được cập nhật khi người dùng lưu ở dialog "Kết nối CSDL SQL".
+    CONFIG: dict = {
+        "host": "",
+        "port": 3306,
+        "user": "",
+        "password": "",
+        "database": "",
         "charset": "utf8mb4",
         "use_unicode": True,
     }
+
+    @staticmethod
+    def load_config_from_file(config_file: str | None = None) -> None:
+        """Load cấu hình kết nối từ file JSON.
+
+        Mặc định: database/db_config.json (qua resource_path).
+        """
+
+        path = Path(config_file) if config_file else Path(resource_path("database/db_config.json"))
+        try:
+            if not path.exists() or not path.is_file():
+                return
+
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw) if raw.strip() else {}
+            if not isinstance(data, dict):
+                return
+
+            host = str(data.get("host") or "").strip()
+            user = str(data.get("user") or "").strip()
+            password = str(data.get("password") or "")
+            database = str(data.get("database") or "").strip()
+
+            port = data.get("port")
+            try:
+                port_int = int(port) if port is not None and str(port).strip() else 3306
+            except Exception:
+                port_int = 3306
+
+            # Chỉ update các trường liên quan kết nối
+            Database.CONFIG.update(
+                {
+                    "host": host,
+                    "port": port_int,
+                    "user": user,
+                    "password": password,
+                    "database": database,
+                }
+            )
+        except Exception as exc:
+            logger.debug(f"Không thể load db_config.json: {exc}")
 
     @staticmethod
     def connect():
@@ -47,6 +96,18 @@ class Database:
         Raises:
             mysql.connector.Error: Nếu kết nối thất bại
         """
+        # Luôn reload cấu hình trước khi kết nối (để thay đổi từ dialog/file có hiệu lực ngay).
+        Database.load_config_from_file()
+
+        # Nếu chưa cấu hình đầy đủ thì báo rõ ràng.
+        host = str(Database.CONFIG.get("host") or "").strip()
+        user = str(Database.CONFIG.get("user") or "").strip()
+        database = str(Database.CONFIG.get("database") or "").strip()
+        if not host or not user or not database:
+            raise RuntimeError(
+                "Chưa cấu hình kết nối CSDL. Vào 'Kết nối CSDL SQL' để thiết lập (host/user/database)."
+            )
+
         try:
             conn = mysql.connector.connect(**Database.CONFIG)
             logger.info("✅ Kết nối MySQL thành công")
@@ -217,3 +278,7 @@ class Database:
                 return True
         except Exception:
             return False
+
+
+# Load cấu hình từ file khi import module (nếu có)
+Database.load_config_from_file()

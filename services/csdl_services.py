@@ -22,20 +22,11 @@ class CSDLService:
 
     def load_config(self) -> CSDLConfig:
         saved = self._repo.load()
-        cfg = Database.CONFIG
-
         if saved is not None:
             return saved
 
-        # Fallback từ Database.CONFIG
-        host = str(cfg.get("host") or "").strip()
-        user = str(cfg.get("user") or "").strip()
-        password = str(cfg.get("password") or "")
-        database = str(cfg.get("database") or "").strip()
-        port = int(cfg.get("port") or 3306)
-        return CSDLConfig(
-            host=host, port=port, user=user, password=password, database=database
-        )
+        # Không fallback vào cấu hình hard-code. Khi chưa có file, để trống để người dùng nhập.
+        return CSDLConfig(host="", port=3306, user="", password="", database="")
 
     def validate(self, config: CSDLConfig) -> tuple[bool, str]:
         if not config.host:
