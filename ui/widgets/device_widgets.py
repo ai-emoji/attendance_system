@@ -276,8 +276,6 @@ class MainContent(QWidget):
         # -----------------
         right = QWidget(self)
         right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        right.setStyleSheet(f"border-left: 1px solid {COLOR_BORDER};")
-
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(12, 10, 12, 10)
         right_layout.setSpacing(10)

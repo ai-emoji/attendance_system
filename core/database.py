@@ -29,7 +29,7 @@ class Database:
     # Cấu hình kết nối - có thể thay đổi
     CONFIG = {
         "host": "192.168.1.64",
-        "user": "duongphuc",
+        "user": "duongduong",
         "password": "duongphuc123",
         "database": "hr_attendance",
         "charset": "utf8mb4",

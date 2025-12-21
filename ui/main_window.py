@@ -27,9 +27,15 @@ from core.resource import (
     set_window_icon,
 )
 from ui.controllers.company_controllers import CompanyController
+from ui.controllers.declare_work_shift_controllers import DeclareWorkShiftController
 from ui.controllers.device_controllers import DeviceController
 from ui.controllers.department_controllers import DepartmentController
 from ui.controllers.holiday_controllers import HolidayController
+from ui.controllers.absence_symbol_controllers import AbsenceSymbolController
+from ui.controllers.weekend_controllers import WeekendController
+from ui.controllers.csdl_controllers import CSDLController
+from ui.controllers.backup_controllers import BackupController
+from ui.controllers.absence_restore_controllers import AbsenceRestoreController
 from ui.controllers.title_controllers import TitleController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
@@ -45,6 +51,12 @@ from ui.widgets.device_widgets import (
     TitleBar1 as DeviceTitleBar1,
     TitleBar2 as DeviceTitleBar2,
 )
+from ui.widgets.declare_work_shift_widgets import (
+    MainContent as DeclareWorkShiftContent,
+    TitleBar1 as DeclareWorkShiftTitleBar1,
+    TitleBar2 as DeclareWorkShiftTitleBar2,
+)
+from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
 
 
 class Header(CommonHeader):
@@ -63,6 +75,7 @@ class Container(QWidget):
         self._department_controller: DepartmentController | None = None
         self._holiday_controller: HolidayController | None = None
         self._device_controller: DeviceController | None = None
+        self._declare_work_shift_controller: DeclareWorkShiftController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -139,6 +152,21 @@ class Container(QWidget):
         self._device_controller = DeviceController(self.window(), title2, content)
         self._device_controller.bind()
 
+    def show_declare_work_shift_view(self) -> None:
+        """Hiển thị màn hình Khai báo Ca làm việc."""
+
+        title1 = DeclareWorkShiftTitleBar1(
+            "Khai báo Ca làm việc", "assets/images/declare_work_shift.svg", self
+        )
+        title2 = DeclareWorkShiftTitleBar2("Tổng: 0", self)
+        content = DeclareWorkShiftContent(self)
+        self.set_container_widgets([title1, title2, content])
+
+        self._declare_work_shift_controller = DeclareWorkShiftController(
+            self.window(), title2, content
+        )
+        self._declare_work_shift_controller.bind()
+
 
 class Footer(CommonFooter):
     """Footer của ứng dụng (kế thừa triển khai trong ui.common.footer)."""
@@ -161,6 +189,11 @@ class MainWindow(QMainWindow):
         """Khởi tạo cửa sổ chính."""
         super().__init__()
         self._company_controller: CompanyController | None = None
+        self._absence_symbol_controller: AbsenceSymbolController | None = None
+        self._weekend_controller: WeekendController | None = None
+        self._csdl_controller: CSDLController | None = None
+        self._backup_controller: BackupController | None = None
+        self._absence_restore_controller: AbsenceRestoreController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -194,6 +227,11 @@ class MainWindow(QMainWindow):
 
         # Controller cho dialog công ty
         self._company_controller = CompanyController(self)
+        self._absence_symbol_controller = AbsenceSymbolController(self)
+        self._weekend_controller = WeekendController(self)
+        self._csdl_controller = CSDLController(self)
+        self._backup_controller = BackupController(self)
+        self._absence_restore_controller = AbsenceRestoreController(self)
         self.header.action_triggered.connect(self._on_header_action_triggered)
 
         main_layout.addWidget(self.header)
@@ -221,6 +259,29 @@ class MainWindow(QMainWindow):
             self.container.show_holiday_view()
             return
 
+        if action_text == "Khai báo\nCa làm việc":
+            self.container.show_declare_work_shift_view()
+            return
+
+        if action_text == "Ký hiệu\nChấm công":
+            dlg = AttendanceSymbolDialog(self)
+            dlg.exec()
+            return
+
+        if (
+            action_text == "Ký hiệu\nVắng"
+            and self._absence_symbol_controller is not None
+        ):
+            self._absence_symbol_controller.show_dialog()
+            return
+
+        if (
+            action_text == "Chọn ngày\nCuối tuần"
+            and self._weekend_controller is not None
+        ):
+            self._weekend_controller.show_dialog()
+            return
+
         # HeaderController currently has a space before newline in this label.
         if (
             action_text == "Thêm Máy \nchấm công"
@@ -231,6 +292,21 @@ class MainWindow(QMainWindow):
 
         if action_text == "Thoát\nỨng dụng":
             QApplication.quit()
+            return
+
+        if action_text == "Kết nối\nCSDL SQL" and self._csdl_controller is not None:
+            self._csdl_controller.show_dialog()
+            return
+
+        if action_text == "Sao lưu\nDữ liệu" and self._backup_controller is not None:
+            self._backup_controller.show_dialog()
+            return
+
+        if (
+            action_text == "Khôi phục\nDữ liệu"
+            and self._absence_restore_controller is not None
+        ):
+            self._absence_restore_controller.show_dialog()
             return
 
     def _center_window(self) -> None:

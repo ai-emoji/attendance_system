@@ -253,29 +253,45 @@ class DeviceService:
                 # `zk` (pyzk) convention: from zk import ZK
                 from zk import ZK  # type: ignore
 
-                zk = ZK(ip, port=port, timeout=5, password=int(password or 0))
+                zk = ZK(ip, port=port, timeout=8, password=int(password or 0))
                 conn = zk.connect()
                 try:
-                    conn.disable_device()
+                    # Một số dòng (đặc biệt dòng Face/Visible Light) có thể không hỗ trợ
+                    # các lệnh như disable/enable_device. Chỉ probe nhẹ; fail thì bỏ qua.
+                    self._zk_probe_best_effort(conn)
                 finally:
-                    try:
-                        conn.enable_device()
-                    except Exception:
-                        pass
                     try:
                         conn.disconnect()
                     except Exception:
                         pass
+
                 return True, "Kết nối thiết bị thành công."
             except Exception as exc:
-                logger.warning("Kết nối ZK thất bại: %s", exc)
+                logger.warning("Kết nối ZK thất bại (%s:%s): %s", ip, port, exc)
                 # fallback to tcp below
 
         # 2) Fallback: TCP reachability
         if self.test_connection_tcp(ip, port):
             return (
                 True,
-                "Thiết bị có phản hồi TCP. (Chưa có thư viện `zk` để handshake đầy đủ)",
+                "Thiết bị có phản hồi TCP. (Không handshake ZKTeco đầy đủ)",
             )
 
         return False, "Không kết nối được thiết bị. Kiểm tra IP/Port và mạng LAN."
+
+    def _zk_probe_best_effort(self, conn) -> None:
+        """Probe nhẹ để xác nhận giao tiếp, không bắt buộc thiết bị phải hỗ trợ đầy đủ."""
+
+        for method_name, args in (
+            ("get_time", ()),
+            ("get_device_name", ()),
+            ("get_serialnumber", ()),
+            ("get_firmware_version", ()),
+        ):
+            method = getattr(conn, method_name, None)
+            if callable(method):
+                try:
+                    method(*args)
+                except Exception:
+                    # Bỏ qua lỗi probe; miễn là connect() thành công.
+                    pass
