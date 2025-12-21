@@ -278,6 +278,8 @@ ICON_DOWNLOAD = "assets/images/download.svg"
 ICON_UPLOAD = "assets/images/upload.svg"
 ICON_EXPORT = "assets/images/export.svg"
 ICON_PRINT = "assets/images/print.svg"
+ICON_EXCEL = "assets/images/excel.svg"
+ICON_IMPORT = "assets/images/import.svg"
 
 # Icon Settings/Configuration
 ICON_SETTINGS = "assets/images/settings.svg"

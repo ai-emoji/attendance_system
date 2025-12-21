@@ -30,6 +30,7 @@ from ui.controllers.company_controllers import CompanyController
 from ui.controllers.declare_work_shift_controllers import DeclareWorkShiftController
 from ui.controllers.device_controllers import DeviceController
 from ui.controllers.department_controllers import DepartmentController
+from ui.controllers.employee_controllers import EmployeeController
 from ui.controllers.holiday_controllers import HolidayController
 from ui.controllers.absence_symbol_controllers import AbsenceSymbolController
 from ui.controllers.weekend_controllers import WeekendController
@@ -46,6 +47,8 @@ from ui.widgets.holiday_widgets import MainContent as HolidayContent
 from ui.widgets.holiday_widgets import TitleBar1 as HolidayTitleBar1
 from ui.widgets.holiday_widgets import TitleBar2 as HolidayTitleBar2
 from ui.widgets.title_widgets import MainContent, TitleBar1, TitleBar2
+from ui.widgets.employee_widgets import MainContent as EmployeeContent
+from ui.widgets.employee_widgets import TitleBar1 as EmployeeTitleBar1
 from ui.widgets.device_widgets import (
     MainContent as DeviceContent,
     TitleBar1 as DeviceTitleBar1,
@@ -76,6 +79,7 @@ class Container(QWidget):
         self._holiday_controller: HolidayController | None = None
         self._device_controller: DeviceController | None = None
         self._declare_work_shift_controller: DeclareWorkShiftController | None = None
+        self._employee_controller: EmployeeController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -167,6 +171,17 @@ class Container(QWidget):
         )
         self._declare_work_shift_controller.bind()
 
+    def show_employee_view(self) -> None:
+        """Hiển thị màn hình Thông tin Nhân viên."""
+        title1 = EmployeeTitleBar1(
+            "Thông tin Nhân viên", "assets/images/employee.svg", self
+        )
+        content = EmployeeContent(self)
+        self.set_container_widgets([title1, content])
+
+        self._employee_controller = EmployeeController(self.window(), content)
+        self._employee_controller.bind()
+
 
 class Footer(CommonFooter):
     """Footer của ứng dụng (kế thừa triển khai trong ui.common.footer)."""
@@ -257,6 +272,10 @@ class MainWindow(QMainWindow):
 
         if action_text == "Khai báo\nNgày lễ":
             self.container.show_holiday_view()
+            return
+
+        if action_text == "Thông tin\nNhân viên":
+            self.container.show_employee_view()
             return
 
         if action_text == "Khai báo\nCa làm việc":

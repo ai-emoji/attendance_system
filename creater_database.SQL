@@ -47,6 +47,60 @@ CREATE TABLE IF NOT EXISTS departments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+-- Thông tin Nhân viên
+-- Quy ước:
+-- - employee_code: Mã NV (unique)
+-- - Liên kết phòng ban/chức danh bằng FK (SET NULL khi xóa)
+-- - Các cột ngày dùng kiểu DATE
+CREATE TABLE IF NOT EXISTS employees (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    employee_code VARCHAR(50) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    start_date DATE NULL,
+    title_id INT NULL,
+    department_id INT NULL,
+    date_of_birth DATE NULL,
+    gender VARCHAR(20) NULL,
+    national_id VARCHAR(50) NULL,
+    id_issue_date DATE NULL,
+    id_issue_place VARCHAR(255) NULL,
+    address VARCHAR(255) NULL,
+    phone VARCHAR(50) NULL,
+    insurance_no VARCHAR(50) NULL,
+    tax_code VARCHAR(50) NULL,
+    degree VARCHAR(255) NULL,
+    major VARCHAR(255) NULL,
+    contract1_signed TINYINT(1) NOT NULL DEFAULT 0,
+    contract1_no VARCHAR(100) NULL,
+    contract1_sign_date DATE NULL,
+    contract1_expire_date DATE NULL,
+    contract2_indefinite TINYINT(1) NOT NULL DEFAULT 0,
+    contract2_no VARCHAR(100) NULL,
+    contract2_sign_date DATE NULL,
+    children_count INT NULL,
+    child_dob_1 DATE NULL,
+    child_dob_2 DATE NULL,
+    child_dob_3 DATE NULL,
+    child_dob_4 DATE NULL,
+    note TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_employees_employee_code (employee_code),
+    KEY idx_employees_department_id (department_id),
+    KEY idx_employees_title_id (title_id),
+    CONSTRAINT fk_employees_department
+        FOREIGN KEY (department_id)
+        REFERENCES departments (id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_employees_title
+        FOREIGN KEY (title_id)
+        REFERENCES job_titles (id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 -- Khai báo Ngày lễ
 -- Quy ước: cho phép trùng ngày nếu khác thông tin; chỉ chặn trùng hoàn toàn (date + info)
 CREATE TABLE IF NOT EXISTS holidays (
