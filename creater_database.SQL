@@ -123,6 +123,9 @@
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         device_no INT NOT NULL,
         device_name VARCHAR(255) NOT NULL,
+        -- Loại máy để chọn đúng module/driver (không phụ thuộc tên)
+        -- Giá trị khuyến nghị: 'SENSEFACE_A4' hoặc 'X629ID'
+        device_type VARCHAR(30) NULL,
         ip_address VARCHAR(50) NOT NULL,
         password VARCHAR(50) NULL,
         port INT NOT NULL DEFAULT 4370,

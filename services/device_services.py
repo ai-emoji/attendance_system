@@ -29,6 +29,7 @@ class DeviceModel:
     id: int
     device_no: int
     device_name: str
+    device_type: str
     ip_address: str
     password: str
     port: int
@@ -37,8 +38,8 @@ class DeviceModel:
 class DeviceService:
     DEFAULT_PORT = 4370
 
-    MODEL_RONALD_JACK_X629ID = "Ronald Jack X629ID"
-    MODEL_SENSEFACE_A4 = "SenseFace A4"
+    DEVICE_TYPE_X629ID = "X629ID"
+    DEVICE_TYPE_SENSEFACE_A4 = "SENSEFACE_A4"
 
     def __init__(self, repository: DeviceRepository | None = None) -> None:
         self._repo = repository or DeviceRepository()
@@ -56,6 +57,7 @@ class DeviceService:
                         id=int(r.get("id")),
                         device_no=int(r.get("device_no") or 0),
                         device_name=str(r.get("device_name") or ""),
+                        device_type=str(r.get("device_type") or ""),
                         ip_address=str(r.get("ip_address") or ""),
                         password=str(r.get("password") or ""),
                         port=int(r.get("port") or 0),
@@ -69,6 +71,7 @@ class DeviceService:
         self,
         device_no: str,
         device_name: str,
+        device_type: str,
         ip_address: str,
         password: str,
         port: str,
@@ -76,6 +79,7 @@ class DeviceService:
         ok, msg, parsed = self._validate_form(
             device_no=device_no,
             device_name=device_name,
+            device_type=device_type,
             ip_address=ip_address,
             password=password,
             port=port,
@@ -95,6 +99,7 @@ class DeviceService:
         device_id: int,
         device_no: str,
         device_name: str,
+        device_type: str,
         ip_address: str,
         password: str,
         port: str,
@@ -105,6 +110,7 @@ class DeviceService:
         ok, msg, parsed = self._validate_form(
             device_no=device_no,
             device_name=device_name,
+            device_type=device_type,
             ip_address=ip_address,
             password=password,
             port=port,
@@ -138,12 +144,14 @@ class DeviceService:
         self,
         device_no: str,
         device_name: str,
+        device_type: str,
         ip_address: str,
         password: str,
         port: str,
     ) -> tuple[bool, str, dict | None]:
         device_no = (device_no or "").strip()
         device_name = (device_name or "").strip()
+        device_type = (device_type or "").strip()
         ip_address = (ip_address or "").strip()
         password = (password or "").strip()
         port = (port or "").strip()
@@ -157,6 +165,9 @@ class DeviceService:
 
         if not device_name:
             return False, "Vui lòng nhập Tên máy.", None
+
+        if device_type not in (self.DEVICE_TYPE_SENSEFACE_A4, self.DEVICE_TYPE_X629ID):
+            return False, "Vui lòng chọn đúng loại máy chấm công.", None
 
         ok_ip, ip_msg = self._validate_ip(ip_address)
         if not ok_ip:
@@ -179,6 +190,7 @@ class DeviceService:
             {
                 "device_no": int(device_no_int),
                 "device_name": device_name,
+                "device_type": device_type,
                 "ip_address": ip_address,
                 "password": password,
                 "port": int(port_int),
@@ -216,16 +228,20 @@ class DeviceService:
     def connect_senseface_a4(
         self, ip: str, port: int = DEFAULT_PORT, password: str = ""
     ) -> tuple[bool, str]:
-        return self._connect_zkteco(ip=ip, port=port, password=password)
+        # SenseFace/Face dòng mới đôi khi cần ommit_ping hoặc force_udp
+        return self._connect_zkteco(
+            ip=ip, port=port, password=password, prefer_senseface=True
+        )
 
     def connect_device(
         self,
+        device_type: str,
         device_name: str,
         ip: str,
         port: int = DEFAULT_PORT,
         password: str = "",
     ) -> tuple[bool, str]:
-        """Chọn module kết nối theo tên máy.
+        """Chọn module kết nối theo loại máy (ưu tiên) và fallback theo tên.
 
         Hỗ trợ:
         - Ronald Jack X629ID
@@ -233,19 +249,32 @@ class DeviceService:
         Fallback: ZKTeco (cùng giao thức phổ biến).
         """
 
-        name = (device_name or "").strip().lower()
-        if "ronald" in name or "x629" in name:
+        dt = (device_type or "").strip().upper()
+        if dt == self.DEVICE_TYPE_X629ID:
             return self.connect_ronald_jack_x629id(ip=ip, port=port, password=password)
+        if dt == self.DEVICE_TYPE_SENSEFACE_A4:
+            return self.connect_senseface_a4(ip=ip, port=port, password=password)
+
+        name = (device_name or "").strip().lower()
         if "senseface" in name or "a4" in name:
             return self.connect_senseface_a4(ip=ip, port=port, password=password)
         return self.connect_ronald_jack_x629id(ip=ip, port=port, password=password)
 
-    def _connect_zkteco(self, ip: str, port: int, password: str) -> tuple[bool, str]:
+    def _connect_zkteco(
+        self,
+        ip: str,
+        port: int,
+        password: str,
+        prefer_senseface: bool = False,
+    ) -> tuple[bool, str]:
         ip = (ip or "").strip()
         try:
             port = int(port)
         except Exception:
             port = self.DEFAULT_PORT
+
+        # Basic reachability hint first
+        tcp_ok = self.test_connection_tcp(ip, port)
 
         # 1) Try real connect via `zk` library if available
         if importlib.util.find_spec("zk") is not None:
@@ -253,31 +282,78 @@ class DeviceService:
                 # `zk` (pyzk) convention: from zk import ZK
                 from zk import ZK  # type: ignore
 
-                zk = ZK(ip, port=port, timeout=8, password=int(password or 0))
-                conn = zk.connect()
                 try:
-                    # Một số dòng (đặc biệt dòng Face/Visible Light) có thể không hỗ trợ
-                    # các lệnh như disable/enable_device. Chỉ probe nhẹ; fail thì bỏ qua.
-                    self._zk_probe_best_effort(conn)
-                finally:
-                    try:
-                        conn.disconnect()
-                    except Exception:
-                        pass
+                    pwd = int(password or 0)
+                except Exception:
+                    pwd = 0
 
-                return True, "Kết nối thiết bị thành công."
+                attempts: list[tuple[bool, bool, int]] = []
+                # (force_udp, ommit_ping, timeout)
+                attempts.append((False, False, 8))
+                attempts.append((False, True, 8))
+                # SenseFace: thường cần bỏ ping; thử UDP ở cuối
+                attempts.append((True, True, 10 if prefer_senseface else 8))
+
+                last_exc: Exception | None = None
+                for force_udp, ommit_ping, timeout in attempts:
+                    try:
+                        zk = ZK(
+                            ip,
+                            port=port,
+                            timeout=int(timeout),
+                            password=pwd,
+                            force_udp=bool(force_udp),
+                            ommit_ping=bool(ommit_ping),
+                        )
+                        conn = zk.connect()
+                        try:
+                            self._zk_probe_best_effort(conn)
+                        finally:
+                            try:
+                                conn.disconnect()
+                            except Exception:
+                                pass
+
+                        mode = []
+                        mode.append("UDP" if force_udp else "TCP")
+                        if ommit_ping:
+                            mode.append("ommit_ping")
+                        return True, f"Kết nối thiết bị thành công ({', '.join(mode)})."
+                    except Exception as exc:
+                        last_exc = exc
+                        logger.warning(
+                            "Kết nối ZK thất bại (%s:%s) force_udp=%s ommit_ping=%s: %s",
+                            ip,
+                            port,
+                            force_udp,
+                            ommit_ping,
+                            exc,
+                        )
+
+                if last_exc is not None:
+                    hint = "TCP OK" if tcp_ok else "TCP FAIL"
+                    return (
+                        False,
+                        "Kết nối thất bại. "
+                        f"Trạng thái port {port}: {hint}. "
+                        f"Lỗi: {last_exc}",
+                    )
             except Exception as exc:
                 logger.warning("Kết nối ZK thất bại (%s:%s): %s", ip, port, exc)
                 # fallback to tcp below
 
         # 2) Fallback: TCP reachability
-        if self.test_connection_tcp(ip, port):
+        if tcp_ok:
             return (
                 True,
                 "Thiết bị có phản hồi TCP. (Không handshake ZKTeco đầy đủ)",
             )
 
-        return False, "Không kết nối được thiết bị. Kiểm tra IP/Port và mạng LAN."
+        return (
+            False,
+            "Không kết nối được thiết bị. "
+            "Vui lòng kiểm tra: đúng IP, đúng port (thường 4370), cùng mạng LAN, firewall/router không chặn port.",
+        )
 
     def _zk_probe_best_effort(self, conn) -> None:
         """Probe nhẹ để xác nhận giao tiếp, không bắt buộc thiết bị phải hỗ trợ đầy đủ."""

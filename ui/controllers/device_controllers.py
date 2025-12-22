@@ -83,6 +83,7 @@ class DeviceController:
             self._content.set_form(
                 device_no=match.device_no,
                 name=match.device_name,
+                device_type=match.device_type,
                 ip_address=match.ip_address,
                 password=match.password,
                 port=match.port,
@@ -97,6 +98,7 @@ class DeviceController:
             ok, msg, _new_id = self._service.create_device(
                 device_no=data.get("device_no", ""),
                 device_name=data.get("device_name", ""),
+                device_type=data.get("device_type", ""),
                 ip_address=data.get("ip_address", ""),
                 password=data.get("password", ""),
                 port=data.get("port", ""),
@@ -115,6 +117,7 @@ class DeviceController:
             device_id=int(self._selected_device_id),
             device_no=data.get("device_no", ""),
             device_name=data.get("device_name", ""),
+            device_type=data.get("device_type", ""),
             ip_address=data.get("ip_address", ""),
             password=data.get("password", ""),
             port=data.get("port", ""),
@@ -129,6 +132,7 @@ class DeviceController:
     def on_connect(self) -> None:
         data = self._content.get_form_data()
         device_name = data.get("device_name", "")
+        device_type = data.get("device_type", "")
         ip_address = data.get("ip_address", "")
         password = data.get("password", "")
         port_raw = data.get("port", "")
@@ -143,6 +147,7 @@ class DeviceController:
             port = int(self._service.DEFAULT_PORT)
 
         ok, msg = self._service.connect_device(
+            device_type=device_type,
             device_name=device_name,
             ip=ip_address,
             port=port,

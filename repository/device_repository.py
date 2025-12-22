@@ -27,9 +27,49 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceRepository:
+    _schema_checked: bool = False
+    _has_device_type: bool = False
+
+    def ensure_schema(self) -> None:
+        """Ensure devices.device_type exists.
+
+        device_type dùng để chọn đúng module/driver khi có nhiều dòng máy.
+        """
+
+        if DeviceRepository._schema_checked:
+            return
+
+        try:
+            with Database.connect() as conn:
+                cursor = Database.get_cursor(conn, dictionary=True)
+                cursor.execute(
+                    """
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'devices'
+                      AND COLUMN_NAME = 'device_type'
+                    """
+                )
+                DeviceRepository._has_device_type = bool(cursor.fetchone())
+
+                if not DeviceRepository._has_device_type:
+                    cur2 = Database.get_cursor(conn, dictionary=False)
+                    cur2.execute(
+                        "ALTER TABLE devices ADD COLUMN device_type VARCHAR(30) NULL AFTER device_name"
+                    )
+                    conn.commit()
+                    DeviceRepository._has_device_type = True
+        except Exception:
+            # Nếu thiếu quyền INFORMATION_SCHEMA/ALTER, vẫn cho app chạy
+            DeviceRepository._has_device_type = False
+
+        DeviceRepository._schema_checked = True
+
     def list_devices(self) -> list[dict[str, Any]]:
+        self.ensure_schema()
         query = (
-            "SELECT id, device_no, device_name, ip_address, password, port "
+            "SELECT id, device_no, device_name, device_type, ip_address, password, port "
             "FROM devices ORDER BY id ASC"
         )
 
@@ -47,8 +87,9 @@ class DeviceRepository:
                 cursor.close()
 
     def get_device(self, device_id: int) -> dict[str, Any] | None:
+        self.ensure_schema()
         query = (
-            "SELECT id, device_no, device_name, ip_address, password, port "
+            "SELECT id, device_no, device_name, device_type, ip_address, password, port "
             "FROM devices WHERE id = %s LIMIT 1"
         )
 
@@ -69,13 +110,15 @@ class DeviceRepository:
         self,
         device_no: int,
         device_name: str,
+        device_type: str,
         ip_address: str,
         password: str,
         port: int,
     ) -> int:
+        self.ensure_schema()
         query = (
-            "INSERT INTO devices (device_no, device_name, ip_address, password, port) "
-            "VALUES (%s, %s, %s, %s, %s)"
+            "INSERT INTO devices (device_no, device_name, device_type, ip_address, password, port) "
+            "VALUES (%s, %s, %s, %s, %s, %s)"
         )
 
         cursor = None
@@ -84,7 +127,14 @@ class DeviceRepository:
                 cursor = Database.get_cursor(conn, dictionary=False)
                 cursor.execute(
                     query,
-                    (int(device_no), device_name, ip_address, password, int(port)),
+                    (
+                        int(device_no),
+                        device_name,
+                        device_type,
+                        ip_address,
+                        password,
+                        int(port),
+                    ),
                 )
                 conn.commit()
                 return int(cursor.lastrowid)
@@ -100,12 +150,14 @@ class DeviceRepository:
         device_id: int,
         device_no: int,
         device_name: str,
+        device_type: str,
         ip_address: str,
         password: str,
         port: int,
     ) -> int:
+        self.ensure_schema()
         query = (
-            "UPDATE devices SET device_no = %s, device_name = %s, ip_address = %s, "
+            "UPDATE devices SET device_no = %s, device_name = %s, device_type = %s, ip_address = %s, "
             "password = %s, port = %s WHERE id = %s"
         )
 
@@ -118,6 +170,7 @@ class DeviceRepository:
                     (
                         int(device_no),
                         device_name,
+                        device_type,
                         ip_address,
                         password,
                         int(port),

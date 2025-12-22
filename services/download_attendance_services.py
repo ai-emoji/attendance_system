@@ -65,21 +65,10 @@ class DownloadAttendanceService:
     def _norm(self, s: str) -> str:
         return "".join(ch.lower() for ch in (s or "") if ch.isalnum())
 
-    def _expected_device_kind(self, device_name: str) -> str | None:
-        """Suy ra loại máy từ tên đã lưu trong DB.
-
-        Quy ước đơn giản để phân biệt 2 dòng máy:
-        - ZKTeco SenseFace A4
-        - Ronald Jack X629ID
-
-        Người dùng có thể đặt device_name chứa các từ khóa để nhận dạng.
-        """
-
-        n = self._norm(device_name)
-        if any(k in n for k in ("senseface", "a4", "zkteco")):
-            return "SENSEFACE_A4"
-        if any(k in n for k in ("ronaldjack", "ronald", "jack", "x629", "x629id")):
-            return "X629ID"
+    def _expected_device_kind(self, device_type: str) -> str | None:
+        dt = (device_type or "").strip().upper()
+        if dt in ("SENSEFACE_A4", "X629ID"):
+            return dt
         return None
 
     def _detect_device_kind_from_info(self, info: str) -> str | None:
@@ -174,15 +163,16 @@ class DownloadAttendanceService:
 
         device_no = int(device.get("device_no") or 0)
         device_name = str(device.get("device_name") or "")
+        device_type = str(device.get("device_type") or "")
         ip = str(device.get("ip_address") or "")
         password_raw = str(device.get("password") or "")
         port = int(device.get("port") or 4370)
 
-        expected_kind = self._expected_device_kind(device_name)
+        expected_kind = self._expected_device_kind(device_type)
         if expected_kind is None:
             return (
                 False,
-                "Chưa xác định loại máy chấm công. Vui lòng đặt 'Tên máy' chứa 'SenseFace A4' hoặc 'X629ID' để tránh xung đột khi dùng 2 máy.",
+                "Chưa thiết lập loại máy chấm công cho thiết bị này. Vui lòng vào mục 'Thiết bị' và chọn đúng loại máy (SenseFace A4 hoặc X629ID) rồi lưu lại.",
                 0,
             )
 

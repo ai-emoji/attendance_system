@@ -15,6 +15,7 @@ from PySide6.QtCore import QTimer, QSize, Qt, Signal
 from PySide6.QtGui import QFont, QIcon, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -305,6 +306,21 @@ class MainContent(QWidget):
             )
             return inp
 
+        def _mk_combo() -> QComboBox:
+            cb = QComboBox()
+            cb.setFont(self._font_normal)
+            cb.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+            cb.setCursor(Qt.CursorShape.PointingHandCursor)
+            cb.setStyleSheet(
+                "\n".join(
+                    [
+                        f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                        f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
+                    ]
+                )
+            )
+            return cb
+
         # Số máy
         right_layout.addWidget(_mk_label("Số máy"))
         self.input_device_no = _mk_input("(ví dụ: 1)")
@@ -338,6 +354,12 @@ class MainContent(QWidget):
         self.ip_3 = _mk_ip_part()
         self.ip_4 = _mk_ip_part()
 
+        # Combobox chọn dòng máy (đặt cùng hàng với IP)
+        self.cbo_device_model = _mk_combo()
+        self.cbo_device_model.setFixedWidth(200)
+        self.cbo_device_model.addItem("ZKTeco SenseFace A4", "SENSEFACE_A4")
+        self.cbo_device_model.addItem("Ronald Jack X629ID", "X629ID")
+
         dot = lambda: QLabel(".")
         for lb in (dot(), dot(), dot()):
             lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -350,9 +372,32 @@ class MainContent(QWidget):
         ip_layout.addWidget(self.ip_3)
         ip_layout.addWidget(dot())
         ip_layout.addWidget(self.ip_4)
+
+        ip_layout.addSpacing(12)
+        lb_model = _mk_label("Máy")
+        lb_model.setFixedWidth(35)
+        lb_model.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+        )
+        ip_layout.addWidget(lb_model)
+        ip_layout.addWidget(self.cbo_device_model)
         ip_layout.addStretch(1)
 
         right_layout.addWidget(ip_row)
+
+        def _norm(s: str) -> str:
+            return "".join(ch.lower() for ch in (s or "") if ch.isalnum())
+
+        def _on_model_changed(text: str) -> None:
+            current = (self.input_device_name.text() or "").strip()
+            # Chỉ auto-fill khi ô Tên máy đang trống hoặc đang đúng 1 trong 2 mẫu
+            if not current or _norm(current) in (
+                _norm("ZKTeco SenseFace A4"),
+                _norm("Ronald Jack X629ID"),
+            ):
+                self.input_device_name.setText(text or "")
+
+        self.cbo_device_model.currentTextChanged.connect(_on_model_changed)
 
         # Mật mã
         right_layout.addWidget(_mk_label("Mật mã"))
@@ -492,6 +537,11 @@ class MainContent(QWidget):
         self.ip_4.setText("")
         self.input_password.setText("")
         self.input_port.setText("")
+        if hasattr(self, "cbo_device_model"):
+            try:
+                self.cbo_device_model.setCurrentIndex(0)
+            except Exception:
+                pass
         self.set_connection_status("Chưa kết nối")
 
     def set_connection_status(self, status: str, ok: bool | None = None) -> None:
@@ -528,12 +578,33 @@ class MainContent(QWidget):
         self,
         device_no: int | None,
         name: str,
+        device_type: str | None,
         ip_address: str,
         password: str,
         port: int | None,
     ) -> None:
         self.input_device_no.setText("" if device_no is None else str(int(device_no)))
         self.input_device_name.setText(name or "")
+
+        # Set loại máy theo device_type từ DB (ưu tiên); fallback theo tên nếu thiếu
+        if hasattr(self, "cbo_device_model"):
+            dt = (device_type or "").strip().upper()
+            try:
+                if dt in ("SENSEFACE_A4", "X629ID"):
+                    self.cbo_device_model.setCurrentIndex(
+                        0 if dt == "SENSEFACE_A4" else 1
+                    )
+                else:
+                    n = "".join(ch.lower() for ch in (name or "") if ch.isalnum())
+                    if any(k in n for k in ("senseface", "a4", "zkteco")):
+                        self.cbo_device_model.setCurrentIndex(0)
+                    elif any(
+                        k in n
+                        for k in ("ronaldjack", "ronald", "jack", "x629", "x629id")
+                    ):
+                        self.cbo_device_model.setCurrentIndex(1)
+            except Exception:
+                pass
 
         parts = [p.strip() for p in (ip_address or "").split(".")]
         parts += [""] * (4 - len(parts))
@@ -548,6 +619,12 @@ class MainContent(QWidget):
     def get_form_data(self) -> dict[str, str]:
         device_no = (self.input_device_no.text() or "").strip()
         name = (self.input_device_name.text() or "").strip()
+        device_type = ""
+        if hasattr(self, "cbo_device_model"):
+            try:
+                device_type = str(self.cbo_device_model.currentData() or "").strip()
+            except Exception:
+                device_type = ""
         ip_address = ".".join(
             [
                 (self.ip_1.text() or "").strip(),
@@ -562,6 +639,7 @@ class MainContent(QWidget):
         return {
             "device_no": device_no,
             "device_name": name,
+            "device_type": device_type,
             "ip_address": ip_address,
             "password": password,
             "port": port,
