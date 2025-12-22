@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date as _date
 from datetime import datetime as _datetime
+import unicodedata
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -42,6 +43,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QSplitter,
+    QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
@@ -148,6 +150,10 @@ class DepartmentTreePreview(QWidget):
 
         self._dept_icon = QIcon(resource_path("assets/images/department.svg"))
 
+        # Cache for quick lookup
+        self._dept_parent_by_id: dict[int, int | None] = {}
+        self._dept_name_by_id: dict[int, str] = {}
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -157,6 +163,10 @@ class DepartmentTreePreview(QWidget):
         self.tree.setColumnCount(1)
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(0)
+        # We render the hierarchy using ASCII connectors (├──/└──), so disable
+        # the built-in expand/collapse decoration to make clicks consistently select rows.
+        self.tree.setRootIsDecorated(False)
+        self.tree.setExpandsOnDoubleClick(False)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -180,10 +190,27 @@ class DepartmentTreePreview(QWidget):
 
         self._last_selected_id: int | None = None
         self.tree.currentItemChanged.connect(self._on_current_item_changed)
+        self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.viewport().installEventFilter(self)
+
+    def _on_item_clicked(self, _item: QTreeWidgetItem, _column: int) -> None:
+        # Ensure filtering triggers even when the user clicks the same item again.
+        self.selection_changed.emit()
 
     def set_departments(self, rows: list[tuple[int, int | None, str, str]]) -> None:
         self.tree.clear()
+
+        # Build lookup maps for parent/name
+        self._dept_parent_by_id.clear()
+        self._dept_name_by_id.clear()
+        for dept_id, parent_id, name, _note in rows or []:
+            try:
+                did = int(dept_id)
+            except Exception:
+                continue
+            pid = int(parent_id) if parent_id is not None else None
+            self._dept_parent_by_id[did] = pid
+            self._dept_name_by_id[did] = str(name or "").strip()
 
         by_parent: dict[int | None, list[tuple[int, int | None, str]]] = defaultdict(
             list
@@ -214,6 +241,7 @@ class DepartmentTreePreview(QWidget):
                 item.setIcon(0, self._dept_icon)
                 item.setData(0, Qt.ItemDataRole.UserRole, int(dept_id))
                 item.setData(0, Qt.ItemDataRole.UserRole + 1, name or "")
+                item.setData(0, Qt.ItemDataRole.UserRole + 2, parent_id)
 
                 if parent_item is None:
                     self.tree.addTopLevelItem(item)
@@ -232,15 +260,56 @@ class DepartmentTreePreview(QWidget):
         self.tree.expandAll()
 
     def get_selected_department(self) -> tuple[int, str] | None:
+        ctx = self.get_selected_department_context()
+        if not ctx:
+            return None
+        return int(ctx["id"]), str(ctx["name"])
+
+    @staticmethod
+    def _norm_text(s: str) -> str:
+        s0 = " ".join(str(s or "").strip().split()).lower()
+        # Remove accents for robust comparisons
+        return "".join(
+            ch
+            for ch in unicodedata.normalize("NFKD", s0)
+            if not unicodedata.combining(ch)
+        )
+
+    def get_selected_department_context(self) -> dict | None:
+        """Return selection context used for filtering.
+
+        Keys: id, name, parent_id, parent_name, parent_name_norm.
+        """
         item = self.tree.currentItem()
         if item is None:
             return None
+
         try:
             dept_id = int(item.data(0, Qt.ItemDataRole.UserRole) or 0)
         except Exception:
             return None
-        raw_name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "")
-        return dept_id, raw_name
+        if dept_id <= 0:
+            return None
+
+        name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "").strip()
+
+        parent_id_raw = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        try:
+            parent_id = int(parent_id_raw) if parent_id_raw is not None else None
+        except Exception:
+            parent_id = None
+
+        parent_name = ""
+        if parent_id is not None:
+            parent_name = str(self._dept_name_by_id.get(int(parent_id)) or "").strip()
+
+        return {
+            "id": dept_id,
+            "name": name,
+            "parent_id": parent_id,
+            "parent_name": parent_name,
+            "parent_name_norm": self._norm_text(parent_name),
+        }
 
     def clear_selection(self) -> None:
         self.tree.clearSelection()
@@ -284,6 +353,15 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
         super().__init__(parent)
         self._column_filters: dict[int, str | None] = {}
 
+    @staticmethod
+    def _norm_text(s: str) -> str:
+        s0 = " ".join(str(s or "").strip().split()).lower()
+        return "".join(
+            ch
+            for ch in unicodedata.normalize("NFKD", s0)
+            if not unicodedata.combining(ch)
+        )
+
     def set_column_filter(self, column: int, value: str | None) -> None:
         self._column_filters[int(column)] = str(value) if value is not None else None
         self.invalidateFilter()
@@ -309,18 +387,32 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
                 continue
             idx = model.index(source_row, int(col), source_parent)
             got = str(model.data(idx, Qt.ItemDataRole.DisplayRole) or "").strip()
-            if got != str(wanted).strip():
+            if self._norm_text(got) != self._norm_text(str(wanted)):
                 return False
         return True
 
 
 class _LeftPaddingDelegate(QStyledItemDelegate):
-    def __init__(self, left_padding_px: int = 0, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        left_padding_px: int = 0,
+        selected_weight: QFont.Weight | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._pad = max(0, int(left_padding_px))
+        self._selected_weight = selected_weight
 
     def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         super().initStyleOption(option, index)
+
+        if self._selected_weight is not None and (
+            option.state & QStyle.StateFlag.State_Selected
+        ):
+            f = QFont(option.font)
+            f.setWeight(self._selected_weight)
+            option.font = f
+
         if self._pad > 0:
             option.rect.adjust(self._pad, 0, 0, 0)
 
@@ -337,9 +429,9 @@ class _EmployeeTableModel(QAbstractTableModel):
         ("start_date", "Ngày vào làm"),
         ("title_name", "Chức Vụ"),
         ("department_name", "Phòng Ban"),
-        ("date_of_birth", "Ngày tháng năm sinh"),
+        ("date_of_birth", "Ngày Sinh"),
         ("gender", "Giới tính"),
-        ("national_id", "CCCD/CMT"),
+        ("national_id", "CCCD/CMND"),
         ("id_issue_date", "Ngày Cấp"),
         ("id_issue_place", "Nơi Cấp"),
         ("address", "Địa chỉ"),
@@ -799,8 +891,14 @@ class EmployeeTable(QTableView):
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setModel(self._proxy)
 
+        # Table font (data rows)
+        body_font = QFont(UI_FONT, int(CONTENT_FONT) + 3)
+        if FONT_WEIGHT_NORMAL >= 400:
+            body_font.setWeight(QFont.Weight.Normal)
+        self.setFont(body_font)
+
         # Header font & header dropdown on main header
-        header_font = QFont(UI_FONT, CONTENT_FONT)
+        header_font = QFont(UI_FONT, int(CONTENT_FONT) + 3)
         if FONT_WEIGHT_SEMIBOLD >= 500:
             header_font.setWeight(QFont.Weight.DemiBold)
 
@@ -811,7 +909,9 @@ class EmployeeTable(QTableView):
         self.horizontalHeader().setFixedHeight(ROW_HEIGHT)
 
         # Delegate for main (padding-left 10px)
-        self.setItemDelegate(_LeftPaddingDelegate(10, self))
+        self.setItemDelegate(
+            _LeftPaddingDelegate(10, selected_weight=QFont.Weight.Medium, parent=self)
+        )
 
         # Unified style (single table)
         self._apply_table_style_main()
@@ -989,6 +1089,17 @@ class EmployeeTable(QTableView):
 
     def clear_column_filters(self) -> None:
         self._proxy.clear_all_filters()
+
+    def set_title_name_filter(self, title_name: str | None) -> None:
+        """Filter by the 'Chức Vụ' column (title_name) on the client side."""
+
+        col = self._col_index("title_name")
+        if col < 0:
+            return
+        if title_name is None or str(title_name).strip() == "":
+            self._proxy.clear_column_filter(col)
+            return
+        self._proxy.set_column_filter(col, str(title_name).strip())
 
 
 class MainContent(QWidget):

@@ -4,11 +4,46 @@
     -- Lưu ý: chạy trong database đã cấu hình (Database.CONFIG["database"]).
     -- =============================================================
 
+     /* =========================
+         Khởi tạo database (cài mới)
+         - Nếu user MySQL không có quyền CREATE/DROP DATABASE, hãy tạo DB thủ công trong phpMyAdmin.
+         - Khối DROP TABLE bên dưới sẽ xóa dữ liệu hiện có trong database hr_attendance.
+         ========================= */
+
+     CREATE DATABASE IF NOT EXISTS hr_attendance
+     CHARACTER SET utf8mb4
+     COLLATE utf8mb4_unicode_ci;
+
+     USE hr_attendance;
+
+     -- Đảm bảo import tiếng Việt đúng encoding (phpMyAdmin/MySQL client)
+     SET NAMES utf8mb4;
+
+     -- Dọn sạch các lần import dở trước đó
+     SET FOREIGN_KEY_CHECKS = 0;
+
+     DROP TABLE IF EXISTS hr_attendance.download_attendance;
+     DROP TABLE IF EXISTS hr_attendance.attendance_raw;
+     DROP TABLE IF EXISTS hr_attendance.employees;
+     DROP TABLE IF EXISTS hr_attendance.departments;
+     DROP TABLE IF EXISTS hr_attendance.job_titles;
+     DROP TABLE IF EXISTS hr_attendance.devices;
+     DROP TABLE IF EXISTS hr_attendance.holidays;
+     DROP TABLE IF EXISTS hr_attendance.work_shifts;
+     DROP TABLE IF EXISTS hr_attendance.company;
+
+     DROP TABLE IF EXISTS hr_attendance.attendance_symbols;
+     DROP TABLE IF EXISTS hr_attendance.absence_symbols;
+     DROP TABLE IF EXISTS hr_attendance.weekend_settings;
+
+     SET FOREIGN_KEY_CHECKS = 1;
+
+
     -- =========================
     -- Danh mục / Khai báo chung
     -- =========================
 
-    CREATE TABLE IF NOT EXISTS company (
+    CREATE TABLE IF NOT EXISTS hr_attendance.company (
         id INT NOT NULL PRIMARY KEY,
         company_name VARCHAR(255) NOT NULL,
         company_address VARCHAR(255) NULL,
@@ -19,7 +54,7 @@
 
 
     -- Khai báo Chức danh
-    CREATE TABLE IF NOT EXISTS job_titles (
+    CREATE TABLE IF NOT EXISTS hr_attendance.job_titles (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         title_name VARCHAR(255) NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +65,7 @@
 
     -- Khai báo Phòng ban
     -- Quy ước: tên phòng ban không được trùng ở mọi cấp (unique toàn hệ thống)
-    CREATE TABLE IF NOT EXISTS departments (
+    CREATE TABLE IF NOT EXISTS hr_attendance.departments (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         parent_id INT NULL,
         department_name VARCHAR(255) NOT NULL,
@@ -41,7 +76,7 @@
         KEY idx_departments_parent_id (parent_id),
         CONSTRAINT fk_departments_parent
             FOREIGN KEY (parent_id)
-            REFERENCES departments (id)
+            REFERENCES hr_attendance.departments (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -52,7 +87,7 @@
     -- - employee_code: Mã NV (unique)
     -- - Liên kết phòng ban/chức danh bằng FK (SET NULL khi xóa)
     -- - Các cột ngày dùng kiểu DATE
-    CREATE TABLE IF NOT EXISTS employees (
+    CREATE TABLE IF NOT EXISTS hr_attendance.employees (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         sort_order INT NULL,
         employee_code VARCHAR(50) NOT NULL,
@@ -95,12 +130,12 @@
         KEY idx_employees_title_id (title_id),
         CONSTRAINT fk_employees_department
             FOREIGN KEY (department_id)
-            REFERENCES departments (id)
+            REFERENCES hr_attendance.departments (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE,
         CONSTRAINT fk_employees_title
             FOREIGN KEY (title_id)
-            REFERENCES job_titles (id)
+            REFERENCES hr_attendance.job_titles (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -108,7 +143,7 @@
 
     -- Khai báo Ngày lễ
     -- Quy ước: cho phép trùng ngày nếu khác thông tin; chỉ chặn trùng hoàn toàn (date + info)
-    CREATE TABLE IF NOT EXISTS holidays (
+    CREATE TABLE IF NOT EXISTS hr_attendance.holidays (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         holiday_date DATE NOT NULL,
         holiday_info VARCHAR(255) NOT NULL,
@@ -119,7 +154,7 @@
 
 
     -- Máy chấm công
-    CREATE TABLE IF NOT EXISTS devices (
+    CREATE TABLE IF NOT EXISTS hr_attendance.devices (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         device_no INT NOT NULL,
         device_name VARCHAR(255) NOT NULL,
@@ -152,7 +187,7 @@
     -- - time_in/out_1..3: tối đa 3 cặp vào/ra trong ngày
     -- - device_no: snapshot số máy (để làm unique và tránh clone)
     -- - ON DUPLICATE KEY UPDATE sẽ ghi đè nếu trùng key
-    CREATE TABLE IF NOT EXISTS attendance_raw (
+    CREATE TABLE IF NOT EXISTS hr_attendance.attendance_raw (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         attendance_code VARCHAR(50) NOT NULL,
         work_date DATE NOT NULL,
@@ -172,7 +207,7 @@
         KEY idx_attendance_raw_device_no (device_no),
         CONSTRAINT fk_attendance_raw_device
             FOREIGN KEY (device_id)
-            REFERENCES devices (id)
+            REFERENCES hr_attendance.devices (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -182,7 +217,7 @@
     -- Ghi chú:
     -- - Schema tương tự attendance_raw
     -- - Upsert để ghi đè nếu trùng
-    CREATE TABLE IF NOT EXISTS download_attendance (
+    CREATE TABLE IF NOT EXISTS hr_attendance.download_attendance (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         attendance_code VARCHAR(50) NOT NULL,
         work_date DATE NOT NULL,
@@ -202,7 +237,7 @@
         KEY idx_download_attendance_device_no (device_no),
         CONSTRAINT fk_download_attendance_device
             FOREIGN KEY (device_id)
-            REFERENCES devices (id)
+            REFERENCES hr_attendance.devices (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -214,7 +249,7 @@
     -- - Các cột giờ dùng kiểu TIME
     -- - total_minutes: tổng phút
     -- - work_count: số công (ví dụ 1.0, 0.5)
-    CREATE TABLE IF NOT EXISTS work_shifts (
+    CREATE TABLE IF NOT EXISTS hr_attendance.work_shifts (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         shift_code VARCHAR(50) NOT NULL,
         time_in TIME NOT NULL,
@@ -240,7 +275,12 @@
     -- - description: mô tả
     -- - symbol: ký hiệu
     -- - is_visible: checkbox "Hiện"
-    CREATE TABLE IF NOT EXISTS attendance_symbols (
+    -- Lưu ý: các dòng DROP TABLE bên dưới chỉ nên dùng khi cài mới
+    -- hoặc khi gặp lỗi #1932 (table doesn't exist in engine). Nếu DB đang có dữ liệu,
+    -- hãy xóa/disable các dòng DROP TABLE.
+    DROP TABLE IF EXISTS hr_attendance.attendance_symbols;
+
+    CREATE TABLE hr_attendance.attendance_symbols (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(3) NOT NULL,
         description VARCHAR(255) NULL,
@@ -251,18 +291,22 @@
         UNIQUE KEY uq_attendance_symbols_code (code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-    -- Seed: C01..C09 (nếu chưa có)
-    INSERT INTO attendance_symbols (code, description, symbol, is_visible) VALUES
-    ('C01', 'Ký hiệu đi trễ', '', 1),
-    ('C02', 'Ký hiệu về sớm', '', 1),
-    ('C03', 'Ký hiệu đúng giờ', '', 1),
-    ('C04', 'Ký hiệu tăng ca', '', 1),
-    ('C05', 'Ký hiệu thiếu giờ ra', '', 1),
-    ('C06', 'Ký hiệu thiếu giờ vào', '', 1),
-    ('C07', 'Ký hiệu vắng (mặc định không chấm công)', '', 1),
-    ('C08', 'Ký hiệu đúng giờ ca có qua đêm', '', 1),
-    ('C09', 'Ký hiệu ngày không xếp ca', '', 1)
-    ON DUPLICATE KEY UPDATE code = code;
+    /* Seed: C01..C09 (nếu chưa có) */
+    INSERT INTO hr_attendance.attendance_symbols (code, description, symbol, is_visible)
+    SELECT v.code, v.description, v.symbol, v.is_visible
+    FROM (
+        SELECT 'C01' AS code, 'Ký hiệu đi trễ' AS description, '' AS symbol, 1 AS is_visible
+        UNION ALL SELECT 'C02', 'Ký hiệu về sớm', '', 1
+        UNION ALL SELECT 'C03', 'Ký hiệu đúng giờ', '', 1
+        UNION ALL SELECT 'C04', 'Ký hiệu tăng ca', '', 1
+        UNION ALL SELECT 'C05', 'Ký hiệu thiếu giờ ra', '', 1
+        UNION ALL SELECT 'C06', 'Ký hiệu thiếu giờ vào', '', 1
+        UNION ALL SELECT 'C07', 'Ký hiệu vắng (mặc định không chấm công)', '', 1
+        UNION ALL SELECT 'C08', 'Ký hiệu đúng giờ ca có qua đêm', '', 1
+        UNION ALL SELECT 'C09', 'Ký hiệu ngày không xếp ca', '', 1
+    ) AS v
+    LEFT JOIN hr_attendance.attendance_symbols a ON a.code = v.code
+    WHERE a.code IS NULL;
 
 
     -- Ký hiệu Vắng
@@ -272,7 +316,12 @@
     -- - symbol: ký hiệu
     -- - is_used: sử dụng
     -- - is_paid: tính công
-    CREATE TABLE IF NOT EXISTS absence_symbols (
+    -- Lưu ý: các dòng DROP TABLE bên dưới chỉ nên dùng khi cài mới
+    -- hoặc khi gặp lỗi #1932 (table doesn't exist in engine). Nếu DB đang có dữ liệu,
+    -- hãy xóa/disable các dòng DROP TABLE.
+    DROP TABLE IF EXISTS hr_attendance.absence_symbols;
+
+    CREATE TABLE hr_attendance.absence_symbols (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         code VARCHAR(3) NOT NULL,
         description VARCHAR(255) NULL,
@@ -284,31 +333,40 @@
         UNIQUE KEY uq_absence_symbols_code (code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-    -- Seed: A01..A15 (nếu chưa có)
-    INSERT INTO absence_symbols (code, description, symbol, is_used, is_paid) VALUES
-    ('A01', '', '', 0, 0),
-    ('A02', '', '', 0, 0),
-    ('A03', '', '', 0, 0),
-    ('A04', '', '', 0, 0),
-    ('A05', '', '', 0, 0),
-    ('A06', '', '', 0, 0),
-    ('A07', '', '', 0, 0),
-    ('A08', '', '', 0, 0),
-    ('A09', '', '', 0, 0),
-    ('A10', '', '', 0, 0),
-    ('A11', '', '', 0, 0),
-    ('A12', '', '', 0, 0),
-    ('A13', '', '', 0, 0),
-    ('A14', '', '', 0, 0),
-    ('A15', '', '', 0, 0)
-    ON DUPLICATE KEY UPDATE code = code;
+    /* Seed: A01..A15 (nếu chưa có) */
+    INSERT INTO hr_attendance.absence_symbols (code, description, symbol, is_used, is_paid)
+    SELECT v.code, v.description, v.symbol, v.is_used, v.is_paid
+    FROM (
+        SELECT 'A01' AS code, '' AS description, '' AS symbol, 0 AS is_used, 0 AS is_paid
+        UNION ALL SELECT 'A02', '', '', 0, 0
+        UNION ALL SELECT 'A03', '', '', 0, 0
+        UNION ALL SELECT 'A04', '', '', 0, 0
+        UNION ALL SELECT 'A05', '', '', 0, 0
+        UNION ALL SELECT 'A06', '', '', 0, 0
+        UNION ALL SELECT 'A07', '', '', 0, 0
+        UNION ALL SELECT 'A08', '', '', 0, 0
+        UNION ALL SELECT 'A09', '', '', 0, 0
+        UNION ALL SELECT 'A10', '', '', 0, 0
+        UNION ALL SELECT 'A11', '', '', 0, 0
+        UNION ALL SELECT 'A12', '', '', 0, 0
+        UNION ALL SELECT 'A13', '', '', 0, 0
+        UNION ALL SELECT 'A14', '', '', 0, 0
+        UNION ALL SELECT 'A15', '', '', 0, 0
+    ) v
+    LEFT JOIN hr_attendance.absence_symbols a ON a.code = v.code
+    WHERE a.code IS NULL;
 
 
     -- Chọn ngày Cuối tuần
     -- Quy ước:
     -- - Hiển thị cố định Thứ 2..Chủ nhật
     -- - is_weekend: checkbox "Cuối tuần"
-    CREATE TABLE IF NOT EXISTS weekend_settings (
+    -- Lưu ý: các dòng DROP TABLE bên dưới chỉ nên dùng khi cài mới
+    -- hoặc khi gặp lỗi #1932 (table doesn't exist in engine). Nếu DB đang có dữ liệu,
+    -- hãy xóa/disable các dòng DROP TABLE.
+    DROP TABLE IF EXISTS hr_attendance.weekend_settings;
+
+    CREATE TABLE hr_attendance.weekend_settings (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         day_name VARCHAR(20) NOT NULL,
         is_weekend TINYINT(1) NOT NULL DEFAULT 0,
@@ -317,16 +375,20 @@
         UNIQUE KEY uq_weekend_settings_day_name (day_name)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-    -- Seed: Thứ 2..Chủ nhật (nếu chưa có)
-    INSERT INTO weekend_settings (day_name, is_weekend) VALUES
-    ('Thứ 2', 0),
-    ('Thứ 3', 0),
-    ('Thứ 4', 0),
-    ('Thứ 5', 0),
-    ('Thứ 6', 0),
-    ('Thứ 7', 1),
-    ('Chủ nhật', 1)
-    ON DUPLICATE KEY UPDATE day_name = day_name;
+    /* Seed: Thứ 2..Chủ nhật (nếu chưa có) */
+    INSERT INTO hr_attendance.weekend_settings (day_name, is_weekend)
+    SELECT v.day_name, v.is_weekend
+    FROM (
+        SELECT 'Thứ 2' AS day_name, 0 AS is_weekend
+        UNION ALL SELECT 'Thứ 3', 0
+        UNION ALL SELECT 'Thứ 4', 0
+        UNION ALL SELECT 'Thứ 5', 0
+        UNION ALL SELECT 'Thứ 6', 0
+        UNION ALL SELECT 'Thứ 7', 1
+        UNION ALL SELECT 'Chủ nhật', 1
+    ) v
+    LEFT JOIN hr_attendance.weekend_settings w ON w.day_name = v.day_name
+    WHERE w.day_name IS NULL;
 
     -- =========================
     -- Ghi chú migrate thủ công

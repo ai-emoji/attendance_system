@@ -356,7 +356,7 @@ class MainContent(QWidget):
 
         # Combobox chọn dòng máy (đặt cùng hàng với IP)
         self.cbo_device_model = _mk_combo()
-        self.cbo_device_model.setFixedWidth(200)
+        self.cbo_device_model.setFixedWidth(250)
         self.cbo_device_model.addItem("ZKTeco SenseFace A4", "SENSEFACE_A4")
         self.cbo_device_model.addItem("Ronald Jack X629ID", "X629ID")
 

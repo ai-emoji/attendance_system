@@ -182,7 +182,7 @@ class EmployeeListDialog(QDialog):
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Xuất danh sách nhân viên",
-            "employees.xlsx",
+            "Danh sách nhân viên.xlsx",
             "Excel (*.xlsx)",
         )
         if not file_path:

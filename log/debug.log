@@ -251,3 +251,1415 @@
 2025-12-22 16:28:28,463 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
 2025-12-22 16:28:28,463 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
 2025-12-22 16:28:36,169 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 16:51:02,880 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 16:51:02,984 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 16:51:02,984 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 16:51:02,984 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 16:51:03,192 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 16:51:07,029 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:07,029 - repository.department_repository - ERROR - Lỗi list_departments
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\department_repository.py", line 33, in list_departments
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:07,087 - ui.controllers.employee_controllers - ERROR - Không thể tải cây phòng ban
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\employee_controllers.py", line 35, in bind
+    dept_rows = self._service.list_departments_tree_rows()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\employee_services.py", line 142, in list_departments_tree_rows
+    models = self._department_service.list_departments()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\department_services.py", line 37, in list_departments
+    rows = self._repo.list_departments()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\department_repository.py", line 33, in list_departments
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:09,099 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:11,126 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:11,126 - ui.controllers.employee_controllers - ERROR - Không thể tải danh sách nhân viên
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\employee_controllers.py", line 70, in refresh
+    rows = self._service.list_employees(filters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\employee_services.py", line 176, in list_employees
+    return self._repo.list_employees(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\employee_repository.py", line 1036, in list_employees
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:46,417 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:46,417 - repository.download_attendance_repository - ERROR - Lỗi clear_download_attendance
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\download_attendance_repository.py", line 76, in clear_download_attendance
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 16:51:46,419 - services.download_attendance_services - ERROR - Không thể clear download_attendance (best-effort)
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\services\download_attendance_services.py", line 91, in clear_download_attendance
+    self._repo.clear_download_attendance()
+  File "H:\myapp\repository\download_attendance_repository.py", line 76, in clear_download_attendance
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on '192.168.1.64:3306' (10061)
+2025-12-22 17:45:31,490 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 17:45:31,594 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 17:45:31,594 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 17:45:31,594 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 17:45:31,739 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 17:45:57,041 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:45:57,041 - repository.title_repository - ERROR - Lỗi list_titles
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\title_repository.py", line 42, in list_titles
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:45:57,094 - ui.controllers.title_controllers - ERROR - Không thể tải danh sách chức danh
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\title_controllers.py", line 42, in refresh
+    models = self._service.list_titles()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\title_services.py", line 32, in list_titles
+    rows = self._repo.list_titles()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\title_repository.py", line 42, in list_titles
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - repository.department_repository - ERROR - Lỗi list_departments
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\department_repository.py", line 33, in list_departments
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - ui.controllers.employee_controllers - ERROR - Không thể tải cây phòng ban
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\employee_controllers.py", line 35, in bind
+    dept_rows = self._service.list_departments_tree_rows()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\employee_services.py", line 142, in list_departments_tree_rows
+    models = self._department_service.list_departments()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\department_services.py", line 37, in list_departments
+    rows = self._repo.list_departments()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\department_repository.py", line 33, in list_departments
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:02,663 - ui.controllers.employee_controllers - ERROR - Không thể tải danh sách nhân viên
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\ui\controllers\employee_controllers.py", line 70, in refresh
+    rows = self._service.list_employees(filters)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\services\employee_services.py", line 176, in list_employees
+    return self._repo.list_employees(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\repository\employee_repository.py", line 1036, in list_employees
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:10,427 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:10,427 - repository.department_repository - ERROR - Lỗi list_departments
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\department_repository.py", line 33, in list_departments
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:46:24,312 - ui.controllers.header_controllers - INFO - Chuyển tab header: cong_cu
+2025-12-22 17:46:24,312 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 3
+2025-12-22 17:46:25,032 - ui.controllers.csdl_controllers - INFO - Mở dialog Kết nối CSDL SQL
+2025-12-22 17:48:24,072 - core.database - ERROR - ❌ Lỗi kết nối MySQL: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:48:24,072 - repository.download_attendance_repository - ERROR - Lỗi clear_download_attendance
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\repository\download_attendance_repository.py", line 76, in clear_download_attendance
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:48:24,072 - services.download_attendance_services - ERROR - Không thể clear download_attendance (best-effort)
+Traceback (most recent call last):
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 354, in _open_connection
+    self._cmysql.connect(**cnx_kwargs)
+_mysql_connector.MySQLInterfaceError: Host 'phuc' is not allowed to connect to this MariaDB server
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "H:\myapp\services\download_attendance_services.py", line 91, in clear_download_attendance
+    self._repo.clear_download_attendance()
+  File "H:\myapp\repository\download_attendance_repository.py", line 76, in clear_download_attendance
+    with Database.connect() as conn:
+         ^^^^^^^^^^^^^^^^^^
+  File "H:\myapp\core\database.py", line 112, in connect
+    conn = mysql.connector.connect(**Database.CONFIG)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\pooling.py", line 322, in connect
+    return CMySQLConnection(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 142, in __init__
+    self.connect(**kwargs)
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\abstracts.py", line 1604, in connect
+    self._open_connection()
+  File "C:\Users\duong\AppData\Local\Programs\Python\Python312\Lib\site-packages\mysql\connector\connection_cext.py", line 360, in _open_connection
+    raise get_mysql_exception(
+mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed to connect to this MariaDB server
+2025-12-22 17:56:05,792 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 17:56:05,832 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 17:56:05,832 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 17:56:05,832 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 17:56:05,944 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 17:56:06,931 - ui.controllers.header_controllers - INFO - Chuyển tab header: cong_cu
+2025-12-22 17:56:06,931 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 3
+2025-12-22 17:56:07,522 - ui.controllers.csdl_controllers - INFO - Mở dialog Kết nối CSDL SQL
+2025-12-22 17:56:10,561 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-22 17:56:10,561 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-22 17:56:11,757 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 17:56:11,757 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 17:56:12,508 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:12,508 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:26,971 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:26,971 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:29,336 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:40,695 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:40,695 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:40,710 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:42,262 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:56:42,262 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:57:04,088 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:57:28,338 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:57:28,348 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:57:28,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:51,182 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 17:58:51,182 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 17:58:52,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:52,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:52,353 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,619 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,623 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,623 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,623 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,644 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,647 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,664 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,664 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,664 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,696 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,710 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,712 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,723 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,723 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,728 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,730 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,732 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,734 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,736 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,738 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,740 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,743 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,745 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,747 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,749 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,751 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,753 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,755 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,757 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,774 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,789 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,821 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,824 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,837 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,853 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,855 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,857 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,859 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,861 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,864 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,866 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,868 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,868 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,868 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,868 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,884 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,900 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,900 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,900 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,908 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,908 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,908 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,916 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,916 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,916 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,916 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,924 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,924 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,924 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,924 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,932 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,932 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,932 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,932 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,942 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,942 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,942 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,948 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,948 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,948 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,948 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,958 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,958 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,963 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,966 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,968 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,970 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,972 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,975 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,976 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,977 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:58,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,009 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,025 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,041 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,044 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,056 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,073 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,075 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,078 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,079 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,082 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,083 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,086 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,087 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,103 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,119 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,119 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,124 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,135 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,151 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,151 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,151 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,168 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,170 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,172 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,174 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,176 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,179 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,180 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,183 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,185 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,187 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,189 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,192 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,193 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,196 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,212 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,224 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,227 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,243 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,275 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,292 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,294 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,298 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,300 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,302 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,304 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,306 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,322 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,324 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,369 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,385 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,401 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,403 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,405 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,408 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,410 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,413 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,414 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,414 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,414 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,414 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,414 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,424 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,424 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,430 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,463 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,465 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,467 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,469 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,471 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,473 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,475 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,477 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,479 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,481 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,483 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,486 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,487 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,490 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,492 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,494 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,496 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,498 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,500 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,502 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,504 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,506 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,508 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,511 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,513 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,515 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,517 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,521 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,522 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,524 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,555 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,572 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,603 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,621 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,622 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,625 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,627 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,630 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,631 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,633 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,634 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:58:59,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:01,399 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:03,029 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:03,461 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:04,084 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:05,150 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:06,321 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:06,321 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:08,869 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,035 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,149 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,258 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,258 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,258 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,258 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,357 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,361 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,365 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,368 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:09,368 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:11,353 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:12,604 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,150 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,337 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,471 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,668 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,775 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,946 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,955 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:15,994 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,156 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,165 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,173 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,180 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,228 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,383 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,491 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,618 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,742 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:16,995 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,203 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,363 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,448 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,525 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,525 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,525 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,541 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,618 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,633 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,633 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,633 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:17,633 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:31,415 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 17:59:31,415 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 17:59:32,055 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:32,055 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:57,776 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 17:59:57,776 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:00,805 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:14,552 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:00:14,583 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:00:14,583 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:00:14,583 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:00:14,709 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:00:15,966 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:16,205 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:16,205 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:16,706 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:00:16,706 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:00:17,893 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-22 18:00:17,893 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-22 18:00:18,499 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:00:18,499 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:00:18,910 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:18,925 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:18,927 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:27,082 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-22 18:00:27,082 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-22 18:00:28,697 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:00:28,697 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:00:29,016 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:00:29,016 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:00:29,959 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:29,975 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:33,073 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:37,322 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:38,746 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:39,801 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:44,413 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:45,581 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:45,581 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:48,168 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:54,926 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:00:54,926 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:00,720 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:00,720 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:07,650 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:07,650 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:10,529 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:10,993 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:10,993 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:22,159 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:01:22,159 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:01:22,630 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:01:22,630 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:01:23,262 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:23,647 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:36,192 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:36,203 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:41,907 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:51,580 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:01:51,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:06,490 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:06,496 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:10,820 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:10,836 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:18,527 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:18,906 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:18,906 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:25,548 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:34,607 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:35,246 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:36,700 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:37,674 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:37,690 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:39,507 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:39,684 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:39,876 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:40,085 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:40,437 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:40,597 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:40,741 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:40,899 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:41,268 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:42,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:42,880 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:43,024 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:44,719 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:52,171 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:52,171 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:52,171 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:52,171 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:57,682 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:57,685 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:02:57,689 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:03,967 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:03:03,967 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:03:04,478 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:03:04,478 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:03:04,780 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:09,993 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:10,937 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:10,937 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:16,022 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:18,482 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:18,482 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:19,151 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:19,423 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:03:19,423 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:46,039 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:48,118 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:48,601 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:49,195 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:55,853 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:56,441 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:56,707 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:57,329 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:58,531 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:04:59,119 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:04,771 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:05,653 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:06,003 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:06,320 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:07,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:07,687 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:08,037 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:09,970 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:10,454 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:10,887 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:11,237 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:13,587 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:13,937 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:14,610 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:18,638 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:18,971 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:19,255 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:21,115 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:21,459 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:22,435 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:31,059 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:31,372 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:31,690 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:31,963 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:32,428 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:36,607 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:36,974 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:37,490 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:37,773 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:38,540 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:38,890 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:39,407 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:39,757 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:40,068 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:40,446 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:40,723 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:43,279 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:43,295 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:43,311 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:44,675 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:44,964 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:05:46,164 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:51,862 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:07:51,912 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:07:51,912 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:07:51,912 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:07:52,030 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:07:53,036 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:53,291 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:53,291 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:54,251 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:54,331 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:54,791 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:54,874 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:55,226 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:55,319 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:55,803 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:55,898 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:56,228 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:56,313 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:56,648 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:56,744 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:57,256 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:57,463 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:57,544 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:57,879 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:07:57,990 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:53,157 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:53,236 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:53,556 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:53,635 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:54,003 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:54,099 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:54,370 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:08:54,434 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:36,871 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:36,937 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:37,737 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:37,826 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:38,054 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:38,154 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:38,537 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:38,627 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:39,393 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:39,493 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:40,787 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:40,871 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:50,043 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:50,139 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:50,489 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:50,556 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:50,823 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:51,041 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:51,123 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:51,906 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:09:51,972 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:47,493 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:52,333 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:12:52,370 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:12:52,370 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:12:52,370 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:12:52,513 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:12:53,678 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:53,917 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:54,311 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:54,312 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:55,162 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:55,245 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:56,495 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:56,578 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:56,845 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:12:56,928 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:03,413 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:03,496 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:03,846 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:03,929 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:24,916 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:25,282 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:25,349 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:25,715 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:25,816 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:26,099 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:26,199 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:26,571 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:26,649 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:26,982 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:27,547 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:13:27,616 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:14:07,621 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:17,611 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:15:17,663 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:15:17,663 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:15:17,663 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:15:17,770 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:15:18,994 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:19,218 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:19,233 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,030 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,093 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,493 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,588 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,827 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:20,907 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,259 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,339 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,611 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,690 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,881 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:21,961 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:22,520 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:23,112 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:23,192 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:23,448 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:23,528 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:25,388 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:30,876 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:32,496 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:15:32,502 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:17:45,446 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:17:45,446 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:17:46,224 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:17:46,224 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:17:46,240 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:17:55,237 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:19:22,401 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:19:22,445 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:19:22,445 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:19:22,445 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:19:22,561 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:19:23,763 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:19:23,763 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:19:24,276 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:19:24,277 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:19:24,277 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:19:27,960 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:12,341 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:21:12,375 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:21:12,375 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:21:12,375 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:21:12,493 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:21:14,404 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:14,653 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:14,653 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:15,517 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:15,517 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:15,612 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:15,612 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,377 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,377 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,461 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,461 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,793 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,793 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:16,875 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,436 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,436 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,512 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,512 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,817 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,817 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,913 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:17,913 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:21:19,497 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:22:27,896 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:22:27,938 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:22:27,938 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:22:27,938 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:22:28,050 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:22:29,347 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:22:29,347 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:22:29,813 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:22:29,829 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:22:29,829 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:22:37,002 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:22:37,002 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:22:37,800 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:24:42,133 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:24:42,179 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:24:42,179 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:24:42,179 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:24:42,272 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:24:44,785 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-22 18:24:44,785 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-22 18:24:45,816 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:24:45,816 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:24:46,666 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:24:46,683 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:24:46,683 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:24:59,785 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:24:59,785 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:25:00,535 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:25:29,472 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:25:29,511 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:25:29,511 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:25:29,511 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:25:29,623 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:25:30,650 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:25:30,650 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:25:31,319 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:25:31,335 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:25:31,335 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:25:36,523 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:10,654 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:29:10,706 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:29:10,706 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:29:10,706 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:29:10,833 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:29:12,442 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:29:12,442 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:29:13,213 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:13,229 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:13,229 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:22,513 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:22,917 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:22,917 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:29:35,153 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:31:53,236 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:31:53,275 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:31:53,276 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:31:53,276 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:31:53,387 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:31:55,064 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:31:55,064 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:31:55,526 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:31:55,539 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:31:55,541 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:32:04,852 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:32:18,011 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:32:18,046 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:32:18,046 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:32:18,046 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:32:18,161 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:32:19,238 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:32:19,238 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:32:20,067 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:32:20,079 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:32:20,079 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:32:25,357 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:34:38,157 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:34:38,197 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:34:38,197 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:34:38,197 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:34:38,307 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:34:40,965 - ui.controllers.header_controllers - INFO - Chuyển tab header: cham_cong
+2025-12-22 18:34:40,965 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 6
+2025-12-22 18:34:41,298 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:34:41,298 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:34:41,792 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:34:41,808 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:34:41,808 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:34:49,796 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:41,906 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:36:41,940 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:36:41,940 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:36:41,940 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:36:42,062 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:36:43,067 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:36:43,067 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:36:43,850 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:43,862 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:43,869 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:49,400 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:49,400 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:49,755 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:36:55,347 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:08,129 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:41:08,162 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:41:08,162 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:41:08,162 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:41:08,282 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:41:09,754 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:41:09,754 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:41:10,215 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:10,215 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:13,231 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:21,427 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:41:21,465 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:41:21,465 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:41:21,465 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:41:21,576 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:41:23,178 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:41:23,178 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:41:23,946 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:23,961 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:23,961 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:24,208 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:33,193 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:50,995 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:41:51,027 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:41:51,027 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:41:51,027 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:41:51,149 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:41:52,115 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:41:52,115 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:41:52,558 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:41:52,571 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:19,531 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:31,822 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:42:31,860 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:42:31,860 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:42:31,860 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:42:31,973 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:42:33,892 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:42:33,892 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:42:34,342 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:34,354 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:38,070 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:38,422 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:38,426 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:39,618 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:40,673 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:42:40,673 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:42:41,200 - ui.controllers.header_controllers - INFO - Chuyển tab header: ket_noi
+2025-12-22 18:42:41,200 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 4
+2025-12-22 18:42:42,031 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:42,031 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:42:43,723 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:43:08,079 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:43:08,086 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:43:08,098 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:45:36,762 - ui.controllers.header_controllers - INFO - Chuyển tab header: cong_cu
+2025-12-22 18:45:36,763 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 3
+2025-12-22 18:45:37,987 - ui.controllers.backup_controllers - INFO - Mở dialog Sao lưu Dữ liệu
+2025-12-22 18:49:13,035 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:49:13,035 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:49:13,642 - core.database - INFO - ✅ Kết nối MySQL thành công

@@ -179,6 +179,7 @@ class EmployeeService:
             sort_order=sort_order,
             employment_status=employment_status,
             department_id=filters.get("department_id"),
+            title_id=filters.get("title_id"),
         )
 
     def list_departments_dropdown(self) -> list[tuple[int, str]]:
@@ -664,7 +665,13 @@ class EmployeeService:
                         s_raw = str(raw).strip()
                         item[key] = s_raw if s_raw != "" else None
                 elif key == "contract2_indefinite":
-                    item[key] = self._parse_bool(raw)
+                    # Keep raw text for correct preview display (do NOT coerce to bool here).
+                    # Import step will interpret this value using parse_bool/to_bool.
+                    if raw is None:
+                        item[key] = None
+                    else:
+                        s_raw = str(raw).strip()
+                        item[key] = s_raw if s_raw != "" else None
                 elif key in {"children_count"}:
                     item[key] = parse_int(raw)
                 elif key == "tax_code":

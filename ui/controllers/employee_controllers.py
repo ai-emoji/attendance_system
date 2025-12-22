@@ -6,6 +6,7 @@ Controller cho màn "Thông tin Nhân viên".
 from __future__ import annotations
 
 import logging
+import unicodedata
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog
@@ -64,11 +65,62 @@ class EmployeeController:
     def _get_selected(self) -> tuple[int, str, str] | None:
         return self._content.table.get_selected_employee()
 
+    @staticmethod
+    def _norm_text(s: str) -> str:
+        s0 = " ".join(str(s or "").strip().split()).lower()
+        return "".join(
+            ch
+            for ch in unicodedata.normalize("NFKD", s0)
+            if not unicodedata.combining(ch)
+        )
+
+    def _resolve_title_id_by_name(self, title_name: str) -> int | None:
+        title_name = str(title_name or "").strip()
+        if not title_name:
+            return None
+
+        target = self._norm_text(title_name)
+        try:
+            for tid, tname in self._service.list_titles_dropdown() or []:
+                if self._norm_text(tname) == target:
+                    try:
+                        return int(tid)
+                    except Exception:
+                        return None
+        except Exception:
+            return None
+        return None
+
+    def _apply_parent_child_filters(self, filters: dict) -> dict:
+        """Apply rule: parent node -> department_id, child node -> title_id."""
+
+        filters = dict(filters or {})
+        filters["title_id"] = None
+
+        ctx = None
+        try:
+            ctx = self._content.department_tree.get_selected_department_context()
+        except Exception:
+            ctx = None
+
+        parent_id = (ctx or {}).get("parent_id")
+        is_child = parent_id is not None
+
+        if is_child:
+            # Child nodes filter by title_id (not department_id)
+            filters["department_id"] = None
+            filters["title_id"] = self._resolve_title_id_by_name(
+                str((ctx or {}).get("name") or "").strip()
+            )
+
+        return filters
+
     def refresh(self) -> None:
         try:
-            filters = self._content.get_filters()
+            filters = self._apply_parent_child_filters(self._content.get_filters())
             rows = self._service.list_employees(filters)
             self._content.table.set_rows(rows)
+
             self._content.set_total(len(rows))
         except Exception:
             logger.exception("Không thể tải danh sách nhân viên")
@@ -79,7 +131,7 @@ class EmployeeController:
         file_path, _ = QFileDialog.getSaveFileName(
             self._parent_window,
             "Xuất danh sách nhân viên",
-            "employees.xlsx",
+            "Danh sách nhân viên.xlsx",
             "Excel (*.xlsx)",
         )
         if not file_path:
@@ -94,7 +146,7 @@ class EmployeeController:
         if selected_rows:
             ok, msg = self._service.export_xlsx_rows(file_path, selected_rows)
         else:
-            filters = self._content.get_filters()
+            filters = self._apply_parent_child_filters(self._content.get_filters())
             ok, msg = self._service.export_xlsx(file_path, filters)
         MessageDialog.info(self._parent_window, "Xuất danh sách", msg)
 

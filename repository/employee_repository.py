@@ -930,6 +930,7 @@ class EmployeeRepository:
         sort_order: int | None = None,
         employment_status: str | None = None,
         department_id: int | None = None,
+        title_id: int | None = None,
     ) -> list[dict[str, Any]]:
         self.ensure_import_schema()
         where: list[str] = []
@@ -958,6 +959,10 @@ class EmployeeRepository:
         if department_id:
             where.append("e.department_id = %s")
             params.append(int(department_id))
+
+        if title_id:
+            where.append("e.title_id = %s")
+            params.append(int(title_id))
 
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 

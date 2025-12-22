@@ -222,7 +222,7 @@ class ImportEmployeeDialog(QDialog):
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Tải file mẫu nhân viên",
-            "employees_template.xlsx",
+            "Biểu mẫu tải nhân viên.xlsx",
             "Excel (*.xlsx)",
         )
         if not file_path:

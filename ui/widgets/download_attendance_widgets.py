@@ -22,6 +22,7 @@ from PySide6.QtCore import QDate, QLocale, QTimer, QSize, Qt, Signal
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCalendarWidget,
     QComboBox,
     QDateEdit,
     QHBoxLayout,
@@ -39,6 +40,7 @@ from PySide6.QtWidgets import QHeaderView
 from core.resource import (
     CONTENT_FONT,
     COLOR_BORDER,
+    ICON_DROPDOWN,
     COLOR_TEXT_PRIMARY,
     FONT_WEIGHT_NORMAL,
     FONT_WEIGHT_SEMIBOLD,
@@ -137,8 +139,23 @@ class TitleBar2(QWidget):
             de.setDisplayFormat("dd/MM/yyyy")
             de.setCalendarPopup(True)
             de.setFixedHeight(28)
-            # Tăng chiều rộng để luôn hiển thị đủ dd/MM/yyyy (không bị cắt, không cần hover)
-            de.setFixedWidth(140)
+
+            dropdown_icon_url = resource_path(ICON_DROPDOWN).replace("\\", "/")
+
+            # Đủ chỗ cho "dd/MM/yyyy" + nút dropdown (Windows + font lớn dễ bị cắt)
+            try:
+                de.setMinimumContentsLength(10)  # len("dd/MM/yyyy")
+            except Exception:
+                pass
+
+            try:
+                fm = de.fontMetrics()
+                sample = "88/88/8888"
+                text_w = int(fm.horizontalAdvance(sample))
+                target_w = text_w + (8 * 2) + 34
+                de.setFixedWidth(max(180, target_w))
+            except Exception:
+                de.setFixedWidth(190)
 
             # Text nằm giữa
             try:
@@ -148,21 +165,45 @@ class TitleBar2(QWidget):
             except Exception:
                 pass
 
-            # Lịch hiển thị tiếng Việt
+            # Lịch hiển thị tiếng Việt + luôn thấy tháng/năm ở header
             vi_locale = QLocale(QLocale.Language.Vietnamese, QLocale.Country.Vietnam)
             de.setLocale(vi_locale)
             try:
                 cw = de.calendarWidget()
                 if cw is not None:
                     cw.setLocale(vi_locale)
+                    cw.setNavigationBarVisible(True)
+                    cw.setVerticalHeaderFormat(
+                        QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
+                    )
+                    cw.setHorizontalHeaderFormat(
+                        QCalendarWidget.HorizontalHeaderFormat.ShortDayNames
+                    )
+
+                    # Fix: month/year text bị "ẩn" (thường do stylesheet/palette làm chữ trắng)
+                    cw.setStyleSheet(
+                        "\n".join(
+                            [
+                                f"QCalendarWidget QWidget#qt_calendar_navigationbar {{ background: {BG_TITLE_2_HEIGHT}; }}",
+                                f"QCalendarWidget QToolButton#qt_calendar_monthbutton, QCalendarWidget QToolButton#qt_calendar_yearbutton {{ color: {COLOR_TEXT_PRIMARY}; font-weight: 600; }}",
+                                f"QCalendarWidget QToolButton#qt_calendar_prevmonth, QCalendarWidget QToolButton#qt_calendar_nextmonth {{ color: {COLOR_TEXT_PRIMARY}; }}",
+                                f"QCalendarWidget QSpinBox {{ color: {COLOR_TEXT_PRIMARY}; }}",
+                                "QCalendarWidget QToolButton { background: transparent; border: none; padding: 2px 6px; }",
+                            ]
+                        )
+                    )
             except Exception:
                 pass
 
             de.setStyleSheet(
                 "\n".join(
                     [
-                        f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 6px; }}",
+                        # Chừa chỗ bên phải cho nút dropdown (calendarPopup)
+                        f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-right: 30px; border-radius: 6px; }}",
                         f"QDateEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
+                        # Hiển thị rõ nút dropdown để click mở lịch
+                        f"QDateEdit::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 26px; border-left: 1px solid {COLOR_BORDER}; background: #FFFFFF; }}",
+                        f'QDateEdit::down-arrow {{ image: url("{dropdown_icon_url}"); width: 10px; height: 10px; }}',
                     ]
                 )
             )
