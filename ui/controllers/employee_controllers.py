@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import logging
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QProgressDialog
 
 from services.employee_services import EmployeeService
 from ui.dialog.employee_dialog import EmployeeDialog
@@ -40,8 +42,21 @@ class EmployeeController:
         self._content.add_clicked.connect(self.on_add)
         self._content.edit_clicked.connect(self.on_edit)
         self._content.delete_clicked.connect(self.on_delete)
-        self._content.refresh_clicked.connect(self.refresh)
+        self._content.refresh_clicked.connect(self.on_refresh_clicked)
 
+        self.refresh()
+
+    def on_refresh_clicked(self) -> None:
+        # User intent: refresh should clear department filtering.
+        try:
+            self._content.department_tree.clear_selection()
+        except Exception:
+            try:
+                # Fallback in case the widget doesn't expose helper.
+                self._content.department_tree.tree.clearSelection()
+                self._content.department_tree.tree.setCurrentItem(None)
+            except Exception:
+                pass
         self.refresh()
 
     def _get_selected(self) -> tuple[int, str, str] | None:
@@ -142,16 +157,103 @@ class EmployeeController:
             self.refresh()
 
     def on_delete(self) -> None:
-        selected = self._get_selected()
-        if not selected:
+        selected_many = self._content.table.get_selected_employees()
+        if not selected_many:
             MessageDialog.info(
                 self._parent_window,
                 "Thông báo",
-                "Hãy chọn 1 dòng trong bảng trước khi Xóa.",
+                "Hãy chọn ít nhất 1 dòng trong bảng trước khi Xóa.",
             )
             return
 
-        emp_id, _code, _name = selected
+        # Bulk delete
+        if len(selected_many) > 1:
+            count = len(selected_many)
+            sample_codes = [c for (_id, c, _n) in selected_many[:5] if str(c).strip()]
+            sample_text = (
+                ("\nVí dụ mã: " + ", ".join(sample_codes)) if sample_codes else ""
+            )
+
+            if not MessageDialog.confirm(
+                self._parent_window,
+                "Xác nhận xóa",
+                f"Bạn có chắc muốn xóa {count} nhân viên?{sample_text}",
+                ok_text="Xóa",
+                cancel_text="Hủy",
+                destructive=True,
+            ):
+                return
+
+            progress = QProgressDialog(
+                "Đang xóa nhân viên...",
+                "Hủy",
+                0,
+                count,
+                self._parent_window,
+            )
+            progress.setWindowTitle("Xóa nhân viên")
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+
+            ids = [int(i) for (i, _c, _n) in selected_many]
+
+            canceled = False
+            deleted = 0
+            first_fail_msg: str | None = None
+
+            def on_bulk_progress(done: int, total: int) -> None:
+                progress.setValue(done)
+                progress.setLabelText(f"{done}/{total} - Đang xóa...")
+                if progress.wasCanceled():
+                    raise RuntimeError("Đã hủy.")
+
+            try:
+                deleted, total_req = self._service.delete_employees_bulk(
+                    ids, progress_cb=on_bulk_progress
+                )
+            except Exception as exc:
+                canceled = "hủy" in str(exc).lower()
+                first_fail_msg = str(exc)
+                deleted = deleted or 0
+                total_req = count
+
+            try:
+                progress.setValue(count)
+            except Exception:
+                pass
+            try:
+                progress.close()
+            except Exception:
+                pass
+
+            self.refresh()
+
+            if canceled:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Xóa nhân viên",
+                    f"Đã xóa {deleted}/{count} nhân viên. (Đã hủy thao tác)",
+                )
+                return
+
+            fail_count = max(0, int(count) - int(deleted))
+            if fail_count == 0:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Xóa nhân viên",
+                    f"Đã xóa {deleted}/{count} nhân viên.",
+                )
+            else:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Xóa nhân viên",
+                    f"Đã xóa {deleted}/{count} nhân viên. Thất bại: {fail_count}.\n{first_fail_msg or ''}",
+                )
+            return
+
+        # Single delete keeps existing dialog
+        emp_id, _code, _name = selected_many[0]
 
         employee = self._service.get_employee(emp_id)
         if not employee:

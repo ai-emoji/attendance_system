@@ -25,12 +25,13 @@ from PySide6.QtCore import (
     QObject,
     QModelIndex,
     QPoint,
+    QRect,
     QSize,
     Qt,
     Signal,
     QSortFilterProxyModel,
 )
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtGui import QFont, QIcon, QActionGroup
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -74,6 +75,7 @@ from core.resource import (
     UI_FONT,
     ICON_EXCEL,
     ICON_IMPORT,
+    ICON_DROPDOWN,
     resource_path,
 )
 
@@ -164,7 +166,7 @@ class DepartmentTreePreview(QWidget):
                 [
                     f"QTreeWidget {{ background-color: {MAIN_CONTENT_BG_COLOR}; color: {COLOR_TEXT_PRIMARY};}}",
                     f"QTreeWidget::item {{ padding-left: 8px; padding-right: 8px; height: {ROW_HEIGHT}px; }}",
-                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QTreeWidget::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTreeWidget::item:focus { outline: none; }",
                     "QTreeWidget:focus { outline: none; }",
@@ -238,6 +240,11 @@ class DepartmentTreePreview(QWidget):
         raw_name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "")
         return dept_id, raw_name
 
+    def clear_selection(self) -> None:
+        self.tree.clearSelection()
+        self.tree.setCurrentItem(None)
+        self.selection_changed.emit()
+
     def _on_current_item_changed(
         self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None
     ) -> None:
@@ -284,15 +291,15 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
             self._column_filters.pop(int(column), None)
             self.invalidateFilter()
 
+    def clear_all_filters(self) -> None:
+        if not self._column_filters:
+            return
+        self._column_filters.clear()
+        self.invalidateFilter()
+
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
         model = self.sourceModel()
         if model is None:
-            return True
-
-        # Do not filter placeholder rows (rows beyond real df length)
-        if hasattr(model, "is_placeholder_row") and model.is_placeholder_row(
-            source_row
-        ):
             return True
 
         for col, wanted in self._column_filters.items():
@@ -337,7 +344,7 @@ class _EmployeeTableModel(QAbstractTableModel):
         ("tax_code", "Mã số Thuế TNCN"),
         ("degree", "Bằng cấp"),
         ("major", "Chuyên ngành"),
-        ("contract1_signed", "HĐLĐ (ký lần 1)"),
+        ("contract1_term", "HĐLĐ (ký lần 1)"),
         ("contract1_no", "Số HĐLĐ (lần 1)"),
         ("contract1_sign_date", "Ngày ký (lần 1)"),
         ("contract1_expire_date", "Ngày hết hạn (lần 1)"),
@@ -355,7 +362,6 @@ class _EmployeeTableModel(QAbstractTableModel):
     def __init__(self, parent: QObject | None = None) -> None:  # type: ignore[name-defined]
         super().__init__(parent)
         self._df: pd.DataFrame = pd.DataFrame(columns=[k for k, _ in self.COLUMNS])
-        self._placeholder_rows: int = 0
 
         self._date_keys: set[str] = {
             "start_date",
@@ -414,10 +420,6 @@ class _EmployeeTableModel(QAbstractTableModel):
 
         return s
 
-    def set_placeholder_rows(self, n: int) -> None:
-        self._placeholder_rows = max(0, int(n))
-        self.layoutChanged.emit()
-
     def set_rows(self, rows: list[dict]) -> None:
         cols = [k for k, _ in self.COLUMNS]
         if not rows:
@@ -429,20 +431,22 @@ class _EmployeeTableModel(QAbstractTableModel):
         norm: list[dict] = []
         for idx, r in enumerate(rows, start=1):
             item = {k: r.get(k) for k in cols}
-            item["stt"] = r.get("stt") or idx
+            stt_val = r.get("stt")
+            if stt_val is None or str(stt_val).strip() == "":
+                stt_val = r.get("sort_order")
+            item["stt"] = (
+                stt_val if stt_val is not None and str(stt_val).strip() != "" else idx
+            )
             norm.append(item)
 
         self.beginResetModel()
         self._df = pd.DataFrame(norm, columns=cols)
         self.endResetModel()
 
-    def is_placeholder_row(self, row: int) -> bool:
-        return int(row) >= int(len(self._df))
-
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.isValid():
             return 0
-        return max(int(len(self._df)), int(self._placeholder_rows))
+        return int(len(self._df))
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.isValid():
@@ -507,18 +511,66 @@ class _FilterHeaderView(QHeaderView):
         super().__init__(Qt.Orientation.Horizontal, parent)
         self._proxy = proxy
         self._model = model
-        self.setSectionsClickable(True)
-        self.sectionClicked.connect(self._on_section_clicked)
+        self._dropdown_icon = QIcon(resource_path(ICON_DROPDOWN))
+        self._dropdown_icon_size = 14
+        self._dropdown_icon_pad = 6
+        self._resize_handle_margin = 4
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setMouseTracking(True)
+        # Only open filter menu when clicking the dropdown icon.
+        # (Do not open menu when clicking the header text.)
 
-    def _on_section_clicked(self, logical_index: int) -> None:
-        col = int(logical_index)
+    def _is_over_resize_handle(self, pos: QPoint) -> bool:
+        # When we override cursor, we must preserve the resize-handle cursor.
+        # QHeaderView typically shows SplitHCursor near section borders.
+        try:
+            col = int(self.logicalIndexAt(pos))
+        except Exception:
+            return False
+        if col < 0:
+            return False
 
+        margin = int(self._resize_handle_margin)
+        x = int(self.sectionViewportPosition(int(col)))
+        w = int(self.sectionSize(int(col)))
+        left = x
+        right = x + w
+        px = int(pos.x())
+
+        # Near the right edge of this section
+        if abs(px - right) <= margin:
+            return True
+        # Near the left edge (resize handle belongs to boundary between previous/current)
+        if col > 0 and abs(px - left) <= margin:
+            return True
+        return False
+
+    def _is_over_dropdown_icon(self, pos: QPoint) -> bool:
+        try:
+            col = int(self.logicalIndexAt(pos))
+        except Exception:
+            return False
+        if col <= 0:
+            return False
+        x = int(self.sectionViewportPosition(int(col)))
+        w = int(self.sectionSize(int(col)))
+        sec_rect = QRect(x, 0, w, int(self.height()))
+        icon_rect = self._dropdown_rect_for_section(sec_rect)
+        return icon_rect.contains(pos)
+
+    def _dropdown_rect_for_section(self, section_rect: QRect) -> QRect:
+        size = int(self._dropdown_icon_size)
+        pad = int(self._dropdown_icon_pad)
+        x = int(section_rect.right() - pad - size)
+        y = int(section_rect.center().y() - (size // 2))
+        return QRect(x, y, size, size)
+
+    def _exec_filter_menu(self, col: int, global_pos: QPoint | None = None) -> None:
         # Ignore ID column
-        if col == 0:
+        if int(col) == 0:
             return
 
-        # Collect unique values from current source df
-        key = self._model.COLUMNS[col][0]
+        key = self._model.COLUMNS[int(col)][0]
         if key not in self._model._df.columns:
             return
 
@@ -528,25 +580,172 @@ class _FilterHeaderView(QHeaderView):
         except Exception:
             values = []
         values = [v.strip() for v in values if str(v).strip()]
-        values.sort()
-        values = values[:200]
+        if key in {"stt", "sort_order"}:
+
+            def _to_int_or_none(s: str) -> int | None:
+                try:
+                    return int(float(str(s).strip()))
+                except Exception:
+                    return None
+
+            nums: list[tuple[int, str]] = []
+            others: list[str] = []
+            for s in values:
+                n = _to_int_or_none(s)
+                if n is None:
+                    others.append(s)
+                else:
+                    nums.append((n, str(n)))
+            nums.sort(key=lambda t: t[0])
+            others.sort()
+            values = [t[1] for t in nums] + others
+        else:
+            values.sort()
+
+        current_filter = self._proxy._column_filters.get(int(col))  # type: ignore[attr-defined]
 
         menu = QMenu(self)
+        # Set menu height to 90% of the screen height and center vertically
+        screen = (
+            self.window().windowHandle().screen()
+            if self.window() and self.window().windowHandle()
+            else None
+        )
+        if screen:
+            screen_height = screen.geometry().height()
+            menu.setFixedHeight(int(screen_height * 0.9))
+            # Move menu to vertical center of the screen
+            if global_pos is None:
+                # Calculate center Y position
+                menu_height = int(screen_height * 0.9)
+                screen_geom = screen.geometry()
+                center_y = screen_geom.top() + (screen_height - menu_height) // 2
+                x = int(self.sectionViewportPosition(int(col)))
+                w = int(self.sectionSize(int(col)))
+                sec_rect = QRect(x, 0, w, int(self.height()))
+                icon_rect = self._dropdown_rect_for_section(sec_rect)
+                global_pos = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+                # Adjust Y to center
+                global_pos.setY(center_y)
+        menu.setStyleSheet(
+            "\n".join(
+                [
+                    f"QMenu {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
+                    f"QMenu::item {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; border-bottom: 0px; }}",
+                    f"QMenu::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QMenu::separator {{ height: 1px; background: {COLOR_BORDER}; margin: 4px 8px; }}",
+                ]
+            )
+        )
+
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+
         act_all = menu.addAction("(Tất cả)")
+        act_all.setCheckable(True)
+        act_all.setChecked(current_filter is None)
+        group.addAction(act_all)
+        menu.addSeparator()
 
         for v in values:
-            menu.addAction(v)
+            act = menu.addAction(v)
+            act.setCheckable(True)
+            act.setChecked(str(current_filter or "").strip() == str(v).strip())
+            group.addAction(act)
 
-        pos = self.mapToGlobal(QPoint(self.sectionViewportPosition(col), self.height()))
-        chosen = menu.exec(pos)
+        if global_pos is None:
+            x = int(self.sectionViewportPosition(int(col)))
+            w = int(self.sectionSize(int(col)))
+            sec_rect = QRect(x, 0, w, int(self.height()))
+            icon_rect = self._dropdown_rect_for_section(sec_rect)
+            global_pos = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+        chosen = menu.exec(global_pos)
         if chosen is None:
             return
-
         if chosen == act_all:
-            self._proxy.clear_column_filter(col)
+            self._proxy.clear_column_filter(int(col))
+            return
+        self._proxy.set_column_filter(int(col), chosen.text())
+
+    def paintSection(
+        self, painter, rect: QRect, logicalIndex: int
+    ) -> None:  # noqa: N802
+        super().paintSection(painter, rect, logicalIndex)
+        if int(logicalIndex) == 0:
+            return
+        if rect.width() < (self._dropdown_icon_size + self._dropdown_icon_pad * 2):
+            return
+        icon_rect = self._dropdown_rect_for_section(rect)
+        pix = self._dropdown_icon.pixmap(
+            QSize(self._dropdown_icon_size, self._dropdown_icon_size)
+        )
+        painter.drawPixmap(icon_rect, pix)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        try:
+            col = int(self.logicalIndexAt(event.pos()))
+        except Exception:
+            col = -1
+
+        if col > 0:
+            x = int(self.sectionViewportPosition(int(col)))
+            w = int(self.sectionSize(int(col)))
+            sec_rect = QRect(x, 0, w, int(self.height()))
+            icon_rect = self._dropdown_rect_for_section(sec_rect)
+            if icon_rect.contains(event.pos()):
+                gp = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+                self._exec_filter_menu(col, gp)
+                event.accept()
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        try:
+            pos = event.pos()
+        except Exception:
+            super().mouseMoveEvent(event)
             return
 
-        self._proxy.set_column_filter(col, chosen.text())
+        if self._is_over_dropdown_icon(pos):
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        elif self._is_over_resize_handle(pos):
+            self.setCursor(Qt.CursorShape.SplitHCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().leaveEvent(event)
+
+    def event(self, event) -> bool:  # noqa: N802
+        et = event.type()
+        if et == QEvent.Type.HoverMove:
+            try:
+                pos = event.position().toPoint()
+            except Exception:
+                try:
+                    pos = event.pos()
+                except Exception:
+                    pos = None
+
+            if pos is not None and self._is_over_dropdown_icon(pos):
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+            elif pos is not None and self._is_over_resize_handle(pos):
+                self.setCursor(Qt.CursorShape.SplitHCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            return True
+
+        if et in {QEvent.Type.HoverLeave, QEvent.Type.Leave}:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+        return super().event(event)
+
+    # Intentionally no sectionClicked handler.
 
 
 class EmployeeTable(QTableView):
@@ -556,12 +755,8 @@ class EmployeeTable(QTableView):
     - No frozen columns.
     """
 
-    _EMPTY_MIN_ROWS: int = 8
-
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-
-        self._is_placeholder: bool = True
 
         self._model = _EmployeeTableModel(self)
         self._proxy = _EmployeeFilterProxy(self)
@@ -573,7 +768,8 @@ class EmployeeTable(QTableView):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        # Allow selecting multiple rows for bulk delete (Ctrl/Shift).
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
         self.verticalHeader().setVisible(False)
@@ -602,35 +798,13 @@ class EmployeeTable(QTableView):
 
         self._configure_columns()
 
-        self._update_placeholder_rows_to_viewport()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        if self._is_placeholder:
-            self._update_placeholder_rows_to_viewport()
-
-    def _update_placeholder_rows_to_viewport(self) -> None:
-        vh = int(self.viewport().height() or 0)
-        if vh <= 0:
-            if self._model.rowCount() == 0:
-                self.set_placeholder_rows(self._EMPTY_MIN_ROWS)
-            return
-        per = max(1, int((vh + ROW_HEIGHT - 1) / ROW_HEIGHT))
-        desired = max(self._EMPTY_MIN_ROWS, per)
-        self.set_placeholder_rows(desired)
-
-    def set_placeholder_rows(self, rows_count: int) -> None:
-        n = max(0, int(rows_count))
-        self._is_placeholder = True
-        self._model.set_placeholder_rows(n)
-
     def _apply_table_style_main(self) -> None:
         self.setStyleSheet(
             "\n".join(
                 [
                     f"QTableView {{ background-color: {ODD_ROW_BG_COLOR}; alternate-background-color: {EVEN_ROW_BG_COLOR}; gridline-color: {GRID_LINES_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
-                    f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 0px; border-right: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; }}",
-                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                    f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 0px; border-right: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; padding-right: 22px; }}",
+                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QTableView::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     f"QTableView::item:selected:active {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTableView::item { padding-left: 10px; padding-right: 0px; border: 0px; }",
@@ -645,7 +819,7 @@ class EmployeeTable(QTableView):
         self.setColumnHidden(0, True)
 
         # Column widths
-        self.setColumnWidth(1, 70)   # STT
+        self.setColumnWidth(1, 70)  # STT
         self.setColumnWidth(2, 120)  # MÃ NV
         self.setColumnWidth(3, 220)  # HỌ VÀ TÊN
 
@@ -659,8 +833,7 @@ class EmployeeTable(QTableView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def clear(self) -> None:
-        self._is_placeholder = True
-        self._update_placeholder_rows_to_viewport()
+        self._model.set_rows([])
 
     def get_selected_employee(self) -> tuple[int, str, str] | None:
         row = self.currentIndex().row()
@@ -684,14 +857,62 @@ class EmployeeTable(QTableView):
         name = str(data.get("full_name") or "").strip()
         return emp_id, code, name
 
-    def set_rows(self, rows: list[dict]) -> None:
-        if not rows:
-            self._is_placeholder = True
-            self._update_placeholder_rows_to_viewport()
-            return
+    def get_selected_employees(self) -> list[tuple[int, str, str]]:
+        """Return selected employees in current view order.
 
-        self._is_placeholder = False
+        Each item is (id, employee_code, full_name).
+        """
+
+        sm = self.selectionModel()
+        if sm is None:
+            one = self.get_selected_employee()
+            return [one] if one else []
+
+        # Users may drag-select multiple cells; selectedRows() can be empty.
+        # Use selectedIndexes() to collect unique rows robustly.
+        selected_indexes = sm.selectedIndexes()  # type: ignore[call-arg]
+        if not selected_indexes:
+            one = self.get_selected_employee()
+            return [one] if one else []
+
+        proxy_rows = sorted({int(i.row()) for i in selected_indexes if i.isValid()})
+        if not proxy_rows:
+            one = self.get_selected_employee()
+            return [one] if one else []
+
+        out: list[tuple[int, str, str]] = []
+        seen: set[int] = set()
+        proxy_row_count = int(self._proxy.rowCount())
+        for proxy_row in proxy_rows:
+            if proxy_row < 0 or proxy_row >= proxy_row_count:
+                continue
+
+            src_idx = self._proxy.mapToSource(self._proxy.index(int(proxy_row), 0))
+            src_row = int(src_idx.row())
+
+            data = self._model.get_row_dict(src_row)
+            if not data:
+                continue
+
+            try:
+                emp_id = int(str(data.get("id") or "0") or 0)
+            except Exception:
+                emp_id = 0
+            if emp_id <= 0 or emp_id in seen:
+                continue
+            seen.add(emp_id)
+
+            code = str(data.get("employee_code") or "").strip()
+            name = str(data.get("full_name") or "").strip()
+            out.append((emp_id, code, name))
+
+        return out
+
+    def set_rows(self, rows: list[dict]) -> None:
         self._model.set_rows(rows)
+
+    def clear_column_filters(self) -> None:
+        self._proxy.clear_all_filters()
 
 
 class MainContent(QWidget):
@@ -756,7 +977,7 @@ class MainContent(QWidget):
                 [
                     f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
                     "QPushButton::icon { margin-right: 10px; }",
-                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: #FFFFFF; }}",
+                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_PRIMARY}; }}",
                 ]
             )
         )
@@ -838,10 +1059,17 @@ class MainContent(QWidget):
         self.btn_add.clicked.connect(self.add_clicked.emit)
         self.btn_edit.clicked.connect(self.edit_clicked.emit)
         self.btn_delete.clicked.connect(self.delete_clicked.emit)
-        self.btn_refresh.clicked.connect(self.refresh_clicked.emit)
+        self.btn_refresh.clicked.connect(self._on_refresh_clicked)
 
     def set_total(self, total: int | str) -> None:
         self.label_total.setText(f"Tổng: {total}")
+
+    def _on_refresh_clicked(self) -> None:
+        try:
+            self.table.clear_column_filters()
+        except Exception:
+            pass
+        self.refresh_clicked.emit()
 
     def get_filters(self) -> dict:
         dept = self.department_tree.get_selected_department()

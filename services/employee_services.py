@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from typing import Callable
+import re
+import unicodedata
 
 from repository.employee_repository import EmployeeRepository
 from services.department_services import DepartmentService
@@ -19,6 +21,113 @@ from services.title_services import TitleService
 
 
 class EmployeeService:
+    @staticmethod
+    def _parse_bool(v: Any) -> bool | None:
+        """Parse cell value into boolean.
+
+        Supports:
+        - bool
+        - numbers (0/1, including 1.0)
+        - strings: 1/0, true/false, yes/no, x, có/không, and strings containing numbers (e.g. '01 năm')
+        """
+
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            return bool(v)
+
+        if isinstance(v, (int, float)):
+            try:
+                return float(v) != 0.0
+            except Exception:
+                return None
+
+        s = str(v or "").strip().lower()
+        if not s:
+            return None
+
+        # numeric-looking strings like "1.0"
+        try:
+            return float(s) != 0.0
+        except Exception:
+            pass
+
+        # strings like "01 năm", "02 nam"...
+        m = re.search(r"(-?\d+(?:[\.,]\d+)?)", s)
+        if m:
+            num = m.group(1).replace(",", ".")
+            try:
+                return float(num) != 0.0
+            except Exception:
+                pass
+
+        true_set = {"1", "true", "yes", "y", "x", "có", "co", "✓", "✔"}
+        false_set = {"0", "false", "no", "n", "không", "khong"}
+        if s in true_set:
+            return True
+        if s in false_set:
+            return False
+        return None
+
+    @staticmethod
+    def _parse_date_for_db(v: Any) -> str | None:
+        """Parse input into ISO date string (YYYY-MM-DD) for DB."""
+
+        if v is None:
+            return None
+
+        # openpyxl returns datetime/date objects
+        try:
+            if hasattr(v, "date"):
+                d = v.date() if hasattr(v, "hour") else v
+                return d.isoformat()
+        except Exception:
+            pass
+
+        s = str(v or "").strip()
+        if not s:
+            return None
+
+        # Full date formats
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                dt = datetime.strptime(s, fmt)
+                return dt.date().isoformat()
+            except Exception:
+                continue
+
+        # Month/year formats like 07/2013 or 07-2013
+        m = re.match(r"^(\d{1,2})[\/-](\d{4})$", s)
+        if m:
+            try:
+                mm = int(m.group(1))
+                yy = int(m.group(2))
+                if 1 <= mm <= 12:
+                    return f"{yy:04d}-{mm:02d}-01"
+            except Exception:
+                return None
+
+        return None
+
+    @staticmethod
+    def _date_value_for_preview(v: Any) -> Any:
+        """Keep Excel date display as-is when it is a string (e.g. '07/2013').
+
+        For true date/datetime objects, store ISO (table model will format nicely).
+        """
+
+        if v is None:
+            return None
+        try:
+            if hasattr(v, "date"):
+                d = v.date() if hasattr(v, "hour") else v
+                return d.isoformat()
+        except Exception:
+            pass
+
+        s = str(v or "").strip()
+        return s if s != "" else None
+
     def __init__(
         self,
         repo: EmployeeRepository | None = None,
@@ -318,7 +427,24 @@ class EmployeeService:
             )
 
         def norm_header(s: Any) -> str:
-            return str(s or "").strip()
+            # Normalize headers so Excel variations like "Phòng ban" vs "Phòng Ban"
+            # or double spaces still map correctly.
+            raw = str(s or "").strip()
+            raw = re.sub(r"\s+", " ", raw)
+            return raw
+
+        def norm_header_key(s: Any) -> str:
+            # Robust matching for Vietnamese headers even if the file contains
+            # replacement characters ("�") or different diacritics.
+            raw = str(s or "").strip().lower()
+            raw = re.sub(r"\s+", " ", raw)
+            raw = raw.replace("đ", "d").replace("Đ", "d")
+            raw = raw.replace("\ufffd", "")  # Unicode replacement char
+            raw = unicodedata.normalize("NFKD", raw)
+            raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
+            raw = re.sub(r"[^0-9a-z ]+", "", raw)
+            raw = raw.replace(" ", "")
+            return raw
 
         header_to_key: dict[str, str] = {
             # keys
@@ -388,16 +514,6 @@ class EmployeeService:
             "ID": "id",
         }
 
-        def parse_bool(v: Any) -> bool | None:
-            if v is None:
-                return None
-            if isinstance(v, bool):
-                return bool(v)
-            s = str(v or "").strip().lower()
-            if not s:
-                return None
-            return s in {"1", "true", "yes", "y", "x", "có", "co"}
-
         def parse_int(v: Any) -> int | None:
             if v is None:
                 return None
@@ -409,28 +525,6 @@ class EmployeeService:
             except Exception:
                 return None
 
-        def parse_date(v: Any) -> str | None:
-            if v is None:
-                return None
-            # openpyxl returns datetime/date objects
-            try:
-                if hasattr(v, "date"):
-                    d = v.date() if hasattr(v, "hour") else v
-                    return d.isoformat()
-            except Exception:
-                pass
-
-            s = str(v or "").strip()
-            if not s:
-                return None
-            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-                try:
-                    dt = datetime.strptime(s, fmt)
-                    return dt.date().isoformat()
-                except Exception:
-                    continue
-            return None
-
         wb = load_workbook(str(path), data_only=True)
         ws = wb.active
         rows_iter = ws.iter_rows(values_only=True)
@@ -440,9 +534,25 @@ class EmployeeService:
             return False, "File Excel trống.", []
 
         headers = [norm_header(h) for h in list(header_row or [])]
+        header_to_key_lower = {
+            str(k).strip().lower(): v for k, v in header_to_key.items()
+        }
+        header_to_key_norm = {norm_header_key(k): v for k, v in header_to_key.items()}
+
         col_keys: list[str | None] = []
         for h in headers:
-            col_keys.append(header_to_key.get(h))
+            key = header_to_key.get(h)
+            if key is None:
+                key = header_to_key_lower.get(str(h or "").strip().lower())
+            if key is None:
+                key = header_to_key_norm.get(norm_header_key(h))
+            col_keys.append(key)
+
+        unknown_headers = [
+            headers[i]
+            for i, k in enumerate(col_keys)
+            if k is None and str(headers[i] or "").strip()
+        ]
 
         out: list[dict[str, Any]] = []
         for r in rows_iter:
@@ -452,7 +562,13 @@ class EmployeeService:
             empty = True
             for idx, raw in enumerate(list(r)):
                 key = col_keys[idx] if idx < len(col_keys) else None
-                if not key or key in {"id", "stt"}:
+                if not key or key in {"id"}:
+                    continue
+
+                # Preserve STT from Excel when provided, but do not treat it as
+                # a data-bearing field for the "empty row" check.
+                if key == "stt":
+                    item[key] = parse_int(raw)
                     continue
                 if raw is not None and str(raw).strip() != "":
                     empty = False
@@ -469,11 +585,44 @@ class EmployeeService:
                     "child_dob_3",
                     "child_dob_4",
                 }:
-                    item[key] = parse_date(raw)
-                elif key in {"contract1_signed", "contract2_indefinite"}:
-                    item[key] = parse_bool(raw)
+                    # Keep preview display unchanged (e.g. '07/2013' stays '07/2013')
+                    item[key] = self._date_value_for_preview(raw)
+                elif key == "contract1_signed":
+                    # Keep raw text (e.g. "01 năm", "02 năm") for correct display in preview.
+                    # Import step will interpret this value using parse_bool/to_bool.
+                    if raw is None:
+                        item[key] = None
+                    else:
+                        s_raw = str(raw).strip()
+                        item[key] = s_raw if s_raw != "" else None
+                elif key == "contract2_indefinite":
+                    item[key] = self._parse_bool(raw)
                 elif key in {"children_count"}:
                     item[key] = parse_int(raw)
+                elif key == "tax_code":
+                    if raw is None:
+                        item[key] = None
+                    elif isinstance(raw, (int, float)):
+                        # Excel can treat MST as a number; keep it as text to avoid scientific notation.
+                        try:
+                            f = float(raw)
+                            if f.is_integer():
+                                item[key] = str(int(f))
+                            else:
+                                item[key] = str(raw).strip()
+                        except Exception:
+                            item[key] = str(raw).strip() or None
+                    else:
+                        s = str(raw).strip()
+                        if not s:
+                            item[key] = None
+                        elif "e+" in s.lower() or "e-" in s.lower():
+                            try:
+                                item[key] = str(int(float(s)))
+                            except Exception:
+                                item[key] = s
+                        else:
+                            item[key] = s
                 else:
                     s = str(raw or "").strip()
                     item[key] = s if s != "" else None
@@ -481,16 +630,13 @@ class EmployeeService:
             if empty:
                 continue
 
-            # required fields for UI preview
-            code = str(item.get("employee_code") or "").strip()
-            name = str(item.get("full_name") or "").strip()
-            if code:
-                # normalize like create/update
-                if code.isdigit():
-                    code = code.zfill(5)
-                item["employee_code"] = code
-            if name:
-                item["full_name"] = name
+            # Keep preview values as user entered (only trim outer spaces)
+            if item.get("employee_code") is not None:
+                item["employee_code"] = (
+                    str(item.get("employee_code") or "").strip() or None
+                )
+            if item.get("full_name") is not None:
+                item["full_name"] = str(item.get("full_name") or "").strip() or None
 
             out.append(item)
 
@@ -501,7 +647,14 @@ class EmployeeService:
             row.update(it)
             preview_rows.append(row)
 
-        return True, f"Đã đọc {len(preview_rows)} dòng từ Excel.", preview_rows
+        msg = f"Đã đọc {len(preview_rows)} dòng từ Excel."
+        if unknown_headers:
+            # Keep message short; this helps users fix header typos instead of silently dropping columns.
+            sample = ", ".join([str(h) for h in unknown_headers[:6]])
+            more = "..." if len(unknown_headers) > 6 else ""
+            msg += f" (Không nhận diện {len(unknown_headers)} cột: {sample}{more})"
+
+        return True, msg, preview_rows
 
     def import_employees_rows(
         self,
@@ -526,7 +679,21 @@ class EmployeeService:
                 title_map[s] = int(tid)
 
         def to_bool(v: Any) -> bool:
-            return bool(v) if v is not None else False
+            parsed = self._parse_bool(v)
+            return bool(parsed) if parsed is not None else False
+
+        def norm_tax_code(v: Any) -> str | None:
+            if v is None:
+                return None
+            s = str(v or "").strip()
+            if not s:
+                return None
+            if "e+" in s.lower() or "e-" in s.lower():
+                try:
+                    return str(int(float(s)))
+                except Exception:
+                    return s
+            return s
 
         def norm_str(v: Any) -> str | None:
             s = str(v or "").strip()
@@ -544,40 +711,81 @@ class EmployeeService:
 
             code = code.zfill(5)
 
+            # Persist Excel order to DB so list can show STT 1..N (top-to-bottom).
+            sort_order_val = it.get("stt")
+            try:
+                sort_order_int = (
+                    int(sort_order_val) if sort_order_val is not None else None
+                )
+            except Exception:
+                sort_order_int = None
+
             title_name = norm_str(it.get("title_name"))
             dept_name = norm_str(it.get("department_name"))
-            title_id = title_map.get(str(title_name or "").lower()) if title_name else None
-            dept_id = dept_map.get(str(dept_name or "").lower()) if dept_name else None
+
+            title_key = str(title_name or "").strip().lower() if title_name else ""
+            dept_key = str(dept_name or "").strip().lower() if dept_name else ""
+
+            title_id = title_map.get(title_key) if title_key else None
+            dept_id = dept_map.get(dept_key) if dept_key else None
+
+            # Auto-create missing department/title so import does not silently drop values.
+            if title_name and not title_id:
+                ok, _msg, new_id = self._title_service.create_title(str(title_name))
+                if ok and new_id:
+                    title_id = int(new_id)
+                    title_map[title_key] = int(new_id)
+
+            if dept_name and not dept_id:
+                ok, _msg, new_id = self._department_service.create_department(
+                    department_name=str(dept_name),
+                    parent_id=None,
+                    department_note="",
+                )
+                if ok and new_id:
+                    dept_id = int(new_id)
+                    dept_map[dept_key] = int(new_id)
+
+            # Keep contract term text (e.g. '01 năm', '02 năm') for display.
+            contract1_term = norm_str(it.get("contract1_signed"))
 
             return {
+                "sort_order": sort_order_int,
                 "employee_code": code,
                 "full_name": name,
-                "start_date": it.get("start_date"),
+                "start_date": self._parse_date_for_db(it.get("start_date")),
                 "title_id": title_id,
                 "department_id": dept_id,
-                "date_of_birth": it.get("date_of_birth"),
+                "date_of_birth": self._parse_date_for_db(it.get("date_of_birth")),
                 "gender": norm_str(it.get("gender")),
                 "national_id": norm_str(it.get("national_id")),
-                "id_issue_date": it.get("id_issue_date"),
+                "id_issue_date": self._parse_date_for_db(it.get("id_issue_date")),
                 "id_issue_place": norm_str(it.get("id_issue_place")),
                 "address": norm_str(it.get("address")),
                 "phone": norm_str(it.get("phone")),
                 "insurance_no": norm_str(it.get("insurance_no")),
-                "tax_code": norm_str(it.get("tax_code")),
+                "tax_code": norm_tax_code(it.get("tax_code")),
                 "degree": norm_str(it.get("degree")),
                 "major": norm_str(it.get("major")),
                 "contract1_signed": to_bool(it.get("contract1_signed")),
+                "contract1_term": contract1_term,
                 "contract1_no": norm_str(it.get("contract1_no")),
-                "contract1_sign_date": it.get("contract1_sign_date"),
-                "contract1_expire_date": it.get("contract1_expire_date"),
+                "contract1_sign_date": self._parse_date_for_db(
+                    it.get("contract1_sign_date")
+                ),
+                "contract1_expire_date": self._parse_date_for_db(
+                    it.get("contract1_expire_date")
+                ),
                 "contract2_indefinite": to_bool(it.get("contract2_indefinite")),
                 "contract2_no": norm_str(it.get("contract2_no")),
-                "contract2_sign_date": it.get("contract2_sign_date"),
+                "contract2_sign_date": self._parse_date_for_db(
+                    it.get("contract2_sign_date")
+                ),
                 "children_count": it.get("children_count"),
-                "child_dob_1": it.get("child_dob_1"),
-                "child_dob_2": it.get("child_dob_2"),
-                "child_dob_3": it.get("child_dob_3"),
-                "child_dob_4": it.get("child_dob_4"),
+                "child_dob_1": self._parse_date_for_db(it.get("child_dob_1")),
+                "child_dob_2": self._parse_date_for_db(it.get("child_dob_2")),
+                "child_dob_3": self._parse_date_for_db(it.get("child_dob_3")),
+                "child_dob_4": self._parse_date_for_db(it.get("child_dob_4")),
                 "note": norm_str(it.get("note")),
             }
 
@@ -591,6 +799,12 @@ class EmployeeService:
                     return v
 
             return {
+                "sort_order": (
+                    int(db.get("sort_order"))
+                    if db.get("sort_order") is not None
+                    and str(db.get("sort_order")) != ""
+                    else None
+                ),
                 "employee_code": str(db.get("employee_code") or "").strip(),
                 "full_name": str(db.get("full_name") or "").strip(),
                 "start_date": to_iso(db.get("start_date")),
@@ -608,6 +822,7 @@ class EmployeeService:
                 "degree": (str(db.get("degree") or "").strip() or None),
                 "major": (str(db.get("major") or "").strip() or None),
                 "contract1_signed": bool(int(db.get("contract1_signed") or 0)),
+                "contract1_term": (str(db.get("contract1_term") or "").strip() or None),
                 "contract1_no": (str(db.get("contract1_no") or "").strip() or None),
                 "contract1_sign_date": to_iso(db.get("contract1_sign_date")),
                 "contract1_expire_date": to_iso(db.get("contract1_expire_date")),
@@ -622,12 +837,54 @@ class EmployeeService:
                 "note": (str(db.get("note") or "").strip() or None),
             }
 
+        def normalize_payload_for_compare(p: dict[str, Any]) -> dict[str, Any]:
+            # Keep only fields that represent employee state.
+            outp = dict(p)
+            # Normalize ints/bools/strings similarly to normalize_db_row
+            try:
+                so = outp.get("sort_order")
+                outp["sort_order"] = (
+                    int(so) if so is not None and str(so) != "" else None
+                )
+            except Exception:
+                outp["sort_order"] = None
+            outp["employee_code"] = str(outp.get("employee_code") or "").strip()
+            outp["full_name"] = str(outp.get("full_name") or "").strip()
+            outp["gender"] = str(outp.get("gender") or "").strip() or None
+            outp["national_id"] = str(outp.get("national_id") or "").strip() or None
+            outp["id_issue_place"] = (
+                str(outp.get("id_issue_place") or "").strip() or None
+            )
+            outp["address"] = str(outp.get("address") or "").strip() or None
+            outp["phone"] = str(outp.get("phone") or "").strip() or None
+            outp["insurance_no"] = str(outp.get("insurance_no") or "").strip() or None
+            outp["tax_code"] = str(outp.get("tax_code") or "").strip() or None
+            outp["degree"] = str(outp.get("degree") or "").strip() or None
+            outp["major"] = str(outp.get("major") or "").strip() or None
+            outp["contract1_signed"] = bool(outp.get("contract1_signed"))
+            outp["contract1_term"] = (
+                str(outp.get("contract1_term") or "").strip() or None
+            )
+            outp["contract1_no"] = str(outp.get("contract1_no") or "").strip() or None
+            outp["contract2_indefinite"] = bool(outp.get("contract2_indefinite"))
+            outp["contract2_no"] = str(outp.get("contract2_no") or "").strip() or None
+            outp["note"] = str(outp.get("note") or "").strip() or None
+            return outp
+
         inserted = 0
         updated = 0
         skipped = 0
         invalid = 0
         failed = 0
 
+        # STT/sort_order rules:
+        # - Existing employees: never change sort_order (do not create new STT).
+        # - New employees: assign a unique sort_order (no duplicates).
+        used_sort_orders: set[int] = set()
+        max_sort_order: int = 0
+
+        # Always process strictly by the incoming list order (Excel row order / preview order):
+        # row 1 -> row 2 -> row 3 ...
         total = len(rows)
         for idx, it in enumerate(rows, start=1):
             payload = norm_payload(it)
@@ -642,37 +899,74 @@ class EmployeeService:
             try:
                 existing = self._repo.get_employee_by_code(code)
                 if not existing:
-                    self._repo.create_employee(payload)
-                    inserted += 1
-                    if progress_cb:
-                        progress_cb(idx, True, code, "Đã thêm")
-                    continue
+                    # Checkbox meaning: only add new employees when checked.
+                    if only_new:
+                        # Assign unique STT for new employees. Prefer Excel STT when possible.
+                        desired = payload.get("sort_order")
+                        try:
+                            desired_i = int(desired) if desired is not None else None
+                        except Exception:
+                            desired_i = None
 
-                if only_new:
-                    existing_norm = normalize_db_row(existing)
-                    payload_cmp = dict(payload)
-                    payload_cmp["contract1_signed"] = bool(payload_cmp.get("contract1_signed"))
-                    payload_cmp["contract2_indefinite"] = bool(payload_cmp.get("contract2_indefinite"))
+                        if (
+                            desired_i is None
+                            or desired_i <= 0
+                            or desired_i in used_sort_orders
+                        ):
+                            max_sort_order = max(
+                                max_sort_order, *(used_sort_orders or {0})
+                            )
+                            desired_i = max_sort_order + 1
 
-                    changed = False
-                    for k, v in payload_cmp.items():
-                        if k == "employee_code":
-                            continue
-                        if existing_norm.get(k) != v:
-                            changed = True
-                            break
+                        payload["sort_order"] = desired_i
+                        used_sort_orders.add(int(desired_i))
+                        max_sort_order = max(max_sort_order, int(desired_i))
 
-                    if not changed:
+                        self._repo.create_employee(payload)
+                        inserted += 1
+                        if progress_cb:
+                            progress_cb(idx, True, code, "Đã thêm")
+                    else:
                         skipped += 1
                         if progress_cb:
-                            progress_cb(idx, True, code, "Bỏ qua (không đổi)")
-                        continue
+                            progress_cb(idx, True, code, "Bỏ qua (chưa có dữ liệu)")
+                    continue
 
-                # only_new=False => always update existing
+                # Compare all fields: if identical -> skip; if changed -> overwrite.
+                db_norm = normalize_db_row(existing)
+
+                # Existing employees: keep current sort_order to avoid creating/overwriting STT.
+                payload["sort_order"] = db_norm.get("sort_order")
+                if db_norm.get("sort_order") is not None:
+                    try:
+                        so_i = int(db_norm.get("sort_order") or 0)
+                        if so_i > 0:
+                            used_sort_orders.add(so_i)
+                            max_sort_order = max(max_sort_order, so_i)
+                    except Exception:
+                        pass
+
+                payload_norm = normalize_payload_for_compare(payload)
+
+                same = True
+                for k, v in payload_norm.items():
+                    # Only compare keys we also keep in db_norm.
+                    if k not in db_norm:
+                        continue
+                    if db_norm.get(k) != v:
+                        same = False
+                        break
+
+                if same:
+                    skipped += 1
+                    if progress_cb:
+                        progress_cb(idx, True, code, "Bỏ qua (trùng dữ liệu)")
+                    continue
+
                 self._repo.update_employee(int(existing.get("id")), payload)
                 updated += 1
                 if progress_cb:
-                    progress_cb(idx, True, code, "Đã cập nhật")
+                    progress_cb(idx, True, code, "Đã cập nhật (ghi đè)")
             except Exception as exc:
                 failed += 1
                 if progress_cb:
@@ -680,9 +974,20 @@ class EmployeeService:
                 continue
 
         ok_all = failed == 0
+        success = int(inserted) + int(updated)
         return (
             ok_all,
-            f"Tổng: {total} | Thêm mới: {inserted} | Cập nhật: {updated} | Bỏ qua: {skipped} | Không hợp lệ: {invalid} | Thất bại: {failed}",
+            " | ".join(
+                [
+                    f"Tổng: {total}",
+                    f"Thành công: {success}",
+                    f"Thêm mới: {inserted}",
+                    f"Cập nhật: {updated}",
+                    f"Bỏ qua: {skipped}",
+                    f"Lỗi dữ liệu: {invalid}",
+                    f"Thất bại: {failed}",
+                ]
+            ),
         )
 
     def import_csv(self, file_path: str) -> tuple[bool, str]:
@@ -784,6 +1089,16 @@ class EmployeeService:
         payload["employee_code"] = code
         payload["full_name"] = name
 
+        # Preserve STT semantics: when sort_order exists and user didn't provide one,
+        # assign the next available sort_order so the new employee doesn't appear as STT=1.
+        try:
+            if payload.get("sort_order") is None:
+                next_stt = self._repo.get_next_sort_order()
+                if next_stt is not None:
+                    payload["sort_order"] = int(next_stt)
+        except Exception:
+            pass
+
         try:
             new_id = self._repo.create_employee(payload)
             return True, "Đã thêm nhân viên.", new_id
@@ -813,6 +1128,16 @@ class EmployeeService:
         payload["employee_code"] = code
         payload["full_name"] = name
 
+        # Do not reset STT/contract term when editing from UI.
+        try:
+            existing = self._repo.get_employee(int(employee_id)) or {}
+            if payload.get("sort_order") is None:
+                payload["sort_order"] = existing.get("sort_order")
+            if payload.get("contract1_term") is None:
+                payload["contract1_term"] = existing.get("contract1_term")
+        except Exception:
+            pass
+
         try:
             affected = self._repo.update_employee(int(employee_id), payload)
             if affected <= 0:
@@ -827,4 +1152,45 @@ class EmployeeService:
         affected = self._repo.delete_employee(int(employee_id))
         if affected <= 0:
             return False, "Không tìm thấy nhân viên để xóa."
+        try:
+            self._repo.resequence_sort_order()
+        except Exception:
+            pass
         return True, "Đã xóa nhân viên."
+
+    def delete_employees_bulk(
+        self,
+        employee_ids: list[int],
+        progress_cb: Callable[[int, int], None] | None = None,
+    ) -> tuple[int, int]:
+        ids = [int(i) for i in (employee_ids or []) if int(i) > 0]
+        if not ids:
+            return 0, 0
+
+        # Unique but keep stable order
+        seen: set[int] = set()
+        uniq: list[int] = []
+        for i in ids:
+            if i in seen:
+                continue
+            seen.add(i)
+            uniq.append(i)
+
+        total = len(uniq)
+        deleted = 0
+        processed = 0
+
+        chunk_size = 200
+        for start in range(0, total, chunk_size):
+            chunk = uniq[start : start + chunk_size]
+            deleted += int(self._repo.delete_employees_bulk(chunk))
+            processed = min(total, start + len(chunk))
+            if progress_cb:
+                progress_cb(processed, total)
+
+        try:
+            self._repo.resequence_sort_order()
+        except Exception:
+            pass
+
+        return deleted, total

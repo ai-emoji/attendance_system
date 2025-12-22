@@ -53,6 +53,7 @@ from core.resource import (
 
 from services.employee_services import EmployeeService
 from ui.widgets.employee_widgets import EmployeeTable
+from ui.dialog.title_dialog import MessageDialog
 
 
 class ImportEmployeeDialog(QDialog):
@@ -156,6 +157,8 @@ class ImportEmployeeDialog(QDialog):
 
         self.chk_only_new = QCheckBox("Thêm mới nhân viên khi chưa có dữ liệu", self)
         self.chk_only_new.setFont(font_normal)
+        # Default ON: most users import into an empty DB and expect data to be inserted.
+        self.chk_only_new.setChecked(True)
         self.chk_only_new.setStyleSheet(
             "\n".join(
                 [
@@ -186,7 +189,10 @@ class ImportEmployeeDialog(QDialog):
         self.btn_apply_db.clicked.connect(self._on_apply_db)
 
     def eventFilter(self, obj, event) -> bool:
-        if obj is getattr(self, "input_excel_path", None) and event.type() == QEvent.Type.MouseButtonPress:
+        if (
+            obj is getattr(self, "input_excel_path", None)
+            and event.type() == QEvent.Type.MouseButtonPress
+        ):
             if event.button() == Qt.MouseButton.LeftButton:
                 file_path, _ = QFileDialog.getOpenFileName(
                     self,
@@ -264,6 +270,10 @@ class ImportEmployeeDialog(QDialog):
         except Exception as exc:
             progress.close()
             self._set_status(str(exc), ok=False)
+            try:
+                MessageDialog.info(self, "Nhập nhân viên", str(exc))
+            except Exception:
+                pass
             return
         finally:
             try:
@@ -272,5 +282,12 @@ class ImportEmployeeDialog(QDialog):
                 pass
 
         self._set_status(msg, ok=ok)
+
+        # Always show 1 dialog summarizing counts.
+        try:
+            MessageDialog.info(self, "Nhập nhân viên", msg)
+        except Exception:
+            pass
+
         if ok:
             self.accept()

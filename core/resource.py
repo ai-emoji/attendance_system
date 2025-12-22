@@ -292,6 +292,7 @@ ICON_BACK = "assets/images/back.svg"
 ICON_NEXT = "assets/images/next.svg"
 ICON_MENU = "assets/images/menu.svg"
 ICON_CLOSE_MENU = "assets/images/close_menu.svg"
+ICON_DROPDOWN = "assets/images/dropdown.svg"
 
 # Icon Refresh/Reload
 ICON_REFRESH = "assets/images/refresh.svg"
