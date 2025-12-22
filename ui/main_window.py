@@ -9,6 +9,8 @@ Theo .copilot_instructions:
 - Tài nguyên (icon/ảnh/stylesheet) phải load qua resource_path()
 """
 
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
@@ -66,6 +68,7 @@ from ui.widgets.download_attendance_widgets import (
     TitleBar2 as DownloadAttendanceTitleBar2,
 )
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
+from ui.dialog.settings_dialog import SettingsDialog
 
 
 class Header(CommonHeader):
@@ -280,6 +283,8 @@ class MainWindow(QMainWindow):
 
     def _on_header_action_triggered(self, action_text: str) -> None:
         """Điều phối sự kiện click phím chức năng trên Header."""
+        action_text = str(action_text or "").strip()
+        logging.getLogger(__name__).info("Header action clicked: %s", action_text)
         if action_text == "Thông tin\nCông ty" and self._company_controller is not None:
             self._company_controller.show_dialog()
             return
@@ -354,6 +359,10 @@ class MainWindow(QMainWindow):
             self._absence_restore_controller.show_dialog()
             return
 
+        if action_text == "Cài đặt":
+            dlg = SettingsDialog(self)
+            dlg.exec()
+            return
     def _center_window(self) -> None:
         """Căn giữa cửa sổ trên màn hình."""
         screen_geometry = self.screen().geometry()

@@ -1,0 +1,24 @@
+{
+  "employee_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "column_align": {
+      "stt": "center",
+      "employee_code": "center",
+      "department_name": "center",
+      "title_name": "center",
+      "date_of_birth": "center",
+      "gender": "center",
+      "national_id": "center",
+      "id_issue_date": "center",
+      "phone": "center",
+      "insurance_no": "center",
+      "tax_code": "center",
+      "degree": "center",
+      "major": "center",
+      "contract1_term": "center",
+      "start_date": "center"
+    },
+    "column_bold": {}
+  }
+}

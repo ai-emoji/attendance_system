@@ -1,0 +1,57 @@
+"""ui.dialog.settings_dialog
+
+Dialog Cài đặt.
+
+Yêu cầu hiện tại:
+- Tạo button "Cài đặt bảng Nhân viên"; click sẽ mở dialog con
+- Tách phần QGroupBox("Cài đặt bảng Nhân viên") sang file dialog mới
+"""
+
+from __future__ import annotations
+
+import logging
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QDialog, QPushButton, QVBoxLayout
+
+from core.resource import CONTENT_FONT, FONT_WEIGHT_SEMIBOLD, UI_FONT
+from ui.dialog.employee_table_settings_dialog import EmployeeTableSettingsDialog
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        logging.getLogger(__name__).info("Open SettingsDialog")
+        self.setModal(True)
+        self.setWindowTitle("Cài đặt")
+        self.setMinimumSize(420, 220)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
+
+        font_button = QFont(UI_FONT, CONTENT_FONT)
+        if FONT_WEIGHT_SEMIBOLD >= 500:
+            font_button.setWeight(QFont.Weight.DemiBold)
+
+        self.btn_employee_table = QPushButton("Cài đặt bảng Nhân viên", self)
+        self.btn_employee_table.setFont(font_button)
+        self.btn_employee_table.setFixedHeight(38)
+        self.btn_employee_table.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.btn_close = QPushButton("Đóng", self)
+        self.btn_close.setFont(font_button)
+        self.btn_close.setFixedHeight(38)
+        self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        root.addWidget(self.btn_employee_table)
+        root.addStretch(1)
+        root.addWidget(self.btn_close)
+
+        self.btn_close.clicked.connect(self.reject)
+        self.btn_employee_table.clicked.connect(self._open_employee_table_settings)
+
+    def _open_employee_table_settings(self) -> None:
+        dlg = EmployeeTableSettingsDialog(self)
+        dlg.exec()

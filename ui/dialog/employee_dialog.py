@@ -16,7 +16,6 @@ from __future__ import annotations
 from PySide6.QtCore import QDate, QEvent, QLocale, QObject, Qt, QRegularExpression
 from PySide6.QtGui import QFont, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QFrame,
@@ -246,14 +245,18 @@ class EmployeeDialog(QDialog):
         self.input_degree = self._make_line_edit(input_style, font_normal)
         self.input_major = self._make_line_edit(input_style, font_normal)
 
-        self.chk_contract1_signed = QCheckBox("Đã ký")
-        self.chk_contract1_signed.setFont(font_normal)
+        self.cbo_contract1_signed = QComboBox()
+        self.cbo_contract1_signed.setFont(font_normal)
+        self.cbo_contract1_signed.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.cbo_contract1_signed.setStyleSheet(combo_style)
         self.input_contract1_no = self._make_line_edit(input_style, font_normal)
         self.input_contract1_sign_date = self._make_date_edit(date_style, font_normal)
         self.input_contract1_expire_date = self._make_date_edit(date_style, font_normal)
 
-        self.chk_contract2_indefinite = QCheckBox("Có")
-        self.chk_contract2_indefinite.setFont(font_normal)
+        self.cbo_contract2_indefinite = QComboBox()
+        self.cbo_contract2_indefinite.setFont(font_normal)
+        self.cbo_contract2_indefinite.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.cbo_contract2_indefinite.setStyleSheet(combo_style)
         self.input_contract2_no = self._make_line_edit(input_style, font_normal)
         self.input_contract2_sign_date = self._make_date_edit(date_style, font_normal)
 
@@ -291,11 +294,11 @@ class EmployeeDialog(QDialog):
         left_form.addRow("Số điện thoại", self.input_phone)
         left_form.addRow("Địa chỉ", self.input_address)
         left_form.addRow("Ghi chú", self.input_note)
-        left_form.addRow("HĐLĐ (ký lần 1)", self.chk_contract1_signed)
+        left_form.addRow("HĐLĐ (ký lần 1)", self.cbo_contract1_signed)
         left_form.addRow("Số HĐLĐ (lần 1)", self.input_contract1_no)
         left_form.addRow("Ngày ký (lần 1)", self.input_contract1_sign_date)
         left_form.addRow("Ngày hết hạn (lần 1)", self.input_contract1_expire_date)
-        left_form.addRow("HĐLĐ ký không thời hạn", self.chk_contract2_indefinite)
+        left_form.addRow("HĐLĐ ký không thời hạn", self.cbo_contract2_indefinite)
         left_form.addRow("Số HĐLĐ (không thời hạn)", self.input_contract2_no)
         left_form.addRow("Ngày ký (không thời hạn)", self.input_contract2_sign_date)
 
@@ -540,8 +543,8 @@ class EmployeeDialog(QDialog):
             self.cbo_id_issue_place,
             self.cbo_employment_status,
             self.spin_children,
-            self.chk_contract1_signed,
-            self.chk_contract2_indefinite,
+            self.cbo_contract1_signed,
+            self.cbo_contract2_indefinite,
         ):
             w.setEnabled(not bool(value))
 
@@ -581,6 +584,17 @@ class EmployeeDialog(QDialog):
         self.cbo_employment_status.addItem("Nghỉ thai sản", "Nghỉ thai sản")
         self.cbo_employment_status.addItem("Đã nghỉ việc", "Đã nghỉ việc")
         self.cbo_employment_status.setCurrentIndex(0)
+
+        # Contracts
+        self.cbo_contract1_signed.clear()
+        self.cbo_contract1_signed.addItem("Chưa ký", False)
+        self.cbo_contract1_signed.addItem("Đã ký", True)
+        self.cbo_contract1_signed.setCurrentIndex(0)
+
+        self.cbo_contract2_indefinite.clear()
+        self.cbo_contract2_indefinite.addItem("Không", False)
+        self.cbo_contract2_indefinite.addItem("Có", True)
+        self.cbo_contract2_indefinite.setCurrentIndex(0)
 
     def _set_combo_by_data(self, combo: QComboBox, value) -> None:
         for i in range(combo.count()):
@@ -687,10 +701,13 @@ class EmployeeDialog(QDialog):
         self.input_degree.setText(str(e.get("degree") or ""))
         self.input_major.setText(str(e.get("major") or ""))
 
-        self.chk_contract1_signed.setChecked(bool(int(e.get("contract1_signed") or 0)))
+        self._set_combo_by_data(
+            self.cbo_contract1_signed, bool(int(e.get("contract1_signed") or 0))
+        )
         self.input_contract1_no.setText(str(e.get("contract1_no") or ""))
-        self.chk_contract2_indefinite.setChecked(
-            bool(int(e.get("contract2_indefinite") or 0))
+        self._set_combo_by_data(
+            self.cbo_contract2_indefinite,
+            bool(int(e.get("contract2_indefinite") or 0)),
         )
         self.input_contract2_no.setText(str(e.get("contract2_no") or ""))
 
@@ -740,7 +757,7 @@ class EmployeeDialog(QDialog):
             "tax_code": (self.input_tax_code.text() or "").strip() or None,
             "degree": (self.input_degree.text() or "").strip() or None,
             "major": (self.input_major.text() or "").strip() or None,
-            "contract1_signed": bool(self.chk_contract1_signed.isChecked()),
+            "contract1_signed": bool(self.cbo_contract1_signed.currentData()),
             "contract1_no": (self.input_contract1_no.text() or "").strip() or None,
             "contract1_sign_date": self._date_edit_to_iso(
                 self.input_contract1_sign_date
@@ -748,7 +765,7 @@ class EmployeeDialog(QDialog):
             "contract1_expire_date": self._date_edit_to_iso(
                 self.input_contract1_expire_date
             ),
-            "contract2_indefinite": bool(self.chk_contract2_indefinite.isChecked()),
+            "contract2_indefinite": bool(self.cbo_contract2_indefinite.currentData()),
             "contract2_no": (self.input_contract2_no.text() or "").strip() or None,
             "contract2_sign_date": self._date_edit_to_iso(
                 self.input_contract2_sign_date
@@ -763,7 +780,7 @@ class EmployeeDialog(QDialog):
             "child_dob_3": self._date_edit_to_iso(self.input_child_dob_3),
             "child_dob_4": self._date_edit_to_iso(self.input_child_dob_4),
             "note": (self.input_note.text() or "").strip() or None,
-        }
+        } 
 
     def set_status(self, message: str, ok: bool = True) -> None:
         self.label_status.setStyleSheet(
