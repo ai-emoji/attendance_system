@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QSplitter,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -41,6 +42,7 @@ from ui.controllers.backup_controllers import BackupController
 from ui.controllers.absence_restore_controllers import AbsenceRestoreController
 from ui.controllers.title_controllers import TitleController
 from ui.controllers.download_attendance_controllers import DownloadAttendanceController
+from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
 from ui.widgets.department_widgets import MainContent as DepartmentContent
@@ -67,6 +69,11 @@ from ui.widgets.download_attendance_widgets import (
     TitleBar1 as DownloadAttendanceTitleBar1,
     TitleBar2 as DownloadAttendanceTitleBar2,
 )
+from ui.widgets.shift_attendance_widgets import (
+    TitleBar1 as ShiftAttendanceTitleBar1,
+    MainContent1 as ShiftAttendanceContent1,
+    MainContent2 as ShiftAttendanceContent2,
+)
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
 from ui.dialog.settings_dialog import SettingsDialog
 
@@ -90,6 +97,7 @@ class Container(QWidget):
         self._declare_work_shift_controller: DeclareWorkShiftController | None = None
         self._employee_controller: EmployeeController | None = None
         self._download_attendance_controller: DownloadAttendanceController | None = None
+        self._shift_attendance_controller: ShiftAttendanceController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -206,6 +214,49 @@ class Container(QWidget):
             self.window(), title2, content
         )
         self._download_attendance_controller.bind()
+
+    def show_shift_attendance_view(self) -> None:
+        """Hiển thị màn hình Chấm công Theo ca."""
+
+        title1 = ShiftAttendanceTitleBar1(
+            "Chấm công Theo ca", "assets/images/shift_attendance.svg", self
+        )
+
+        # Gói 2 phần content vào một widget để Container chỉ stretch 1 vùng nội dung.
+        content_root = QWidget(self)
+        content_root.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        content_layout = QVBoxLayout(content_root)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        splitter = QSplitter(Qt.Orientation.Vertical, content_root)
+        splitter.setChildrenCollapsible(False)
+
+        content1 = ShiftAttendanceContent1(splitter)
+        content2 = ShiftAttendanceContent2(splitter)
+        splitter.addWidget(content1)
+        splitter.addWidget(content2)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+
+        # Tỉ lệ mặc định: phần danh sách NV nhỏ hơn phần lưới chấm công.
+        try:
+            splitter.setSizes([1, 1])
+        except Exception:
+            pass
+
+        content_layout.addWidget(splitter, 1)
+
+        self.set_container_widgets([title1, content_root])
+
+        # Controller: load phòng ban + danh sách nhân viên cho MainContent1
+        self._shift_attendance_controller = ShiftAttendanceController(
+            self.window(), content1, content2
+        )
+        self._shift_attendance_controller.bind()
 
 
 class Footer(CommonFooter):
@@ -338,6 +389,10 @@ class MainWindow(QMainWindow):
 
         if action_text == "Tải dữ liệu\nMáy chấm công":
             self.container.show_download_attendance_view()
+            return
+
+        if action_text == "Chấm công\nTheo ca":
+            self.container.show_shift_attendance_view()
             return
 
         if action_text == "Thoát\nỨng dụng":

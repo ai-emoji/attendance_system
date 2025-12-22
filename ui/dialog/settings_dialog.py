@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QDialog, QPushButton, QVBoxLayout
 
 from core.resource import CONTENT_FONT, FONT_WEIGHT_SEMIBOLD, UI_FONT
 from ui.dialog.employee_table_settings_dialog import EmployeeTableSettingsDialog
+from ui.dialog.shift_attendance_settings_dialog import ShiftAttendanceSettingsDialog
 
 
 class SettingsDialog(QDialog):
@@ -40,18 +41,29 @@ class SettingsDialog(QDialog):
         self.btn_employee_table.setFixedHeight(38)
         self.btn_employee_table.setCursor(Qt.CursorShape.PointingHandCursor)
 
+        self.btn_shift_attendance = QPushButton("Cài đặt chấm công theo ca", self)
+        self.btn_shift_attendance.setFont(font_button)
+        self.btn_shift_attendance.setFixedHeight(38)
+        self.btn_shift_attendance.setCursor(Qt.CursorShape.PointingHandCursor)
+
         self.btn_close = QPushButton("Đóng", self)
         self.btn_close.setFont(font_button)
         self.btn_close.setFixedHeight(38)
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
 
         root.addWidget(self.btn_employee_table)
+        root.addWidget(self.btn_shift_attendance)
         root.addStretch(1)
         root.addWidget(self.btn_close)
 
         self.btn_close.clicked.connect(self.reject)
         self.btn_employee_table.clicked.connect(self._open_employee_table_settings)
+        self.btn_shift_attendance.clicked.connect(self._open_shift_attendance_settings)
 
     def _open_employee_table_settings(self) -> None:
         dlg = EmployeeTableSettingsDialog(self)
+        dlg.exec()
+
+    def _open_shift_attendance_settings(self) -> None:
+        dlg = ShiftAttendanceSettingsDialog(self)
         dlg.exec()

@@ -20,5 +20,37 @@
       "start_date": "center"
     },
     "column_bold": {}
+  },
+  "shift_attendance_table": {
+    "column_visible": {
+      "in_2": true,
+      "employee_code": true,
+      "leave_plus": true,
+      "total": true,
+      "tc2": true,
+      "tc3": true,
+      "tc1": true,
+      "work_plus": true,
+      "hours_plus": true,
+      "leave": true,
+      "mcc_code": true,
+      "title_name": true,
+      "department_name": true,
+      "start_date": true,
+      "full_name": true,
+      "hours": true
+    },
+    "font_size": 11,
+    "font_weight": "normal",
+    "column_align": {
+      "employee_code": "center",
+      "leave_plus": "left",
+      "mcc_code": "center",
+      "title_name": "center",
+      "department_name": "center",
+      "start_date": "center",
+      "full_name": "center"
+    },
+    "column_bold": {}
   }
 }
