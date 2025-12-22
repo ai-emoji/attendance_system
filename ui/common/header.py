@@ -88,8 +88,8 @@ class Header(QWidget):
                     # Hover/Active nhẹ, tạo cảm giác liền mạch
                     f'QPushButton[tabButton="true"]:hover {{ background-color: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_BG_HEADER}; border-radius: 0px; }}',
                     f'QPushButton[tabButton="true"][active="true"] {{ background-color: {COLOR_BUTTON_ACTIVE}; color: {COLOR_BG_HEADER}; border-radius: 0px; }}',
-                    "QToolButton { border: none; background: transparent; padding: 6px 6px; margin: 0px; border-radius: 0px; }",
-                    f"QToolButton:hover {{ background-color: {COLOR_BUTTON_PRIMARY_HOVER}; border-radius: 0px; color: {COLOR_BG_HEADER}; }}",
+                    "#Header QToolButton { border: none; background: transparent; padding: 6px 6px; margin: 0px; border-radius: 0px; }",
+                    f"#Header QToolButton:hover {{ background-color: {COLOR_BUTTON_PRIMARY_HOVER}; border-radius: 0px; color: {COLOR_BG_HEADER}; }}",
                 ]
             )
         )

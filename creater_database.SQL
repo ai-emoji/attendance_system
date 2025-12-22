@@ -138,6 +138,73 @@
     -- =========================
 
 
+    -- =========================
+    -- Tải dữ liệu chấm công (tạm) + lưu thô
+    -- =========================
+
+    -- attendance_raw: lưu dữ liệu chấm công thô (lưu lâu dài)
+    -- Quy ước:
+    -- - attendance_code: mã chấm công (user_id trên máy)
+    -- - work_date: ngày chấm công
+    -- - time_in/out_1..3: tối đa 3 cặp vào/ra trong ngày
+    -- - device_no: snapshot số máy (để làm unique và tránh clone)
+    -- - ON DUPLICATE KEY UPDATE sẽ ghi đè nếu trùng key
+    CREATE TABLE IF NOT EXISTS attendance_raw (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        attendance_code VARCHAR(50) NOT NULL,
+        work_date DATE NOT NULL,
+        time_in_1 TIME NULL,
+        time_out_1 TIME NULL,
+        time_in_2 TIME NULL,
+        time_out_2 TIME NULL,
+        time_in_3 TIME NULL,
+        time_out_3 TIME NULL,
+        device_no INT NOT NULL,
+        device_id INT NULL,
+        device_name VARCHAR(255) NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_attendance_raw_code_date_device (attendance_code, work_date, device_no),
+        KEY idx_attendance_raw_work_date (work_date),
+        KEY idx_attendance_raw_device_no (device_no),
+        CONSTRAINT fk_attendance_raw_device
+            FOREIGN KEY (device_id)
+            REFERENCES devices (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- download_attendance: bảng tạm cho lần tải hiện tại (sẽ xóa khi đóng phần mềm)
+    -- Ghi chú:
+    -- - Schema tương tự attendance_raw
+    -- - Upsert để ghi đè nếu trùng
+    CREATE TABLE IF NOT EXISTS download_attendance (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        attendance_code VARCHAR(50) NOT NULL,
+        work_date DATE NOT NULL,
+        time_in_1 TIME NULL,
+        time_out_1 TIME NULL,
+        time_in_2 TIME NULL,
+        time_out_2 TIME NULL,
+        time_in_3 TIME NULL,
+        time_out_3 TIME NULL,
+        device_no INT NOT NULL,
+        device_id INT NULL,
+        device_name VARCHAR(255) NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_download_attendance_code_date_device (attendance_code, work_date, device_no),
+        KEY idx_download_attendance_work_date (work_date),
+        KEY idx_download_attendance_device_no (device_no),
+        CONSTRAINT fk_download_attendance_device
+            FOREIGN KEY (device_id)
+            REFERENCES devices (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
     -- Khai báo Ca làm việc
     -- Quy ước:
     -- - shift_code: mã ca (unique)

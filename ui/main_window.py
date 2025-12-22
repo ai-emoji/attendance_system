@@ -38,6 +38,7 @@ from ui.controllers.csdl_controllers import CSDLController
 from ui.controllers.backup_controllers import BackupController
 from ui.controllers.absence_restore_controllers import AbsenceRestoreController
 from ui.controllers.title_controllers import TitleController
+from ui.controllers.download_attendance_controllers import DownloadAttendanceController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
 from ui.widgets.department_widgets import MainContent as DepartmentContent
@@ -58,6 +59,11 @@ from ui.widgets.declare_work_shift_widgets import (
     MainContent as DeclareWorkShiftContent,
     TitleBar1 as DeclareWorkShiftTitleBar1,
     TitleBar2 as DeclareWorkShiftTitleBar2,
+)
+from ui.widgets.download_attendance_widgets import (
+    MainContent as DownloadAttendanceContent,
+    TitleBar1 as DownloadAttendanceTitleBar1,
+    TitleBar2 as DownloadAttendanceTitleBar2,
 )
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
 
@@ -80,6 +86,7 @@ class Container(QWidget):
         self._device_controller: DeviceController | None = None
         self._declare_work_shift_controller: DeclareWorkShiftController | None = None
         self._employee_controller: EmployeeController | None = None
+        self._download_attendance_controller: DownloadAttendanceController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -181,6 +188,21 @@ class Container(QWidget):
 
         self._employee_controller = EmployeeController(self.window(), content)
         self._employee_controller.bind()
+
+    def show_download_attendance_view(self) -> None:
+        """Hiển thị màn hình Tải dữ liệu Máy chấm công."""
+
+        title1 = DownloadAttendanceTitleBar1(
+            "Tải dữ liệu Máy chấm công", "assets/images/download_attendance.svg", self
+        )
+        title2 = DownloadAttendanceTitleBar2(self)
+        content = DownloadAttendanceContent(self)
+        self.set_container_widgets([title1, title2, content])
+
+        self._download_attendance_controller = DownloadAttendanceController(
+            self.window(), title2, content
+        )
+        self._download_attendance_controller.bind()
 
 
 class Footer(CommonFooter):
@@ -309,6 +331,10 @@ class MainWindow(QMainWindow):
             self.container.show_device_view()
             return
 
+        if action_text == "Tải dữ liệu\nMáy chấm công":
+            self.container.show_download_attendance_view()
+            return
+
         if action_text == "Thoát\nỨng dụng":
             QApplication.quit()
             return
@@ -335,3 +361,16 @@ class MainWindow(QMainWindow):
         center_point = screen_geometry.center()
         window_geometry.moveCenter(center_point)
         self.move(window_geometry.topLeft())
+
+    def closeEvent(self, event) -> None:
+        """Khi đóng phần mềm: tự động xóa dữ liệu tải tạm trong download_attendance."""
+
+        try:
+            from services.download_attendance_services import DownloadAttendanceService
+
+            DownloadAttendanceService().clear_download_attendance()
+        except Exception:
+            # Best-effort: không chặn app đóng nếu xóa thất bại
+            pass
+
+        super().closeEvent(event)

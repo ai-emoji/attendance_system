@@ -5,6 +5,7 @@ Khởi tạo ứng dụng và cửa sổ chính.
 
 import sys
 import logging
+import faulthandler
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
@@ -50,6 +51,15 @@ def main() -> None:
     setup_logging()
     logger = logging.getLogger(__name__)
     logger.info("Khởi động ứng dụng...")
+
+    # Dump trace nếu gặp crash native/segfault (hữu ích khi app "out" không traceback)
+    try:
+        dump_path = Path(resource_path("log/faulthandler.log"))
+        dump_path.parent.mkdir(parents=True, exist_ok=True)
+        with dump_path.open("a", encoding="utf-8") as f:
+            faulthandler.enable(file=f, all_threads=True)
+    except Exception:
+        pass
 
     app = QApplication(sys.argv)
 

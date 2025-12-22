@@ -440,11 +440,12 @@ def set_app_icon_from_bytes(data: bytes | None) -> bool:
     is_svg = b"<svg" in head or head.strip().startswith(b"<?xml")
 
     if is_svg:
-        try:
-            from PySide6.QtCore import QByteArray, QSize
-            from PySide6.QtGui import QImage, QPainter
-            from PySide6.QtSvg import QSvgRenderer
+        from PySide6.QtCore import QByteArray, QSize
+        from PySide6.QtGui import QImage, QPainter
+        from PySide6.QtSvg import QSvgRenderer
 
+        painter = None
+        try:
             renderer = QSvgRenderer(QByteArray(data))
             size = renderer.defaultSize()
             if not size.isValid():
@@ -454,10 +455,15 @@ def set_app_icon_from_bytes(data: bytes | None) -> bool:
             image.fill(0)
             painter = QPainter(image)
             renderer.render(painter)
-            painter.end()
             pixmap = QPixmap.fromImage(image)
         except Exception:
             return False
+        finally:
+            try:
+                if painter is not None:
+                    painter.end()
+            except Exception:
+                pass
     else:
         pixmap = QPixmap()
         if not pixmap.loadFromData(data):
