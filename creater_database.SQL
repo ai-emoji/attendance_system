@@ -54,8 +54,11 @@
     -- - Các cột ngày dùng kiểu DATE
     CREATE TABLE IF NOT EXISTS employees (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        sort_order INT NULL,
         employee_code VARCHAR(50) NOT NULL,
+        mcc_code VARCHAR(50) NULL,
         full_name VARCHAR(255) NOT NULL,
+        name_on_mcc VARCHAR(255) NULL,
         start_date DATE NULL,
         title_id INT NULL,
         department_id INT NULL,
@@ -71,6 +74,7 @@
         degree VARCHAR(255) NULL,
         major VARCHAR(255) NULL,
         contract1_signed TINYINT(1) NOT NULL DEFAULT 0,
+        contract1_term VARCHAR(50) NULL,
         contract1_no VARCHAR(100) NULL,
         contract1_sign_date DATE NULL,
         contract1_expire_date DATE NULL,
@@ -82,6 +86,7 @@
         child_dob_2 DATE NULL,
         child_dob_3 DATE NULL,
         child_dob_4 DATE NULL,
+        employment_status VARCHAR(20) NULL,
         note TEXT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

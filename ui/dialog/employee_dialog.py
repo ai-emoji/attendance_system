@@ -203,6 +203,9 @@ class EmployeeDialog(QDialog):
         self.input_name.setCursor(Qt.CursorShape.IBeamCursor)
         self.input_name.setStyleSheet(input_style)
 
+        self.input_mcc_code = self._make_line_edit(input_style, font_normal)
+        self.input_name_on_mcc = self._make_line_edit(input_style, font_normal)
+
         self.input_start_date = self._make_date_edit(date_style, font_normal)
 
         self.cbo_department = QComboBox()
@@ -230,6 +233,11 @@ class EmployeeDialog(QDialog):
         self.cbo_id_issue_place.setFont(font_normal)
         self.cbo_id_issue_place.setFixedHeight(INPUT_HEIGHT_DEFAULT)
         self.cbo_id_issue_place.setStyleSheet(combo_style)
+
+        self.cbo_employment_status = QComboBox()
+        self.cbo_employment_status.setFont(font_normal)
+        self.cbo_employment_status.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.cbo_employment_status.setStyleSheet(combo_style)
 
         self.input_address = self._make_line_edit(input_style, font_normal)
         self.input_phone = self._make_line_edit(input_style, font_normal)
@@ -273,7 +281,9 @@ class EmployeeDialog(QDialog):
 
         # Left 50%
         left_form.addRow("Mã NV", self.input_code)
+        left_form.addRow("Mã CC", self.input_mcc_code)
         left_form.addRow("Họ và tên", self.input_name)
+        left_form.addRow("Tên trên MCC", self.input_name_on_mcc)
         left_form.addRow("Ngày vào làm", self.input_start_date)
         left_form.addRow("Phòng ban", self.cbo_department)
         left_form.addRow("Chức vụ", self.cbo_title)
@@ -303,6 +313,7 @@ class EmployeeDialog(QDialog):
         right_form.addRow("Ngày sinh con 2", self.input_child_dob_2)
         right_form.addRow("Ngày sinh con 3", self.input_child_dob_3)
         right_form.addRow("Ngày sinh con 4", self.input_child_dob_4)
+        right_form.addRow("Hiện trạng", self.cbo_employment_status)
 
         self.label_status = QLabel("")
         self.label_status.setWordWrap(True)
@@ -472,7 +483,6 @@ class EmployeeDialog(QDialog):
             cal.installEventFilter(EmployeeDialog._CalendarPopupMonthFix(w, cal))
         return w
 
-
     class _CalendarPopupMonthFix(QObject):
         def __init__(self, date_edit: QDateEdit, calendar_widget: QWidget) -> None:
             super().__init__(calendar_widget)
@@ -528,6 +538,7 @@ class EmployeeDialog(QDialog):
             self.cbo_title,
             self.cbo_gender,
             self.cbo_id_issue_place,
+            self.cbo_employment_status,
             self.spin_children,
             self.chk_contract1_signed,
             self.chk_contract2_indefinite,
@@ -562,6 +573,14 @@ class EmployeeDialog(QDialog):
             s = str(p or "").strip()
             if s:
                 self.cbo_id_issue_place.addItem(s)
+
+        # Employment status
+        self.cbo_employment_status.clear()
+        self.cbo_employment_status.addItem("Chưa chọn", "")
+        self.cbo_employment_status.addItem("Đi làm", "Đi làm")
+        self.cbo_employment_status.addItem("Nghỉ thai sản", "Nghỉ thai sản")
+        self.cbo_employment_status.addItem("Đã nghỉ việc", "Đã nghỉ việc")
+        self.cbo_employment_status.setCurrentIndex(0)
 
     def _set_combo_by_data(self, combo: QComboBox, value) -> None:
         for i in range(combo.count()):
@@ -606,6 +625,14 @@ class EmployeeDialog(QDialog):
 
         self.set_employee_code(str(e.get("employee_code") or ""))
         self.set_full_name(str(e.get("full_name") or ""))
+        try:
+            self.input_mcc_code.setText(str(e.get("mcc_code") or ""))
+        except Exception:
+            pass
+        try:
+            self.input_name_on_mcc.setText(str(e.get("name_on_mcc") or ""))
+        except Exception:
+            pass
 
         # dates
         for key, widget in (
@@ -641,6 +668,17 @@ class EmployeeDialog(QDialog):
                 self.cbo_id_issue_place.setCurrentText(place)
         else:
             self.cbo_id_issue_place.setCurrentIndex(0)
+
+        status = str(e.get("employment_status") or "").strip()
+        if status:
+            idx_s = self.cbo_employment_status.findData(status)
+            if idx_s >= 0:
+                self.cbo_employment_status.setCurrentIndex(idx_s)
+            else:
+                # Unknown/legacy value -> show as blank (unselected)
+                self.cbo_employment_status.setCurrentIndex(0)
+        else:
+            self.cbo_employment_status.setCurrentIndex(0)
 
         self.input_address.setText(str(e.get("address") or ""))
         self.input_phone.setText(str(e.get("phone") or ""))
@@ -678,9 +716,15 @@ class EmployeeDialog(QDialog):
         gender = str(gender).strip() if gender is not None else None
         issue_place = (self.cbo_id_issue_place.currentText() or "").strip() or None
 
+        status = self.cbo_employment_status.currentData()
+        status = str(status).strip() if status is not None else ""
+        status = status or None
+
         return {
             "employee_code": code,
+            "mcc_code": (self.input_mcc_code.text() or "").strip() or None,
             "full_name": name,
+            "name_on_mcc": (self.input_name_on_mcc.text() or "").strip() or None,
             "start_date": self._date_edit_to_iso(self.input_start_date),
             "department_id": int(dept_id) if dept_id is not None else None,
             "title_id": int(title_id) if title_id is not None else None,
@@ -689,6 +733,7 @@ class EmployeeDialog(QDialog):
             "national_id": (self.input_national_id.text() or "").strip() or None,
             "id_issue_date": self._date_edit_to_iso(self.input_id_issue_date),
             "id_issue_place": issue_place,
+            "employment_status": status,
             "address": (self.input_address.text() or "").strip() or None,
             "phone": (self.input_phone.text() or "").strip() or None,
             "insurance_no": (self.input_insurance.text() or "").strip() or None,

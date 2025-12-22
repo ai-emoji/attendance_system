@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QProgressDialog
 
 from services.employee_services import EmployeeService
 from ui.dialog.employee_dialog import EmployeeDialog
+from ui.dialog.employee_list_dialog import EmployeeListDialog
 from ui.dialog.import_employee_dialog import ImportEmployeeDialog
 from ui.dialog.title_dialog import MessageDialog
 
@@ -39,6 +40,7 @@ class EmployeeController:
         self._content.search_changed.connect(self.refresh)
         self._content.export_clicked.connect(self.on_export)
         self._content.import_clicked.connect(self.on_import)
+        self._content.view_list_clicked.connect(self.on_view_list)
         self._content.add_clicked.connect(self.on_add)
         self._content.edit_clicked.connect(self.on_edit)
         self._content.delete_clicked.connect(self.on_delete)
@@ -74,7 +76,6 @@ class EmployeeController:
             self._content.set_total(0)
 
     def on_export(self) -> None:
-        filters = self._content.get_filters()
         file_path, _ = QFileDialog.getSaveFileName(
             self._parent_window,
             "Xuất danh sách nhân viên",
@@ -83,13 +84,28 @@ class EmployeeController:
         )
         if not file_path:
             return
-        ok, msg = self._service.export_xlsx(file_path, filters)
+
+        selected_rows: list[dict] = []
+        try:
+            selected_rows = self._content.table.get_selected_row_dicts() or []
+        except Exception:
+            selected_rows = []
+
+        if selected_rows:
+            ok, msg = self._service.export_xlsx_rows(file_path, selected_rows)
+        else:
+            filters = self._content.get_filters()
+            ok, msg = self._service.export_xlsx(file_path, filters)
         MessageDialog.info(self._parent_window, "Xuất danh sách", msg)
 
     def on_import(self) -> None:
         dlg = ImportEmployeeDialog(service=self._service, parent=self._parent_window)
         if dlg.exec() == ImportEmployeeDialog.Accepted:
             self.refresh()
+
+    def on_view_list(self) -> None:
+        dlg = EmployeeListDialog(service=self._service, parent=self._parent_window)
+        dlg.exec()
 
     def on_add(self) -> None:
         departments = self._service.list_departments_dropdown()

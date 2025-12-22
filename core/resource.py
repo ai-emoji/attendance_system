@@ -19,7 +19,7 @@ _APP_ICON = None
 # ============================================================================
 # 1️⃣ KÍCH THƯỚC CỬA SỔ CHÍNH
 # ============================================================================
-MIN_MAINWINDOW_WIDTH = 1366
+MIN_MAINWINDOW_WIDTH = 1600
 MIN_MAINWINDOW_HEIGHT = 768
 
 # Dialog Thông tin công ty
@@ -293,6 +293,7 @@ ICON_NEXT = "assets/images/next.svg"
 ICON_MENU = "assets/images/menu.svg"
 ICON_CLOSE_MENU = "assets/images/close_menu.svg"
 ICON_DROPDOWN = "assets/images/dropdown.svg"
+ICON_LIST = "assets/images/list.svg"
 
 # Icon Refresh/Reload
 ICON_REFRESH = "assets/images/refresh.svg"

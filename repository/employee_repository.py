@@ -14,12 +14,18 @@ class EmployeeRepository:
     _import_schema_checked: bool = False
     _has_contract1_term: bool = False
     _has_sort_order: bool = False
+    _has_mcc_code: bool = False
+    _has_name_on_mcc: bool = False
+    _has_employment_status: bool = False
 
     def ensure_import_schema(self) -> None:
         """Ensure extra columns needed for Excel import exist.
 
         - contract1_term: stores values like '01 năm', '02 năm'
         - sort_order: preserves Excel/preview STT order (1..N)
+        - mcc_code: Mã CC
+        - name_on_mcc: Tên trên MCC
+        - employment_status: Hiện trạng (Đi làm/Đã nghỉ việc)
         """
 
         if EmployeeRepository._import_schema_checked:
@@ -34,7 +40,7 @@ class EmployeeRepository:
                     FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE()
                       AND TABLE_NAME = 'employees'
-                      AND COLUMN_NAME IN ('contract1_term', 'sort_order')
+                                            AND COLUMN_NAME IN ('contract1_term', 'sort_order', 'mcc_code', 'name_on_mcc', 'employment_status')
                     """
                 )
                 cols = {
@@ -44,12 +50,21 @@ class EmployeeRepository:
 
                 EmployeeRepository._has_contract1_term = "contract1_term" in cols
                 EmployeeRepository._has_sort_order = "sort_order" in cols
+                EmployeeRepository._has_mcc_code = "mcc_code" in cols
+                EmployeeRepository._has_name_on_mcc = "name_on_mcc" in cols
+                EmployeeRepository._has_employment_status = "employment_status" in cols
 
                 alters: list[str] = []
                 if not EmployeeRepository._has_contract1_term:
                     alters.append("ADD COLUMN contract1_term VARCHAR(50) NULL")
                 if not EmployeeRepository._has_sort_order:
                     alters.append("ADD COLUMN sort_order INT NULL")
+                if not EmployeeRepository._has_mcc_code:
+                    alters.append("ADD COLUMN mcc_code VARCHAR(50) NULL")
+                if not EmployeeRepository._has_name_on_mcc:
+                    alters.append("ADD COLUMN name_on_mcc VARCHAR(255) NULL")
+                if not EmployeeRepository._has_employment_status:
+                    alters.append("ADD COLUMN employment_status VARCHAR(20) NULL")
 
                 if alters:
                     # Execute as a single ALTER to keep it fast.
@@ -61,10 +76,16 @@ class EmployeeRepository:
                     # Refresh flags
                     EmployeeRepository._has_contract1_term = True
                     EmployeeRepository._has_sort_order = True
+                    EmployeeRepository._has_mcc_code = True
+                    EmployeeRepository._has_name_on_mcc = True
+                    EmployeeRepository._has_employment_status = True
         except Exception:
             # If the DB user lacks INFORMATION_SCHEMA/ALTER permissions, keep the app usable.
             EmployeeRepository._has_contract1_term = False
             EmployeeRepository._has_sort_order = False
+            EmployeeRepository._has_mcc_code = False
+            EmployeeRepository._has_name_on_mcc = False
+            EmployeeRepository._has_employment_status = False
 
         EmployeeRepository._import_schema_checked = True
 
@@ -75,7 +96,9 @@ class EmployeeRepository:
                 id,
                 {sort_order_col}
                 employee_code,
+                {mcc_code_col}
                 full_name,
+                {name_on_mcc_col}
                 start_date,
                 title_id,
                 department_id,
@@ -103,6 +126,7 @@ class EmployeeRepository:
                 child_dob_2,
                 child_dob_3,
                 child_dob_4,
+                {employment_status_col}
                 note
             FROM employees
             WHERE employee_code = %s
@@ -117,14 +141,31 @@ class EmployeeRepository:
             if EmployeeRepository._has_sort_order
             else "NULL AS sort_order,"
         )
+        mcc_code_col = (
+            "mcc_code," if EmployeeRepository._has_mcc_code else "NULL AS mcc_code,"
+        )
+        name_on_mcc_col = (
+            "name_on_mcc,"
+            if EmployeeRepository._has_name_on_mcc
+            else "NULL AS name_on_mcc,"
+        )
         contract1_term_col = (
             "contract1_term,"
             if EmployeeRepository._has_contract1_term
             else "NULL AS contract1_term,"
         )
+        employment_status_col = (
+            "employment_status,"
+            if EmployeeRepository._has_employment_status
+            else "NULL AS employment_status,"
+        )
 
         sql = sql.format(
-            sort_order_col=sort_order_col, contract1_term_col=contract1_term_col
+            sort_order_col=sort_order_col,
+            mcc_code_col=mcc_code_col,
+            name_on_mcc_col=name_on_mcc_col,
+            contract1_term_col=contract1_term_col,
+            employment_status_col=employment_status_col,
         )
         with Database.connect() as conn:
             cursor = Database.get_cursor(conn, dictionary=True)
@@ -138,7 +179,9 @@ class EmployeeRepository:
                 id,
                 {sort_order_col}
                 employee_code,
+                {mcc_code_col}
                 full_name,
+                {name_on_mcc_col}
                 start_date,
                 title_id,
                 department_id,
@@ -166,6 +209,7 @@ class EmployeeRepository:
                 child_dob_2,
                 child_dob_3,
                 child_dob_4,
+                {employment_status_col}
                 note
             FROM employees
             WHERE id = %s
@@ -176,13 +220,30 @@ class EmployeeRepository:
             if EmployeeRepository._has_sort_order
             else "NULL AS sort_order,"
         )
+        mcc_code_col = (
+            "mcc_code," if EmployeeRepository._has_mcc_code else "NULL AS mcc_code,"
+        )
+        name_on_mcc_col = (
+            "name_on_mcc,"
+            if EmployeeRepository._has_name_on_mcc
+            else "NULL AS name_on_mcc,"
+        )
         contract1_term_col = (
             "contract1_term,"
             if EmployeeRepository._has_contract1_term
             else "NULL AS contract1_term,"
         )
+        employment_status_col = (
+            "employment_status,"
+            if EmployeeRepository._has_employment_status
+            else "NULL AS employment_status,"
+        )
         sql = sql.format(
-            sort_order_col=sort_order_col, contract1_term_col=contract1_term_col
+            sort_order_col=sort_order_col,
+            mcc_code_col=mcc_code_col,
+            name_on_mcc_col=name_on_mcc_col,
+            contract1_term_col=contract1_term_col,
+            employment_status_col=employment_status_col,
         )
         with Database.connect() as conn:
             cursor = Database.get_cursor(conn, dictionary=True)
@@ -191,14 +252,52 @@ class EmployeeRepository:
 
     def create_employee(self, data: dict[str, Any]) -> int:
         self.ensure_import_schema()
+        has_mcc = (
+            EmployeeRepository._has_mcc_code and EmployeeRepository._has_name_on_mcc
+        )
+        has_status = EmployeeRepository._has_employment_status
+
         if (
             EmployeeRepository._has_contract1_term
             and EmployeeRepository._has_sort_order
+            and has_mcc
+            and has_status
         ):
             sql = """
                 INSERT INTO employees (
                     sort_order,
                     employee_code, full_name, start_date, title_id, department_id,
+                    mcc_code, name_on_mcc,
+                    date_of_birth, gender, national_id, id_issue_date, id_issue_place,
+                    address, phone, insurance_no, tax_code, degree, major,
+                    contract1_signed, contract1_term, contract1_no, contract1_sign_date, contract1_expire_date,
+                    contract2_indefinite, contract2_no, contract2_sign_date,
+                    children_count, child_dob_1, child_dob_2, child_dob_3, child_dob_4,
+                    employment_status,
+                    note
+                ) VALUES (
+                    %s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,
+                    %s
+                )
+            """
+        elif (
+            EmployeeRepository._has_contract1_term
+            and EmployeeRepository._has_sort_order
+            and has_mcc
+        ):
+            sql = """
+                INSERT INTO employees (
+                    sort_order,
+                    employee_code, full_name, start_date, title_id, department_id,
+                    mcc_code, name_on_mcc,
                     date_of_birth, gender, national_id, id_issue_date, id_issue_place,
                     address, phone, insurance_no, tax_code, degree, major,
                     contract1_signed, contract1_term, contract1_no, contract1_sign_date, contract1_expire_date,
@@ -208,6 +307,7 @@ class EmployeeRepository:
                 ) VALUES (
                     %s,
                     %s,%s,%s,%s,%s,
+                    %s,%s,
                     %s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,
@@ -216,10 +316,35 @@ class EmployeeRepository:
                     %s
                 )
             """
-        else:
+        elif has_mcc and has_status:
             sql = """
                 INSERT INTO employees (
                     employee_code, full_name, start_date, title_id, department_id,
+                    mcc_code, name_on_mcc,
+                    date_of_birth, gender, national_id, id_issue_date, id_issue_place,
+                    address, phone, insurance_no, tax_code, degree, major,
+                    contract1_signed, contract1_no, contract1_sign_date, contract1_expire_date,
+                    contract2_indefinite, contract2_no, contract2_sign_date,
+                    children_count, child_dob_1, child_dob_2, child_dob_3, child_dob_4,
+                    employment_status,
+                    note
+                ) VALUES (
+                    %s,%s,%s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,
+                    %s
+                )
+            """
+        elif has_mcc:
+            sql = """
+                INSERT INTO employees (
+                    employee_code, full_name, start_date, title_id, department_id,
+                    mcc_code, name_on_mcc,
                     date_of_birth, gender, national_id, id_issue_date, id_issue_place,
                     address, phone, insurance_no, tax_code, degree, major,
                     contract1_signed, contract1_no, contract1_sign_date, contract1_expire_date,
@@ -228,6 +353,7 @@ class EmployeeRepository:
                     note
                 ) VALUES (
                     %s,%s,%s,%s,%s,
+                    %s,%s,
                     %s,%s,%s,%s,%s,
                     %s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,
@@ -236,11 +362,56 @@ class EmployeeRepository:
                     %s
                 )
             """
+        else:
+            if has_status:
+                sql = """
+                    INSERT INTO employees (
+                        employee_code, full_name, start_date, title_id, department_id,
+                        date_of_birth, gender, national_id, id_issue_date, id_issue_place,
+                        address, phone, insurance_no, tax_code, degree, major,
+                        contract1_signed, contract1_no, contract1_sign_date, contract1_expire_date,
+                        contract2_indefinite, contract2_no, contract2_sign_date,
+                        children_count, child_dob_1, child_dob_2, child_dob_3, child_dob_4,
+                        employment_status,
+                        note
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,
+                        %s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,
+                        %s
+                    )
+                """
+            else:
+                sql = """
+                    INSERT INTO employees (
+                        employee_code, full_name, start_date, title_id, department_id,
+                        date_of_birth, gender, national_id, id_issue_date, id_issue_place,
+                        address, phone, insurance_no, tax_code, degree, major,
+                        contract1_signed, contract1_no, contract1_sign_date, contract1_expire_date,
+                        contract2_indefinite, contract2_no, contract2_sign_date,
+                        children_count, child_dob_1, child_dob_2, child_dob_3, child_dob_4,
+                        note
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,
+                        %s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s
+                    )
+                """
         with Database.connect() as conn:
             cursor = Database.get_cursor(conn, dictionary=False)
             if (
                 EmployeeRepository._has_contract1_term
                 and EmployeeRepository._has_sort_order
+                and has_mcc
+                and has_status
             ):
                 cursor.execute(
                     sql,
@@ -251,6 +422,52 @@ class EmployeeRepository:
                         data.get("start_date"),
                         data.get("title_id"),
                         data.get("department_id"),
+                        data.get("mcc_code"),
+                        data.get("name_on_mcc"),
+                        data.get("date_of_birth"),
+                        data.get("gender"),
+                        data.get("national_id"),
+                        data.get("id_issue_date"),
+                        data.get("id_issue_place"),
+                        data.get("address"),
+                        data.get("phone"),
+                        data.get("insurance_no"),
+                        data.get("tax_code"),
+                        data.get("degree"),
+                        data.get("major"),
+                        1 if data.get("contract1_signed") else 0,
+                        data.get("contract1_term"),
+                        data.get("contract1_no"),
+                        data.get("contract1_sign_date"),
+                        data.get("contract1_expire_date"),
+                        1 if data.get("contract2_indefinite") else 0,
+                        data.get("contract2_no"),
+                        data.get("contract2_sign_date"),
+                        data.get("children_count"),
+                        data.get("child_dob_1"),
+                        data.get("child_dob_2"),
+                        data.get("child_dob_3"),
+                        data.get("child_dob_4"),
+                        data.get("employment_status"),
+                        data.get("note"),
+                    ),
+                )
+            elif (
+                EmployeeRepository._has_contract1_term
+                and EmployeeRepository._has_sort_order
+                and has_mcc
+            ):
+                cursor.execute(
+                    sql,
+                    (
+                        data.get("sort_order"),
+                        data.get("employee_code"),
+                        data.get("full_name"),
+                        data.get("start_date"),
+                        data.get("title_id"),
+                        data.get("department_id"),
+                        data.get("mcc_code"),
+                        data.get("name_on_mcc"),
                         data.get("date_of_birth"),
                         data.get("gender"),
                         data.get("national_id"),
@@ -278,7 +495,7 @@ class EmployeeRepository:
                         data.get("note"),
                     ),
                 )
-            else:
+            elif has_mcc and has_status:
                 cursor.execute(
                     sql,
                     (
@@ -287,6 +504,46 @@ class EmployeeRepository:
                         data.get("start_date"),
                         data.get("title_id"),
                         data.get("department_id"),
+                        data.get("mcc_code"),
+                        data.get("name_on_mcc"),
+                        data.get("date_of_birth"),
+                        data.get("gender"),
+                        data.get("national_id"),
+                        data.get("id_issue_date"),
+                        data.get("id_issue_place"),
+                        data.get("address"),
+                        data.get("phone"),
+                        data.get("insurance_no"),
+                        data.get("tax_code"),
+                        data.get("degree"),
+                        data.get("major"),
+                        1 if data.get("contract1_signed") else 0,
+                        data.get("contract1_no"),
+                        data.get("contract1_sign_date"),
+                        data.get("contract1_expire_date"),
+                        1 if data.get("contract2_indefinite") else 0,
+                        data.get("contract2_no"),
+                        data.get("contract2_sign_date"),
+                        data.get("children_count"),
+                        data.get("child_dob_1"),
+                        data.get("child_dob_2"),
+                        data.get("child_dob_3"),
+                        data.get("child_dob_4"),
+                        data.get("employment_status"),
+                        data.get("note"),
+                    ),
+                )
+            elif has_mcc:
+                cursor.execute(
+                    sql,
+                    (
+                        data.get("employee_code"),
+                        data.get("full_name"),
+                        data.get("start_date"),
+                        data.get("title_id"),
+                        data.get("department_id"),
+                        data.get("mcc_code"),
+                        data.get("name_on_mcc"),
                         data.get("date_of_birth"),
                         data.get("gender"),
                         data.get("national_id"),
@@ -313,6 +570,78 @@ class EmployeeRepository:
                         data.get("note"),
                     ),
                 )
+            else:
+                if has_status:
+                    cursor.execute(
+                        sql,
+                        (
+                            data.get("employee_code"),
+                            data.get("full_name"),
+                            data.get("start_date"),
+                            data.get("title_id"),
+                            data.get("department_id"),
+                            data.get("date_of_birth"),
+                            data.get("gender"),
+                            data.get("national_id"),
+                            data.get("id_issue_date"),
+                            data.get("id_issue_place"),
+                            data.get("address"),
+                            data.get("phone"),
+                            data.get("insurance_no"),
+                            data.get("tax_code"),
+                            data.get("degree"),
+                            data.get("major"),
+                            1 if data.get("contract1_signed") else 0,
+                            data.get("contract1_no"),
+                            data.get("contract1_sign_date"),
+                            data.get("contract1_expire_date"),
+                            1 if data.get("contract2_indefinite") else 0,
+                            data.get("contract2_no"),
+                            data.get("contract2_sign_date"),
+                            data.get("children_count"),
+                            data.get("child_dob_1"),
+                            data.get("child_dob_2"),
+                            data.get("child_dob_3"),
+                            data.get("child_dob_4"),
+                            data.get("employment_status"),
+                            data.get("note"),
+                        ),
+                    )
+                else:
+                    cursor.execute(
+                        sql,
+                        (
+                            data.get("employee_code"),
+                            data.get("full_name"),
+                            data.get("start_date"),
+                            data.get("title_id"),
+                            data.get("department_id"),
+                            data.get("date_of_birth"),
+                            data.get("gender"),
+                            data.get("national_id"),
+                            data.get("id_issue_date"),
+                            data.get("id_issue_place"),
+                            data.get("address"),
+                            data.get("phone"),
+                            data.get("insurance_no"),
+                            data.get("tax_code"),
+                            data.get("degree"),
+                            data.get("major"),
+                            1 if data.get("contract1_signed") else 0,
+                            data.get("contract1_no"),
+                            data.get("contract1_sign_date"),
+                            data.get("contract1_expire_date"),
+                            1 if data.get("contract2_indefinite") else 0,
+                            data.get("contract2_no"),
+                            data.get("contract2_sign_date"),
+                            data.get("children_count"),
+                            data.get("child_dob_1"),
+                            data.get("child_dob_2"),
+                            data.get("child_dob_3"),
+                            data.get("child_dob_4"),
+                            data.get("note"),
+                        ),
+                    )
             conn.commit()
             return int(cursor.lastrowid)
 
@@ -338,6 +667,11 @@ class EmployeeRepository:
 
     def update_employee(self, employee_id: int, data: dict[str, Any]) -> int:
         self.ensure_import_schema()
+        has_mcc = (
+            EmployeeRepository._has_mcc_code and EmployeeRepository._has_name_on_mcc
+        )
+        has_status = EmployeeRepository._has_employment_status
+
         if (
             EmployeeRepository._has_contract1_term
             and EmployeeRepository._has_sort_order
@@ -351,6 +685,7 @@ class EmployeeRepository:
                     start_date = %s,
                     title_id = %s,
                     department_id = %s,
+                    {mcc_set}
                     date_of_birth = %s,
                     gender = %s,
                     national_id = %s,
@@ -375,6 +710,7 @@ class EmployeeRepository:
                     child_dob_2 = %s,
                     child_dob_3 = %s,
                     child_dob_4 = %s,
+                    {status_set}
                     note = %s
                 WHERE id = %s
             """
@@ -387,6 +723,7 @@ class EmployeeRepository:
                     start_date = %s,
                     title_id = %s,
                     department_id = %s,
+                    {mcc_set}
                     date_of_birth = %s,
                     gender = %s,
                     national_id = %s,
@@ -410,24 +747,36 @@ class EmployeeRepository:
                     child_dob_2 = %s,
                     child_dob_3 = %s,
                     child_dob_4 = %s,
+                    {status_set}
                     note = %s
                 WHERE id = %s
             """
+
+        mcc_set = ""
+        if has_mcc:
+            mcc_set = "mcc_code = %s,\n                    name_on_mcc = %s,\n"
+        status_set = ""
+        if has_status:
+            status_set = "employment_status = %s,\n                    "
+        sql = sql.format(mcc_set=mcc_set, status_set=status_set)
         with Database.connect() as conn:
             cursor = Database.get_cursor(conn, dictionary=False)
             if (
                 EmployeeRepository._has_contract1_term
                 and EmployeeRepository._has_sort_order
             ):
-                cursor.execute(
-                    sql,
-                    (
-                        data.get("sort_order"),
-                        data.get("employee_code"),
-                        data.get("full_name"),
-                        data.get("start_date"),
-                        data.get("title_id"),
-                        data.get("department_id"),
+                params: list[Any] = [
+                    data.get("sort_order"),
+                    data.get("employee_code"),
+                    data.get("full_name"),
+                    data.get("start_date"),
+                    data.get("title_id"),
+                    data.get("department_id"),
+                ]
+                if has_mcc:
+                    params.extend([data.get("mcc_code"), data.get("name_on_mcc")])
+                params.extend(
+                    [
                         data.get("date_of_birth"),
                         data.get("gender"),
                         data.get("national_id"),
@@ -452,19 +801,27 @@ class EmployeeRepository:
                         data.get("child_dob_2"),
                         data.get("child_dob_3"),
                         data.get("child_dob_4"),
+                        *([data.get("employment_status")] if has_status else []),
                         data.get("note"),
                         int(employee_id),
-                    ),
+                    ]
                 )
-            else:
                 cursor.execute(
                     sql,
-                    (
-                        data.get("employee_code"),
-                        data.get("full_name"),
-                        data.get("start_date"),
-                        data.get("title_id"),
-                        data.get("department_id"),
+                    tuple(params),
+                )
+            else:
+                params2: list[Any] = [
+                    data.get("employee_code"),
+                    data.get("full_name"),
+                    data.get("start_date"),
+                    data.get("title_id"),
+                    data.get("department_id"),
+                ]
+                if has_mcc:
+                    params2.extend([data.get("mcc_code"), data.get("name_on_mcc")])
+                params2.extend(
+                    [
                         data.get("date_of_birth"),
                         data.get("gender"),
                         data.get("national_id"),
@@ -488,9 +845,14 @@ class EmployeeRepository:
                         data.get("child_dob_2"),
                         data.get("child_dob_3"),
                         data.get("child_dob_4"),
+                        *([data.get("employment_status")] if has_status else []),
                         data.get("note"),
                         int(employee_id),
-                    ),
+                    ]
+                )
+                cursor.execute(
+                    sql,
+                    tuple(params2),
                 )
             conn.commit()
             return int(cursor.rowcount)
@@ -565,8 +927,11 @@ class EmployeeRepository:
         self,
         employee_code: str | None = None,
         full_name: str | None = None,
+        sort_order: int | None = None,
+        employment_status: str | None = None,
         department_id: int | None = None,
     ) -> list[dict[str, Any]]:
+        self.ensure_import_schema()
         where: list[str] = []
         params: list[Any] = []
 
@@ -578,13 +943,24 @@ class EmployeeRepository:
             where.append("e.full_name LIKE %s")
             params.append(f"%{full_name}%")
 
+        if (
+            EmployeeRepository._has_sort_order
+            and sort_order is not None
+            and str(sort_order) != ""
+        ):
+            where.append("e.sort_order = %s")
+            params.append(int(sort_order))
+
+        if EmployeeRepository._has_employment_status and employment_status:
+            where.append("e.employment_status = %s")
+            params.append(str(employment_status).strip())
+
         if department_id:
             where.append("e.department_id = %s")
             params.append(int(department_id))
 
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
-        self.ensure_import_schema()
         if EmployeeRepository._has_sort_order:
             stt_expr = "COALESCE(e.sort_order, (SELECT COUNT(*) FROM employees e2 WHERE e2.id > e.id) + 1)"
             order_by = "ORDER BY (e.sort_order IS NULL) ASC, e.sort_order ASC, e.id ASC"
@@ -598,12 +974,29 @@ class EmployeeRepository:
             else "NULL AS contract1_term"
         )
 
+        mcc_code_sel = (
+            "e.mcc_code" if EmployeeRepository._has_mcc_code else "NULL AS mcc_code"
+        )
+        name_on_mcc_sel = (
+            "e.name_on_mcc"
+            if EmployeeRepository._has_name_on_mcc
+            else "NULL AS name_on_mcc"
+        )
+
+        employment_status_sel = (
+            "e.employment_status"
+            if EmployeeRepository._has_employment_status
+            else "NULL AS employment_status"
+        )
+
         sql = f"""
             SELECT
                 e.id,
                 {stt_expr} AS stt,
                 e.employee_code,
+                {mcc_code_sel} AS mcc_code,
                 e.full_name,
+                {name_on_mcc_sel} AS name_on_mcc,
                 e.start_date,
                 jt.title_name,
                 d.department_name,
@@ -631,6 +1024,7 @@ class EmployeeRepository:
                 e.child_dob_2,
                 e.child_dob_3,
                 e.child_dob_4,
+                {employment_status_sel} AS employment_status,
                 e.note
             FROM employees e
             LEFT JOIN job_titles jt ON jt.id = e.title_id
@@ -666,7 +1060,9 @@ class EmployeeRepository:
                     # STT comes from sort_order (Excel order) when available; otherwise falls back to stable rank.
                     "stt": stt_val if stt_val > 0 else idx,
                     "employee_code": r.get("employee_code"),
+                    "mcc_code": r.get("mcc_code"),
                     "full_name": r.get("full_name"),
+                    "name_on_mcc": r.get("name_on_mcc"),
                     "start_date": to_str(r.get("start_date")),
                     "title_name": r.get("title_name"),
                     "department_name": r.get("department_name"),
@@ -696,6 +1092,7 @@ class EmployeeRepository:
                     "child_dob_2": to_str(r.get("child_dob_2")),
                     "child_dob_3": to_str(r.get("child_dob_3")),
                     "child_dob_4": to_str(r.get("child_dob_4")),
+                    "employment_status": r.get("employment_status"),
                     "note": r.get("note"),
                 }
             )

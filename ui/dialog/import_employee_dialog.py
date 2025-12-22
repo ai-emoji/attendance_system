@@ -16,6 +16,9 @@ Luồng:
 
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
+
 from PySide6.QtCore import QEvent, QSize, Qt
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
@@ -146,6 +149,10 @@ class ImportEmployeeDialog(QDialog):
         top_l.addWidget(self.btn_apply_db, 0)
 
         self.table = EmployeeTable(self)
+        try:
+            self.table.show_all_columns()
+        except Exception:
+            pass
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -261,11 +268,14 @@ class ImportEmployeeDialog(QDialog):
             if progress.wasCanceled():
                 raise RuntimeError("Đã hủy.")
 
+        report_items: list[dict] = []
+
         try:
             ok, msg = self._service.import_employees_rows(
                 self._preview_rows,
                 only_new=only_new,
                 progress_cb=on_progress,
+                report=report_items,
             )
         except Exception as exc:
             progress.close()
@@ -283,11 +293,88 @@ class ImportEmployeeDialog(QDialog):
 
         self._set_status(msg, ok=ok)
 
-        # Always show 1 dialog summarizing counts.
+        # Show summary of what succeeded / was skipped / failed.
         try:
-            MessageDialog.info(self, "Nhập nhân viên", msg)
+            success_items = [
+                it
+                for it in report_items
+                if str(it.get("result") or "").upper() == "SUCCESS"
+            ]
+            skipped_items = [
+                it
+                for it in report_items
+                if str(it.get("result") or "").upper() == "SKIPPED"
+            ]
+            invalid_items = [
+                it
+                for it in report_items
+                if str(it.get("result") or "").upper() == "INVALID"
+            ]
+            failed_items = [
+                it
+                for it in report_items
+                if str(it.get("result") or "").upper() == "FAILED"
+            ]
+
+            def _fmt_lines(items: list[dict], limit: int = 8) -> str:
+                lines: list[str] = []
+                for it in items[:limit]:
+                    code = str(it.get("employee_code") or "").strip() or "(không mã)"
+                    name = str(it.get("full_name") or "").strip()
+                    msg_row = str(it.get("message") or "").strip()
+                    if name:
+                        lines.append(f"- {code} | {name} | {msg_row}")
+                    else:
+                        lines.append(f"- {code} | {msg_row}")
+                if len(items) > limit:
+                    lines.append(f"... (+{len(items) - limit} dòng)")
+                return "\n".join(lines)
+
+            detail_msg_parts: list[str] = [msg]
+            detail_msg_parts.append("")
+            detail_msg_parts.append(f"Thành công ({len(success_items)}):")
+            detail_msg_parts.append(_fmt_lines(success_items))
+            detail_msg_parts.append("")
+            detail_msg_parts.append(f"Bỏ qua ({len(skipped_items)}):")
+            detail_msg_parts.append(_fmt_lines(skipped_items))
+            detail_msg_parts.append("")
+            detail_msg_parts.append(f"Lỗi dữ liệu ({len(invalid_items)}):")
+            detail_msg_parts.append(_fmt_lines(invalid_items))
+            detail_msg_parts.append("")
+            detail_msg_parts.append(f"Thất bại ({len(failed_items)}):")
+            detail_msg_parts.append(_fmt_lines(failed_items))
+
+            # Save full report to log file for review (MessageDialog is small).
+            report_path: Path | None = None
+            try:
+                log_dir = Path("log")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                report_path = log_dir / f"import_employee_report_{ts}.txt"
+                with report_path.open("w", encoding="utf-8") as f:
+                    f.write(msg + "\n\n")
+                    for it in report_items:
+                        idx = str(it.get("index") or "")
+                        code = str(it.get("employee_code") or "").strip()
+                        name = str(it.get("full_name") or "").strip()
+                        res = str(it.get("result") or "").strip()
+                        action = str(it.get("action") or "").strip()
+                        msg_row = str(it.get("message") or "").strip()
+                        f.write(f"{idx}\t{res}\t{action}\t{code}\t{name}\t{msg_row}\n")
+            except Exception:
+                report_path = None
+
+            if report_path is not None:
+                detail_msg_parts.append("")
+                detail_msg_parts.append(f"Chi tiết đầy đủ đã lưu: {report_path}")
+
+            MessageDialog.info(self, "Nhập nhân viên", "\n".join(detail_msg_parts))
         except Exception:
-            pass
+            # Fallback: Always show at least the summary.
+            try:
+                MessageDialog.info(self, "Nhập nhân viên", msg)
+            except Exception:
+                pass
 
         if ok:
             self.accept()

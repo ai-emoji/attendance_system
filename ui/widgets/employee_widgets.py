@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QComboBox,
     QPushButton,
     QFrame,
     QSizePolicy,
@@ -74,6 +75,7 @@ from core.resource import (
     TITLE_HEIGHT,
     UI_FONT,
     ICON_EXCEL,
+    ICON_LIST,
     ICON_IMPORT,
     ICON_DROPDOWN,
     resource_path,
@@ -329,7 +331,9 @@ class _EmployeeTableModel(QAbstractTableModel):
         ("id", "ID"),
         ("stt", "STT"),
         ("employee_code", "MÃ NV"),
+        ("mcc_code", "Mã CC"),
         ("full_name", "HỌ VÀ TÊN"),
+        ("name_on_mcc", "Tên trên MCC"),
         ("start_date", "Ngày vào làm"),
         ("title_name", "Chức Vụ"),
         ("department_name", "Phòng Ban"),
@@ -356,6 +360,7 @@ class _EmployeeTableModel(QAbstractTableModel):
         ("child_dob_2", "Ngày sinh con 2"),
         ("child_dob_3", "Ngày sinh con 3"),
         ("child_dob_4", "Ngày sinh con 4"),
+        ("employment_status", "Hiện trạng"),
         ("note", "Ghi chú"),
     ]
 
@@ -431,6 +436,21 @@ class _EmployeeTableModel(QAbstractTableModel):
         norm: list[dict] = []
         for idx, r in enumerate(rows, start=1):
             item = {k: r.get(k) for k in cols}
+
+            # Backward/forward compatibility:
+            # Excel/template and some code paths use `contract1_signed`, while the table
+            # column is `contract1_term` (label: HĐLĐ (ký lần 1)).
+            # Fill the display column from `contract1_signed` when missing.
+            c1_term = item.get("contract1_term")
+            if c1_term is None or str(c1_term).strip() == "":
+                c1_signed = r.get("contract1_signed")
+                if (
+                    c1_signed is not None
+                    and not isinstance(c1_signed, bool)
+                    and str(c1_signed).strip() != ""
+                ):
+                    item["contract1_term"] = str(c1_signed).strip()
+
             stt_val = r.get("stt")
             if stt_val is None or str(stt_val).strip() == "":
                 stt_val = r.get("sort_order")
@@ -798,6 +818,19 @@ class EmployeeTable(QTableView):
 
         self._configure_columns()
 
+    def _col_index(self, key: str) -> int:
+        k = str(key or "").strip()
+        for i, (col_key, _label) in enumerate(self._model.COLUMNS):
+            if col_key == k:
+                return int(i)
+        return -1
+
+    def show_all_columns(self) -> None:
+        """Show all columns except the hidden ID column."""
+        for i, (k, _label) in enumerate(self._model.COLUMNS):
+            self.setColumnHidden(int(i), False)
+        self.setColumnHidden(self._col_index("id"), True)
+
     def _apply_table_style_main(self) -> None:
         self.setStyleSheet(
             "\n".join(
@@ -815,20 +848,22 @@ class EmployeeTable(QTableView):
         )
 
     def _configure_columns(self) -> None:
-        # Hide ID
-        self.setColumnHidden(0, True)
+        # Hide ID + MCC columns in the main table.
+        self.setColumnHidden(self._col_index("id"), True)
+        self.setColumnHidden(self._col_index("mcc_code"), True)
+        self.setColumnHidden(self._col_index("name_on_mcc"), True)
 
         # Column widths
-        self.setColumnWidth(1, 70)  # STT
-        self.setColumnWidth(2, 120)  # MÃ NV
-        self.setColumnWidth(3, 220)  # HỌ VÀ TÊN
+        self.setColumnWidth(self._col_index("stt"), 70)
+        self.setColumnWidth(self._col_index("employee_code"), 120)
+        self.setColumnWidth(self._col_index("full_name"), 220)
 
         # Main columns sizing
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.horizontalHeader().setDefaultSectionSize(160)
         # Some wider columns
-        self.setColumnWidth(12, 240)  # address
-        self.setColumnWidth(30, 260)  # note
+        self.setColumnWidth(self._col_index("address"), 240)
+        self.setColumnWidth(self._col_index("note"), 260)
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -908,6 +943,47 @@ class EmployeeTable(QTableView):
 
         return out
 
+    def get_selected_row_dicts(self) -> list[dict]:
+        """Return selected rows as dictionaries in current view order."""
+
+        sm = self.selectionModel()
+        if sm is None:
+            return []
+
+        selected_indexes = sm.selectedIndexes()  # type: ignore[call-arg]
+        if not selected_indexes:
+            return []
+
+        proxy_rows = sorted({int(i.row()) for i in selected_indexes if i.isValid()})
+        if not proxy_rows:
+            return []
+
+        out: list[dict] = []
+        seen_ids: set[int] = set()
+        proxy_row_count = int(self._proxy.rowCount())
+        for proxy_row in proxy_rows:
+            if proxy_row < 0 or proxy_row >= proxy_row_count:
+                continue
+
+            src_idx = self._proxy.mapToSource(self._proxy.index(int(proxy_row), 0))
+            src_row = int(src_idx.row())
+            data = self._model.get_row_dict(src_row)
+            if not data:
+                continue
+
+            try:
+                emp_id = int(str(data.get("id") or "0") or 0)
+            except Exception:
+                emp_id = 0
+            if emp_id > 0:
+                if emp_id in seen_ids:
+                    continue
+                seen_ids.add(emp_id)
+
+            out.append(dict(data))
+
+        return out
+
     def set_rows(self, rows: list[dict]) -> None:
         self._model.set_rows(rows)
 
@@ -919,6 +995,7 @@ class MainContent(QWidget):
     search_changed = Signal()
     export_clicked = Signal()
     import_clicked = Signal()
+    view_list_clicked = Signal()
     add_clicked = Signal()
     edit_clicked = Signal()
     delete_clicked = Signal()
@@ -957,15 +1034,18 @@ class MainContent(QWidget):
         if FONT_WEIGHT_NORMAL >= 400:
             font_normal.setWeight(QFont.Weight.Normal)
 
-        self.inp_search_code = QLineEdit()
-        self.inp_search_code.setPlaceholderText("Tìm Mã NV...")
-        self.inp_search_code.setFixedHeight(32)
-        self.inp_search_code.setFont(font_normal)
+        self.cbo_search_by = QComboBox()
+        self.cbo_search_by.setFixedHeight(32)
+        self.cbo_search_by.setFont(font_normal)
+        self.cbo_search_by.addItem("STT", "stt")
+        self.cbo_search_by.addItem("Mã NV", "employee_code")
+        self.cbo_search_by.addItem("Họ và tên", "full_name")
+        self.cbo_search_by.setCurrentIndex(1)
 
-        self.inp_search_name = QLineEdit()
-        self.inp_search_name.setPlaceholderText("Tìm Họ và tên...")
-        self.inp_search_name.setFixedHeight(32)
-        self.inp_search_name.setFont(font_normal)
+        self.inp_search_text = QLineEdit()
+        self.inp_search_text.setPlaceholderText("Tìm kiếm...")
+        self.inp_search_text.setFixedHeight(32)
+        self.inp_search_text.setFont(font_normal)
 
         self.btn_export = QPushButton("Xuất danh sách")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -990,6 +1070,13 @@ class MainContent(QWidget):
         self.btn_import.setStyleSheet(self.btn_export.styleSheet())
 
         btn_style = self.btn_export.styleSheet()
+
+        self.btn_view_list = QPushButton("Xem danh sách")
+        self.btn_view_list.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_view_list.setFixedHeight(32)
+        self.btn_view_list.setIcon(QIcon(resource_path(ICON_LIST)))
+        self.btn_view_list.setIconSize(QSize(18, 18))
+        self.btn_view_list.setStyleSheet(btn_style)
 
         self.btn_add = QPushButton("Thêm NV")
         self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1025,8 +1112,9 @@ class MainContent(QWidget):
         )
         self.label_total.setFont(font_normal)
 
-        h.addWidget(self.inp_search_code, 0)
-        h.addWidget(self.inp_search_name, 1)
+        h.addWidget(self.cbo_search_by, 0)
+        h.addWidget(self.inp_search_text, 1)
+        h.addWidget(self.btn_view_list, 0)
         h.addWidget(self.btn_add, 0)
         h.addWidget(self.btn_edit, 0)
         h.addWidget(self.btn_delete, 0)
@@ -1051,11 +1139,14 @@ class MainContent(QWidget):
         root.addWidget(splitter, 1)
 
         # Signals
-        self.inp_search_code.textChanged.connect(lambda _t: self.search_changed.emit())
-        self.inp_search_name.textChanged.connect(lambda _t: self.search_changed.emit())
+        self.inp_search_text.textChanged.connect(lambda _t: self.search_changed.emit())
+        self.cbo_search_by.currentIndexChanged.connect(
+            lambda _i: self.search_changed.emit()
+        )
         self.department_tree.selection_changed.connect(self.search_changed.emit)
         self.btn_export.clicked.connect(self.export_clicked.emit)
         self.btn_import.clicked.connect(self.import_clicked.emit)
+        self.btn_view_list.clicked.connect(self.view_list_clicked.emit)
         self.btn_add.clicked.connect(self.add_clicked.emit)
         self.btn_edit.clicked.connect(self.edit_clicked.emit)
         self.btn_delete.clicked.connect(self.delete_clicked.emit)
@@ -1069,12 +1160,38 @@ class MainContent(QWidget):
             self.table.clear_column_filters()
         except Exception:
             pass
+
+        # Reset search inputs
+        try:
+            self.inp_search_text.blockSignals(True)
+            self.inp_search_text.setText("")
+        finally:
+            try:
+                self.inp_search_text.blockSignals(False)
+            except Exception:
+                pass
+
+        # Default search_by: Mã NV (index 1)
+        try:
+            self.cbo_search_by.blockSignals(True)
+            self.cbo_search_by.setCurrentIndex(1)
+        finally:
+            try:
+                self.cbo_search_by.blockSignals(False)
+            except Exception:
+                pass
+
+        # Trigger a refresh after resetting UI state
         self.refresh_clicked.emit()
 
     def get_filters(self) -> dict:
         dept = self.department_tree.get_selected_department()
+
+        search_text = self.inp_search_text.text().strip()
+        search_by = self.cbo_search_by.currentData()
+        search_by = str(search_by).strip() if search_by is not None else ""
         return {
-            "employee_code": self.inp_search_code.text().strip(),
-            "full_name": self.inp_search_name.text().strip(),
+            "search_by": search_by,
+            "search_text": search_text,
             "department_id": dept[0] if dept else None,
         }

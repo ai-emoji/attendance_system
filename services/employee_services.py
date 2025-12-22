@@ -145,9 +145,39 @@ class EmployeeService:
         ]
 
     def list_employees(self, filters: dict) -> list[dict[str, Any]]:
+        # Backward compatible: allow both old (employee_code/full_name) and new
+        # (search_by/search_text) filter shapes.
+        search_by = str(filters.get("search_by") or "").strip() or None
+        search_text = str(filters.get("search_text") or "").strip() or None
+        employment_status = str(filters.get("employment_status") or "").strip() or None
+
+        # Legacy fields fallback
+        legacy_code = str(filters.get("employee_code") or "").strip() or None
+        legacy_name = str(filters.get("full_name") or "").strip() or None
+
+        employee_code: str | None = None
+        full_name: str | None = None
+        sort_order: int | None = None
+
+        if search_text and search_by:
+            if search_by == "stt":
+                try:
+                    sort_order = int(float(search_text))
+                except Exception:
+                    sort_order = None
+            elif search_by == "full_name":
+                full_name = search_text
+            else:
+                employee_code = search_text
+        else:
+            employee_code = legacy_code
+            full_name = legacy_name
+
         return self._repo.list_employees(
-            employee_code=str(filters.get("employee_code") or "").strip() or None,
-            full_name=str(filters.get("full_name") or "").strip() or None,
+            employee_code=employee_code,
+            full_name=full_name,
+            sort_order=sort_order,
+            employment_status=employment_status,
             department_id=filters.get("department_id"),
         )
 
@@ -220,7 +250,9 @@ class EmployeeService:
         headers = [
             "id",
             "employee_code",
+            "mcc_code",
             "full_name",
+            "name_on_mcc",
             "start_date",
             "title_name",
             "department_name",
@@ -247,6 +279,7 @@ class EmployeeService:
             "child_dob_2",
             "child_dob_3",
             "child_dob_4",
+            "employment_status",
             "note",
         ]
 
@@ -277,10 +310,23 @@ class EmployeeService:
 
         rows = self.list_employees(filters)
 
+        return self.export_xlsx_rows(str(path), rows)
+
+    def export_xlsx_rows(
+        self, file_path: str, rows: list[dict[str, Any]]
+    ) -> tuple[bool, str]:
+        path = Path(file_path)
+        if not str(path).strip():
+            return False, "Vui lòng chọn đường dẫn file xuất."
+        if path.suffix.lower() != ".xlsx":
+            path = path.with_suffix(".xlsx")
+
         columns: list[tuple[str, str]] = [
             ("STT", "stt"),
             ("Mã NV", "employee_code"),
+            ("Mã CC", "mcc_code"),
             ("Họ và tên", "full_name"),
+            ("Tên trên MCC", "name_on_mcc"),
             ("Ngày vào làm", "start_date"),
             ("Chức Vụ", "title_name"),
             ("Phòng Ban", "department_name"),
@@ -307,8 +353,18 @@ class EmployeeService:
             ("Ngày sinh con 2", "child_dob_2"),
             ("Ngày sinh con 3", "child_dob_3"),
             ("Ngày sinh con 4", "child_dob_4"),
+            ("Hiện trạng", "employment_status"),
             ("Ghi chú", "note"),
         ]
+
+        try:
+            from openpyxl import Workbook  # type: ignore
+            from openpyxl.styles import Font  # type: ignore
+        except Exception:
+            return (
+                False,
+                "Thiếu thư viện xuất Excel. Vui lòng cài 'openpyxl' trong môi trường Python.",
+            )
 
         wb = Workbook()
         ws = wb.active
@@ -360,7 +416,9 @@ class EmployeeService:
         columns: list[tuple[str, str]] = [
             ("STT", "stt"),
             ("MÃ NV", "employee_code"),
+            ("Mã CC", "mcc_code"),
             ("HỌ VÀ TÊN", "full_name"),
+            ("Tên trên MCC", "name_on_mcc"),
             ("Ngày vào làm", "start_date"),
             ("Chức Vụ", "title_name"),
             ("Phòng Ban", "department_name"),
@@ -387,6 +445,7 @@ class EmployeeService:
             ("Ngày sinh con 2", "child_dob_2"),
             ("Ngày sinh con 3", "child_dob_3"),
             ("Ngày sinh con 4", "child_dob_4"),
+            ("Hiện trạng", "employment_status"),
             ("Ghi chú", "note"),
         ]
 
@@ -449,7 +508,9 @@ class EmployeeService:
         header_to_key: dict[str, str] = {
             # keys
             "employee_code": "employee_code",
+            "mcc_code": "mcc_code",
             "full_name": "full_name",
+            "name_on_mcc": "name_on_mcc",
             "start_date": "start_date",
             "title_name": "title_name",
             "department_name": "department_name",
@@ -476,12 +537,17 @@ class EmployeeService:
             "child_dob_2": "child_dob_2",
             "child_dob_3": "child_dob_3",
             "child_dob_4": "child_dob_4",
+            "employment_status": "employment_status",
             "note": "note",
             # Vietnamese
             "MÃ NV": "employee_code",
             "Mã NV": "employee_code",
+            "Mã CC": "mcc_code",
+            "MÃ CC": "mcc_code",
             "HỌ VÀ TÊN": "full_name",
             "Họ và tên": "full_name",
+            "Tên trên MCC": "name_on_mcc",
+            "TÊN TRÊN MCC": "name_on_mcc",
             "Ngày vào làm": "start_date",
             "Chức Vụ": "title_name",
             "Phòng Ban": "department_name",
@@ -508,6 +574,8 @@ class EmployeeService:
             "Ngày sinh con 2": "child_dob_2",
             "Ngày sinh con 3": "child_dob_3",
             "Ngày sinh con 4": "child_dob_4",
+            "Hiện trạng": "employment_status",
+            "Hien trang": "employment_status",
             "Ghi chú": "note",
             # ignored
             "STT": "stt",
@@ -661,6 +729,7 @@ class EmployeeService:
         rows: list[dict[str, Any]],
         only_new: bool,
         progress_cb: Callable[[int, bool, str, str], None] | None = None,
+        report: list[dict[str, Any]] | None = None,
     ) -> tuple[bool, str]:
         if not rows:
             return False, "Không có dữ liệu để cập nhật."
@@ -698,6 +767,36 @@ class EmployeeService:
         def norm_str(v: Any) -> str | None:
             s = str(v or "").strip()
             return s if s else None
+
+        def norm_status(v: Any) -> str | None:
+            s = str(v or "").strip()
+            if not s:
+                return None
+            s_low = s.lower()
+            if s_low in {"đi làm", "di lam", "đang làm", "dang lam", "working"}:
+                return "Đi làm"
+            if s_low in {
+                "nghỉ thai sản",
+                "nghi thai san",
+                "thai sản",
+                "thai san",
+                "maternity",
+                "maternity leave",
+                # Common typo seen in user input
+                "nghỉ thai sải",
+                "nghi thai sai",
+            }:
+                return "Nghỉ thai sản"
+            if s_low in {
+                "đã nghỉ việc",
+                "da nghi viec",
+                "nghỉ việc",
+                "nghi viec",
+                "resigned",
+                "quit",
+            }:
+                return "Đã nghỉ việc"
+            return s
 
         def norm_payload(it: dict[str, Any]) -> dict[str, Any] | None:
             code = str(it.get("employee_code") or "").strip()
@@ -747,12 +846,18 @@ class EmployeeService:
                     dept_map[dept_key] = int(new_id)
 
             # Keep contract term text (e.g. '01 năm', '02 năm') for display.
-            contract1_term = norm_str(it.get("contract1_signed"))
+            # Source can be either `contract1_term` (future-proof) or the legacy
+            # Excel column mapping stored in `contract1_signed`.
+            contract1_term = norm_str(it.get("contract1_term")) or norm_str(
+                it.get("contract1_signed")
+            )
 
             return {
                 "sort_order": sort_order_int,
                 "employee_code": code,
+                "mcc_code": norm_str(it.get("mcc_code")),
                 "full_name": name,
+                "name_on_mcc": norm_str(it.get("name_on_mcc")),
                 "start_date": self._parse_date_for_db(it.get("start_date")),
                 "title_id": title_id,
                 "department_id": dept_id,
@@ -767,7 +872,9 @@ class EmployeeService:
                 "tax_code": norm_tax_code(it.get("tax_code")),
                 "degree": norm_str(it.get("degree")),
                 "major": norm_str(it.get("major")),
-                "contract1_signed": to_bool(it.get("contract1_signed")),
+                "contract1_signed": bool(
+                    to_bool(it.get("contract1_signed")) or (contract1_term is not None)
+                ),
                 "contract1_term": contract1_term,
                 "contract1_no": norm_str(it.get("contract1_no")),
                 "contract1_sign_date": self._parse_date_for_db(
@@ -786,6 +893,7 @@ class EmployeeService:
                 "child_dob_2": self._parse_date_for_db(it.get("child_dob_2")),
                 "child_dob_3": self._parse_date_for_db(it.get("child_dob_3")),
                 "child_dob_4": self._parse_date_for_db(it.get("child_dob_4")),
+                "employment_status": norm_status(it.get("employment_status")),
                 "note": norm_str(it.get("note")),
             }
 
@@ -806,7 +914,9 @@ class EmployeeService:
                     else None
                 ),
                 "employee_code": str(db.get("employee_code") or "").strip(),
+                "mcc_code": (str(db.get("mcc_code") or "").strip() or None),
                 "full_name": str(db.get("full_name") or "").strip(),
+                "name_on_mcc": (str(db.get("name_on_mcc") or "").strip() or None),
                 "start_date": to_iso(db.get("start_date")),
                 "title_id": db.get("title_id"),
                 "department_id": db.get("department_id"),
@@ -834,6 +944,9 @@ class EmployeeService:
                 "child_dob_2": to_iso(db.get("child_dob_2")),
                 "child_dob_3": to_iso(db.get("child_dob_3")),
                 "child_dob_4": to_iso(db.get("child_dob_4")),
+                "employment_status": (
+                    str(db.get("employment_status") or "").strip() or None
+                ),
                 "note": (str(db.get("note") or "").strip() or None),
             }
 
@@ -849,7 +962,9 @@ class EmployeeService:
             except Exception:
                 outp["sort_order"] = None
             outp["employee_code"] = str(outp.get("employee_code") or "").strip()
+            outp["mcc_code"] = str(outp.get("mcc_code") or "").strip() or None
             outp["full_name"] = str(outp.get("full_name") or "").strip()
+            outp["name_on_mcc"] = str(outp.get("name_on_mcc") or "").strip() or None
             outp["gender"] = str(outp.get("gender") or "").strip() or None
             outp["national_id"] = str(outp.get("national_id") or "").strip() or None
             outp["id_issue_place"] = (
@@ -868,6 +983,9 @@ class EmployeeService:
             outp["contract1_no"] = str(outp.get("contract1_no") or "").strip() or None
             outp["contract2_indefinite"] = bool(outp.get("contract2_indefinite"))
             outp["contract2_no"] = str(outp.get("contract2_no") or "").strip() or None
+            outp["employment_status"] = (
+                str(outp.get("employment_status") or "").strip() or None
+            )
             outp["note"] = str(outp.get("note") or "").strip() or None
             return outp
 
@@ -876,6 +994,28 @@ class EmployeeService:
         skipped = 0
         invalid = 0
         failed = 0
+
+        def add_report(
+            *,
+            idx: int,
+            code: str,
+            name: str,
+            result: str,
+            action: str,
+            message: str,
+        ) -> None:
+            if report is None:
+                return
+            report.append(
+                {
+                    "index": int(idx),
+                    "employee_code": str(code or "").strip(),
+                    "full_name": str(name or "").strip(),
+                    "result": str(result or ""),
+                    "action": str(action or ""),
+                    "message": str(message or ""),
+                }
+            )
 
         # STT/sort_order rules:
         # - Existing employees: never change sort_order (do not create new STT).
@@ -887,13 +1027,33 @@ class EmployeeService:
         # row 1 -> row 2 -> row 3 ...
         total = len(rows)
         for idx, it in enumerate(rows, start=1):
-            payload = norm_payload(it)
-            code = str((payload or {}).get("employee_code") or "").strip()
+            raw_code = str(it.get("employee_code") or "").strip()
+            raw_name = str(it.get("full_name") or "").strip()
+
+            invalid_reason = ""
+            if not raw_code or not raw_name:
+                invalid_reason = "Thiếu Mã NV hoặc Họ và tên"
+            elif not raw_code.isdigit():
+                invalid_reason = "Mã NV phải là số"
+            elif len(raw_code) > 5:
+                invalid_reason = "Mã NV tối đa 5 ký tự"
+
+            payload = norm_payload(it) if not invalid_reason else None
+            code = str((payload or {}).get("employee_code") or raw_code or "").strip()
 
             if not payload:
                 invalid += 1
+                reason = invalid_reason or "Dòng không hợp lệ"
+                add_report(
+                    idx=idx,
+                    code=code,
+                    name=raw_name,
+                    result="INVALID",
+                    action="INVALID",
+                    message=reason,
+                )
                 if progress_cb:
-                    progress_cb(idx, False, code, "Dòng không hợp lệ")
+                    progress_cb(idx, False, code, reason)
                 continue
 
             try:
@@ -924,10 +1084,26 @@ class EmployeeService:
 
                         self._repo.create_employee(payload)
                         inserted += 1
+                        add_report(
+                            idx=idx,
+                            code=code,
+                            name=str(payload.get("full_name") or raw_name),
+                            result="SUCCESS",
+                            action="INSERT",
+                            message="Đã thêm",
+                        )
                         if progress_cb:
                             progress_cb(idx, True, code, "Đã thêm")
                     else:
                         skipped += 1
+                        add_report(
+                            idx=idx,
+                            code=code,
+                            name=raw_name,
+                            result="SKIPPED",
+                            action="SKIP_NOT_FOUND",
+                            message="Bỏ qua (chưa có dữ liệu)",
+                        )
                         if progress_cb:
                             progress_cb(idx, True, code, "Bỏ qua (chưa có dữ liệu)")
                     continue
@@ -959,16 +1135,40 @@ class EmployeeService:
 
                 if same:
                     skipped += 1
+                    add_report(
+                        idx=idx,
+                        code=code,
+                        name=str(payload.get("full_name") or raw_name),
+                        result="SKIPPED",
+                        action="SKIP_DUPLICATE",
+                        message="Bỏ qua (trùng dữ liệu)",
+                    )
                     if progress_cb:
                         progress_cb(idx, True, code, "Bỏ qua (trùng dữ liệu)")
                     continue
 
                 self._repo.update_employee(int(existing.get("id")), payload)
                 updated += 1
+                add_report(
+                    idx=idx,
+                    code=code,
+                    name=str(payload.get("full_name") or raw_name),
+                    result="SUCCESS",
+                    action="UPDATE",
+                    message="Đã cập nhật (ghi đè)",
+                )
                 if progress_cb:
                     progress_cb(idx, True, code, "Đã cập nhật (ghi đè)")
             except Exception as exc:
                 failed += 1
+                add_report(
+                    idx=idx,
+                    code=code,
+                    name=raw_name,
+                    result="FAILED",
+                    action="FAILED",
+                    message=str(exc),
+                )
                 if progress_cb:
                     progress_cb(idx, False, code, str(exc))
                 continue
