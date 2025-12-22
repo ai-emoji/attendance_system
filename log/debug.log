@@ -1663,3 +1663,20 @@ mysql.connector.errors.DatabaseError: 1130 (HY000): Host 'phuc' is not allowed t
 2025-12-22 18:49:13,035 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
 2025-12-22 18:49:13,035 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
 2025-12-22 18:49:13,642 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:01,573 - __main__ - INFO - Khởi động ứng dụng...
+2025-12-22 18:54:01,624 - ui.controllers.header_controllers - DEBUG - HeaderController đã bind signal
+2025-12-22 18:54:01,624 - ui.controllers.header_controllers - INFO - Chuyển tab header: khai_bao
+2025-12-22 18:54:01,624 - ui.controllers.header_controllers - DEBUG - Số nút ribbon: 7
+2025-12-22 18:54:01,734 - __main__ - INFO - Ứng dụng đã sẵn sàng.
+2025-12-22 18:54:49,584 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:49,814 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:49,826 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:51,669 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:51,672 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:51,756 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:51,758 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:52,100 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:52,102 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:52,197 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:54:52,199 - core.database - INFO - ✅ Kết nối MySQL thành công
+2025-12-22 18:59:01,495 - core.database - INFO - ✅ Kết nối MySQL thành công

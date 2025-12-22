@@ -188,23 +188,31 @@
     -- - device_no: snapshot số máy (để làm unique và tránh clone)
     -- - ON DUPLICATE KEY UPDATE sẽ ghi đè nếu trùng key
     CREATE TABLE IF NOT EXISTS hr_attendance.attendance_raw (
-        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-        attendance_code VARCHAR(50) NOT NULL,
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+        attendance_code VARCHAR(50) NOT NULL COMMENT 'Employee attendance code',
         work_date DATE NOT NULL,
+
         time_in_1 TIME NULL,
         time_out_1 TIME NULL,
         time_in_2 TIME NULL,
         time_out_2 TIME NULL,
         time_in_3 TIME NULL,
         time_out_3 TIME NULL,
-        device_no INT NOT NULL,
-        device_id INT NULL,
+
+        device_no INT NOT NULL COMMENT 'Device number from machine',
+        device_id INT NULL COMMENT 'FK to devices table',
+
         device_name VARCHAR(255) NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
         UNIQUE KEY uq_attendance_raw_code_date_device (attendance_code, work_date, device_no),
+        KEY idx_attendance_raw_code_date (attendance_code, work_date),
         KEY idx_attendance_raw_work_date (work_date),
         KEY idx_attendance_raw_device_no (device_no),
+
         CONSTRAINT fk_attendance_raw_device
             FOREIGN KEY (device_id)
             REFERENCES hr_attendance.devices (id)
@@ -218,23 +226,31 @@
     -- - Schema tương tự attendance_raw
     -- - Upsert để ghi đè nếu trùng
     CREATE TABLE IF NOT EXISTS hr_attendance.download_attendance (
-        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-        attendance_code VARCHAR(50) NOT NULL,
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+        attendance_code VARCHAR(50) NOT NULL COMMENT 'Employee attendance code',
         work_date DATE NOT NULL,
+
         time_in_1 TIME NULL,
         time_out_1 TIME NULL,
         time_in_2 TIME NULL,
         time_out_2 TIME NULL,
         time_in_3 TIME NULL,
         time_out_3 TIME NULL,
-        device_no INT NOT NULL,
-        device_id INT NULL,
+
+        device_no INT NOT NULL COMMENT 'Device number from machine',
+        device_id INT NULL COMMENT 'FK to devices table',
+
         device_name VARCHAR(255) NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
         UNIQUE KEY uq_download_attendance_code_date_device (attendance_code, work_date, device_no),
+        KEY idx_download_attendance_code_date (attendance_code, work_date),
         KEY idx_download_attendance_work_date (work_date),
         KEY idx_download_attendance_device_no (device_no),
+
         CONSTRAINT fk_download_attendance_device
             FOREIGN KEY (device_id)
             REFERENCES hr_attendance.devices (id)
