@@ -43,6 +43,7 @@ from ui.controllers.absence_restore_controllers import AbsenceRestoreController
 from ui.controllers.title_controllers import TitleController
 from ui.controllers.download_attendance_controllers import DownloadAttendanceController
 from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
+from ui.controllers.arrange_schedule_controllers import ArrangeScheduleController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
 from ui.widgets.department_widgets import MainContent as DepartmentContent
@@ -74,6 +75,7 @@ from ui.widgets.shift_attendance_widgets import (
     MainContent1 as ShiftAttendanceContent1,
     MainContent2 as ShiftAttendanceContent2,
 )
+from ui.widgets.arrange_schedule_widgets import ArrangeScheduleView
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
 from ui.dialog.settings_dialog import SettingsDialog
 
@@ -98,6 +100,7 @@ class Container(QWidget):
         self._employee_controller: EmployeeController | None = None
         self._download_attendance_controller: DownloadAttendanceController | None = None
         self._shift_attendance_controller: ShiftAttendanceController | None = None
+        self._arrange_schedule_controller: ArrangeScheduleController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -258,6 +261,18 @@ class Container(QWidget):
         )
         self._shift_attendance_controller.bind()
 
+    def show_arrange_schedule_view(self) -> None:
+        """Hiển thị màn hình Sắp xếp lịch Làm việc."""
+
+        view = ArrangeScheduleView(self)
+        self.set_container_widgets([view])
+
+        # Controller (hiện tại stub/no-op theo yêu cầu)
+        self._arrange_schedule_controller = ArrangeScheduleController(
+            self.window(), view.left, view.right
+        )
+        self._arrange_schedule_controller.bind()
+
 
 class Footer(CommonFooter):
     """Footer của ứng dụng (kế thừa triển khai trong ui.common.footer)."""
@@ -393,6 +408,10 @@ class MainWindow(QMainWindow):
 
         if action_text == "Chấm công\nTheo ca":
             self.container.show_shift_attendance_view()
+            return
+
+        if action_text == "Sắp xếp lịch\nLàm việc":
+            self.container.show_arrange_schedule_view()
             return
 
         if action_text == "Thoát\nỨng dụng":

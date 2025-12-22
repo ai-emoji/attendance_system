@@ -82,6 +82,7 @@ from core.resource import (
     ICON_LIST,
     ICON_IMPORT,
     ICON_DROPDOWN,
+    COLOR_TEXT_LIGHT,
     resource_path,
 )
 
@@ -180,7 +181,7 @@ class DepartmentTreePreview(QWidget):
                 [
                     f"QTreeWidget {{ background-color: {MAIN_CONTENT_BG_COLOR}; color: {COLOR_TEXT_PRIMARY};}}",
                     f"QTreeWidget::item {{ padding-left: 8px; padding-right: 8px; height: {ROW_HEIGHT}px; }}",
-                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QTreeWidget::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTreeWidget::item:focus { outline: none; }",
                     "QTreeWidget:focus { outline: none; }",
@@ -835,7 +836,7 @@ class _FilterHeaderView(QHeaderView):
                     f"QMenu {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QMenu::item {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; border-bottom: 0px; }}",
                     f"QMenu::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
-                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QMenu::separator {{ height: 1px; background: {COLOR_BORDER}; margin: 4px 8px; }}",
                 ]
             )
@@ -1073,7 +1074,7 @@ class EmployeeTable(QTableView):
                 [
                     f"QTableView {{ background-color: {ODD_ROW_BG_COLOR}; alternate-background-color: {EVEN_ROW_BG_COLOR}; gridline-color: {GRID_LINES_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 0px; border-right: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; padding-right: 22px; }}",
-                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QTableView::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     f"QTableView::item:selected:active {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTableView::item { padding-left: 0px; padding-right: 0px; border: 0px; }",
@@ -1363,7 +1364,7 @@ class MainContent(QWidget):
                 [
                     f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
                     "QPushButton::icon { margin-right: 10px; }",
-                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_LIGHT}; }}",
                 ]
             )
         )
