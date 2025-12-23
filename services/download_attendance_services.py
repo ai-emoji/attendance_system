@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import time as time_module
 from dataclasses import dataclass
 from datetime import date, datetime, time
 
@@ -195,73 +196,132 @@ class DownloadAttendanceService:
         except Exception:
             return False, "Không thể import thư viện 'zk'.", 0
 
+        def _is_timeout_error(exc: Exception) -> bool:
+            msg = str(exc).lower()
+            return "timed out" in msg or "timeout" in msg
+
+        def _fetch_attendance_with_retry() -> tuple[list, str | None]:
+            """Return (logs, error_message). error_message is None on success."""
+            base_timeout = 15
+            max_attempts = 3
+
+            last_err: Exception | None = None
+            for attempt in range(1, max_attempts + 1):
+                timeout = base_timeout + (attempt - 1) * 10
+                if progress_cb:
+                    progress_cb(
+                        "fetch",
+                        attempt - 1,
+                        max_attempts,
+                        f"Đang kết nối và tải dữ liệu từ máy... (lần {attempt}/{max_attempts})",
+                    )
+
+                try:
+                    zk = ZK(ip, port=port, timeout=timeout, password=password)
+                    conn = zk.connect()
+                    try:
+                        # Fetch user list (best-effort) to map user_id -> name on device
+                        user_name_by_id: dict[str, str] = {}
+                        try:
+                            users = None
+                            fn_users = getattr(conn, "get_users", None)
+                            if callable(fn_users):
+                                users = fn_users() or []
+                            for u in users or []:
+                                try:
+                                    uid = str(getattr(u, "user_id", "") or "").strip()
+                                    nm = str(getattr(u, "name", "") or "").strip()
+                                    if uid:
+                                        user_name_by_id[uid] = nm
+                                except Exception:
+                                    continue
+                        except Exception:
+                            user_name_by_id = {}
+
+                        # Nhận dạng thiết bị sau khi connect để tránh chọn nhầm loại máy
+                        info_parts: list[str] = []
+                        try:
+                            for attr in (
+                                "get_device_name",
+                                "get_platform",
+                                "get_serialnumber",
+                                "get_firmware_version",
+                            ):
+                                fn = getattr(conn, attr, None)
+                                if callable(fn):
+                                    v = fn()
+                                    if v:
+                                        info_parts.append(str(v))
+                        except Exception:
+                            pass
+
+                        info = " | ".join(info_parts)
+                        detected_kind = (
+                            self._detect_device_kind_from_info(info) if info else None
+                        )
+
+                        # Chỉ chặn khi phát hiện chắc chắn đang kết nối nhầm dòng máy
+                        if detected_kind is not None and detected_kind != expected_kind:
+                            return (
+                                [],
+                                "Đang kết nối nhầm loại máy chấm công. "
+                                f"Máy đã chọn: {self._device_kind_label(expected_kind)}; "
+                                f"Thiết bị thực tế: {self._device_kind_label(detected_kind)}. "
+                                f"Thông tin thiết bị: {info}",
+                            )
+
+                        logs = conn.get_attendance() or []
+                        # Attach mapping to outer scope by returning via closure var
+                        return ([(user_name_by_id, logs)], None)
+                    finally:
+                        try:
+                            conn.disconnect()
+                        except Exception:
+                            pass
+                except Exception as e:
+                    last_err = e
+                    logger.warning(
+                        "Tải dữ liệu từ máy thất bại (lần %s/%s) ip=%s port=%s timeout=%s: %s",
+                        attempt,
+                        max_attempts,
+                        ip,
+                        port,
+                        timeout,
+                        e,
+                    )
+
+                    if attempt < max_attempts:
+                        # backoff nhẹ để tránh spam thiết bị
+                        time_module.sleep(1.0)
+                        continue
+
+            if last_err is None:
+                return [], "Không thể kết nối tới thiết bị."
+
+            if _is_timeout_error(last_err):
+                return (
+                    [],
+                    f"Thiết bị không phản hồi (timeout) khi tải dữ liệu. Vui lòng kiểm tra mạng/điện/port. (IP: {ip}, Port: {port})",
+                )
+
+            return (
+                [],
+                f"Không thể tải dữ liệu từ thiết bị. (IP: {ip}, Port: {port})",
+            )
+
         try:
             try:
                 password = int(password_raw or 0)
             except Exception:
                 password = 0
 
-            zk = ZK(ip, port=port, timeout=15, password=password)
-            conn = zk.connect()
-            try:
-                # Fetch user list (best-effort) to map user_id -> name on device
-                user_name_by_id: dict[str, str] = {}
-                try:
-                    users = None
-                    fn_users = getattr(conn, "get_users", None)
-                    if callable(fn_users):
-                        users = fn_users() or []
-                    for u in users or []:
-                        try:
-                            uid = str(getattr(u, "user_id", "") or "").strip()
-                            nm = str(getattr(u, "name", "") or "").strip()
-                            if uid:
-                                user_name_by_id[uid] = nm
-                        except Exception:
-                            continue
-                except Exception:
-                    user_name_by_id = {}
+            # Retry + tăng timeout để giảm lỗi ZKNetworkError: timed out
+            fetched, fetch_err = _fetch_attendance_with_retry()
+            if fetch_err:
+                return False, fetch_err, 0
 
-                # Nhận dạng thiết bị sau khi connect để tránh chọn nhầm loại máy
-                info_parts: list[str] = []
-                try:
-                    for attr in (
-                        "get_device_name",
-                        "get_platform",
-                        "get_serialnumber",
-                        "get_firmware_version",
-                    ):
-                        fn = getattr(conn, attr, None)
-                        if callable(fn):
-                            v = fn()
-                            if v:
-                                info_parts.append(str(v))
-                except Exception:
-                    # Không để lỗi đọc info làm fail tải
-                    pass
-
-                info = " | ".join(info_parts)
-                detected_kind = (
-                    self._detect_device_kind_from_info(info) if info else None
-                )
-
-                # Chỉ chặn khi phát hiện chắc chắn đang kết nối nhầm dòng máy
-                if detected_kind is not None and detected_kind != expected_kind:
-                    return (
-                        False,
-                        "Đang kết nối nhầm loại máy chấm công. "
-                        f"Máy đã chọn: {self._device_kind_label(expected_kind)}; "
-                        f"Thiết bị thực tế: {self._device_kind_label(detected_kind)}. "
-                        f"Thông tin thiết bị: {info}",
-                        0,
-                    )
-
-                logs = conn.get_attendance() or []
-            finally:
-                try:
-                    conn.disconnect()
-                except Exception:
-                    pass
+            # unpack closure-returned data
+            user_name_by_id, logs = fetched[0]
 
             # Filter logs by date range
             start_dt = datetime.combine(from_date, time.min)
