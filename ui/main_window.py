@@ -9,12 +9,15 @@ Theo .copilot_instructions:
 - Tài nguyên (icon/ảnh/stylesheet) phải load qua resource_path()
 """
 
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QSplitter,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -39,6 +42,8 @@ from ui.controllers.backup_controllers import BackupController
 from ui.controllers.absence_restore_controllers import AbsenceRestoreController
 from ui.controllers.title_controllers import TitleController
 from ui.controllers.download_attendance_controllers import DownloadAttendanceController
+from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
+from ui.controllers.arrange_schedule_controllers import ArrangeScheduleController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
 from ui.widgets.department_widgets import MainContent as DepartmentContent
@@ -65,7 +70,14 @@ from ui.widgets.download_attendance_widgets import (
     TitleBar1 as DownloadAttendanceTitleBar1,
     TitleBar2 as DownloadAttendanceTitleBar2,
 )
+from ui.widgets.shift_attendance_widgets import (
+    TitleBar1 as ShiftAttendanceTitleBar1,
+    MainContent1 as ShiftAttendanceContent1,
+    MainContent2 as ShiftAttendanceContent2,
+)
+from ui.widgets.arrange_schedule_widgets import ArrangeScheduleView
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
+from ui.dialog.settings_dialog import SettingsDialog
 
 
 class Header(CommonHeader):
@@ -87,6 +99,8 @@ class Container(QWidget):
         self._declare_work_shift_controller: DeclareWorkShiftController | None = None
         self._employee_controller: EmployeeController | None = None
         self._download_attendance_controller: DownloadAttendanceController | None = None
+        self._shift_attendance_controller: ShiftAttendanceController | None = None
+        self._arrange_schedule_controller: ArrangeScheduleController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -204,6 +218,61 @@ class Container(QWidget):
         )
         self._download_attendance_controller.bind()
 
+    def show_shift_attendance_view(self) -> None:
+        """Hiển thị màn hình Chấm công Theo ca."""
+
+        title1 = ShiftAttendanceTitleBar1(
+            "Chấm công Theo ca", "assets/images/shift_attendance.svg", self
+        )
+
+        # Gói 2 phần content vào một widget để Container chỉ stretch 1 vùng nội dung.
+        content_root = QWidget(self)
+        content_root.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        content_layout = QVBoxLayout(content_root)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        splitter = QSplitter(Qt.Orientation.Vertical, content_root)
+        splitter.setChildrenCollapsible(False)
+
+        content1 = ShiftAttendanceContent1(splitter)
+        content2 = ShiftAttendanceContent2(splitter)
+        splitter.addWidget(content1)
+        splitter.addWidget(content2)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+
+        # Tỉ lệ mặc định: phần danh sách NV nhỏ hơn phần lưới chấm công.
+        try:
+            splitter.setSizes([1, 1])
+        except Exception:
+            pass
+
+        content_layout.addWidget(splitter, 1)
+
+        self.set_container_widgets([title1, content_root])
+
+        # Controller: load phòng ban + danh sách nhân viên cho MainContent1
+        self._shift_attendance_controller = ShiftAttendanceController(
+            self.window(), content1, content2
+        )
+        self._shift_attendance_controller.bind()
+
+    def show_arrange_schedule_view(self) -> None:
+        """Hiển thị màn hình Sắp xếp lịch Làm việc."""
+
+        view = ArrangeScheduleView(self)
+        self.set_container_widgets([view])
+
+        # Controller (hiện tại stub/no-op theo yêu cầu)
+        self._arrange_schedule_controller = ArrangeScheduleController(
+            self.window(), view.left, view.right
+        )
+        self._arrange_schedule_controller.bind()
+
 
 class Footer(CommonFooter):
     """Footer của ứng dụng (kế thừa triển khai trong ui.common.footer)."""
@@ -280,6 +349,8 @@ class MainWindow(QMainWindow):
 
     def _on_header_action_triggered(self, action_text: str) -> None:
         """Điều phối sự kiện click phím chức năng trên Header."""
+        action_text = str(action_text or "").strip()
+        logging.getLogger(__name__).info("Header action clicked: %s", action_text)
         if action_text == "Thông tin\nCông ty" and self._company_controller is not None:
             self._company_controller.show_dialog()
             return
@@ -335,6 +406,14 @@ class MainWindow(QMainWindow):
             self.container.show_download_attendance_view()
             return
 
+        if action_text == "Chấm công\nTheo ca":
+            self.container.show_shift_attendance_view()
+            return
+
+        if action_text == "Sắp xếp lịch\nLàm việc":
+            self.container.show_arrange_schedule_view()
+            return
+
         if action_text == "Thoát\nỨng dụng":
             QApplication.quit()
             return
@@ -354,6 +433,10 @@ class MainWindow(QMainWindow):
             self._absence_restore_controller.show_dialog()
             return
 
+        if action_text == "Cài đặt":
+            dlg = SettingsDialog(self)
+            dlg.exec()
+            return
     def _center_window(self) -> None:
         """Căn giữa cửa sổ trên màn hình."""
         screen_geometry = self.screen().geometry()

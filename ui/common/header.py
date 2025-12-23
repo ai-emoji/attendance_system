@@ -271,6 +271,10 @@ class Header(QWidget):
         btn.setAutoRaise(True)
         # Style hover đã được áp dụng bằng stylesheet của Header
 
-        icon_path = resource_path(f"assets/images/{svg_file}")
+        s = str(svg_file or "").strip()
+        if "/" in s or "\\" in s:
+            icon_path = resource_path(s)
+        else:
+            icon_path = resource_path(f"assets/images/{s}")
         btn.setIcon(QIcon(icon_path))
         return btn

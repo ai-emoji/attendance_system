@@ -926,6 +926,7 @@ class EmployeeRepository:
     def list_employees(
         self,
         employee_code: str | None = None,
+        mcc_code: str | None = None,
         full_name: str | None = None,
         sort_order: int | None = None,
         employment_status: str | None = None,
@@ -943,6 +944,10 @@ class EmployeeRepository:
         if full_name:
             where.append("e.full_name LIKE %s")
             params.append(f"%{full_name}%")
+
+        if EmployeeRepository._has_mcc_code and mcc_code:
+            where.append("e.mcc_code LIKE %s")
+            params.append(f"%{mcc_code}%")
 
         if (
             EmployeeRepository._has_sort_order
@@ -1003,6 +1008,8 @@ class EmployeeRepository:
                 e.full_name,
                 {name_on_mcc_sel} AS name_on_mcc,
                 e.start_date,
+                e.title_id,
+                e.department_id,
                 jt.title_name,
                 d.department_name,
                 e.date_of_birth,
@@ -1069,6 +1076,8 @@ class EmployeeRepository:
                     "full_name": r.get("full_name"),
                     "name_on_mcc": r.get("name_on_mcc"),
                     "start_date": to_str(r.get("start_date")),
+                    "title_id": r.get("title_id"),
+                    "department_id": r.get("department_id"),
                     "title_name": r.get("title_name"),
                     "department_name": r.get("department_name"),
                     "date_of_birth": to_str(r.get("date_of_birth")),

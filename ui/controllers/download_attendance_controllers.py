@@ -82,6 +82,7 @@ class _Worker(QObject):
 @dataclass
 class _UiRow:
     code: str
+    name_on_mcc: str
     date_str: str
     in1: str
     out1: str
@@ -116,10 +117,26 @@ class DownloadAttendanceController:
         # Proxy QObject để slot chạy đúng UI thread
         self._ui_proxy = _UiProxy(self, parent=self._parent_window)
 
+        self._all_rows: list[_UiRow] = []
+        self._search_by: str = "attendance_code"
+        self._search_text: str = ""
+        self._show_seconds: bool = True
+
     def bind(self) -> None:
         self._title_bar2.download_clicked.connect(self.on_download)
+        if hasattr(self._title_bar2, "search_changed"):
+            self._title_bar2.search_changed.connect(self.on_search_changed)
+        if hasattr(self._title_bar2, "time_format_changed"):
+            self._title_bar2.time_format_changed.connect(self.on_time_format_changed)
         self.refresh_devices()
         self.refresh_table()
+
+        # Ensure initial render matches UI button default
+        try:
+            # default button is HH:MM:SS
+            self._show_seconds = True
+        except Exception:
+            pass
 
     def refresh_devices(self) -> None:
         try:
@@ -133,26 +150,17 @@ class DownloadAttendanceController:
         # Bảng tạm hiển thị dữ liệu đã tải trong phiên
         try:
             rows = self._service.list_download_attendance()
-            ui_rows = [self._to_ui_row(r) for r in rows]
-            self._content.set_attendance_rows(
-                [
-                    (
-                        u.code,
-                        u.date_str,
-                        u.in1,
-                        u.out1,
-                        u.in2,
-                        u.out2,
-                        u.in3,
-                        u.out3,
-                        u.device_name,
-                    )
-                    for u in ui_rows
-                ]
-            )
+            self._all_rows = [self._to_ui_row(r) for r in rows]
+            self._apply_filters()
         except Exception:
             logger.exception("Không thể load bảng download_attendance")
+            self._all_rows = []
             self._content.set_attendance_rows([])
+            try:
+                if hasattr(self._title_bar2, "set_total"):
+                    self._title_bar2.set_total(0)
+            except Exception:
+                pass
 
     def _to_ui_row(self, r) -> _UiRow:
         def fmt_date(d: date) -> str:
@@ -177,6 +185,7 @@ class DownloadAttendanceController:
 
         return _UiRow(
             code=str(r.attendance_code or ""),
+            name_on_mcc=str(getattr(r, "name_on_mcc", "") or ""),
             date_str=fmt_date(wd),
             in1=fmt_time(r.time_in_1),
             out1=fmt_time(r.time_out_1),
@@ -186,6 +195,73 @@ class DownloadAttendanceController:
             out3=fmt_time(r.time_out_3),
             device_name=str(r.device_name or ""),
         )
+
+    def on_search_changed(self) -> None:
+        try:
+            if hasattr(self._title_bar2, "get_search_filters"):
+                f = self._title_bar2.get_search_filters() or {}
+                self._search_by = str(f.get("search_by") or "attendance_code").strip()
+                self._search_text = str(f.get("search_text") or "").strip()
+        except Exception:
+            self._search_by = "attendance_code"
+            self._search_text = ""
+        self._apply_filters()
+
+    def on_time_format_changed(self, show_seconds: bool) -> None:
+        self._show_seconds = bool(show_seconds)
+        self._apply_filters()
+
+    def _apply_filters(self) -> None:
+        needle = str(self._search_text or "").strip().lower()
+        by = str(self._search_by or "attendance_code").strip()
+
+        if not needle:
+            filtered = list(self._all_rows)
+        else:
+            if by == "name_on_mcc":
+                filtered = [
+                    u for u in self._all_rows if needle in str(u.name_on_mcc).lower()
+                ]
+            else:
+                filtered = [u for u in self._all_rows if needle in str(u.code).lower()]
+
+        self._content.set_attendance_rows(
+            [
+                (
+                    u.code,
+                    u.name_on_mcc,
+                    u.date_str,
+                    self._fmt_time(u.in1),
+                    self._fmt_time(u.out1),
+                    self._fmt_time(u.in2),
+                    self._fmt_time(u.out2),
+                    self._fmt_time(u.in3),
+                    self._fmt_time(u.out3),
+                    u.device_name,
+                )
+                for u in filtered
+            ]
+        )
+        try:
+            if hasattr(self._title_bar2, "set_total"):
+                self._title_bar2.set_total(len(filtered))
+        except Exception:
+            pass
+
+    def _fmt_time(self, s: str) -> str:
+        v = str(s or "")
+        if not v:
+            return ""
+        if self._show_seconds:
+            return v
+        # HH:MM (avoid trailing ':')
+        if ":" in v:
+            parts = v.split(":")
+            if len(parts) >= 2:
+                hh = (parts[0] or "").zfill(2)
+                mm = (parts[1] or "").zfill(2)
+                return f"{hh[:2]}:{mm[:2]}"
+        return v
 
     def on_download(self) -> None:
         device_id = self._title_bar2.get_selected_device_id()

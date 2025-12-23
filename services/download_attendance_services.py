@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class DownloadAttendanceRow:
     attendance_code: str
+    name_on_mcc: str
     work_date: date
     time_in_1: time | None
     time_out_1: time | None
@@ -118,6 +119,7 @@ class DownloadAttendanceService:
                 result.append(
                     DownloadAttendanceRow(
                         attendance_code=str(r.get("attendance_code") or ""),
+                        name_on_mcc=str(r.get("name_on_mcc") or ""),
                         work_date=wd,
                         time_in_1=r.get("time_in_1"),
                         time_out_1=r.get("time_out_1"),
@@ -200,6 +202,24 @@ class DownloadAttendanceService:
             zk = ZK(ip, port=port, timeout=15, password=password)
             conn = zk.connect()
             try:
+                # Fetch user list (best-effort) to map user_id -> name on device
+                user_name_by_id: dict[str, str] = {}
+                try:
+                    users = None
+                    fn_users = getattr(conn, "get_users", None)
+                    if callable(fn_users):
+                        users = fn_users() or []
+                    for u in users or []:
+                        try:
+                            uid = str(getattr(u, "user_id", "") or "").strip()
+                            nm = str(getattr(u, "name", "") or "").strip()
+                            if uid:
+                                user_name_by_id[uid] = nm
+                        except Exception:
+                            continue
+                except Exception:
+                    user_name_by_id = {}
+
                 # Nhận dạng thiết bị sau khi connect để tránh chọn nhầm loại máy
                 info_parts: list[str] = []
                 try:
@@ -283,6 +303,7 @@ class DownloadAttendanceService:
                 built.append(
                     {
                         "attendance_code": user_id,
+                        "name_on_mcc": str(user_name_by_id.get(str(user_id), "") or ""),
                         "work_date": wd.isoformat(),
                         "time_in_1": _get(0),
                         "time_out_1": _get(1),

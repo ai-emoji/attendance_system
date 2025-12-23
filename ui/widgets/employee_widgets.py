@@ -58,6 +58,8 @@ from PySide6.QtWidgets import QHeaderView
 
 import pandas as pd
 
+from core.ui_settings import get_employee_table_ui, ui_settings_bus
+
 from core.resource import (
     BG_TITLE_1_HEIGHT,
     BG_TITLE_2_HEIGHT,
@@ -80,6 +82,7 @@ from core.resource import (
     ICON_LIST,
     ICON_IMPORT,
     ICON_DROPDOWN,
+    COLOR_TEXT_LIGHT,
     resource_path,
 )
 
@@ -178,7 +181,7 @@ class DepartmentTreePreview(QWidget):
                 [
                     f"QTreeWidget {{ background-color: {MAIN_CONTENT_BG_COLOR}; color: {COLOR_TEXT_PRIMARY};}}",
                     f"QTreeWidget::item {{ padding-left: 8px; padding-right: 8px; height: {ROW_HEIGHT}px; }}",
-                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QTreeWidget::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTreeWidget::item:focus { outline: none; }",
                     "QTreeWidget:focus { outline: none; }",
@@ -419,46 +422,49 @@ class _LeftPaddingDelegate(QStyledItemDelegate):
 
 class _EmployeeTableModel(QAbstractTableModel):
     # model columns: id (hidden), stt, employee_code, full_name, ...
-    COLUMNS: list[tuple[str, str]] = [
-        ("id", "ID"),
-        ("stt", "STT"),
-        ("employee_code", "MÃ NV"),
-        ("mcc_code", "Mã CC"),
-        ("full_name", "HỌ VÀ TÊN"),
-        ("name_on_mcc", "Tên trên MCC"),
-        ("start_date", "Ngày vào làm"),
-        ("title_name", "Chức Vụ"),
-        ("department_name", "Phòng Ban"),
-        ("date_of_birth", "Ngày Sinh"),
-        ("gender", "Giới tính"),
-        ("national_id", "CCCD/CMND"),
-        ("id_issue_date", "Ngày Cấp"),
-        ("id_issue_place", "Nơi Cấp"),
-        ("address", "Địa chỉ"),
-        ("phone", "Số điện thoại"),
-        ("insurance_no", "Số Bảo Hiểm"),
-        ("tax_code", "Mã số Thuế TNCN"),
-        ("degree", "Bằng cấp"),
-        ("major", "Chuyên ngành"),
-        ("contract1_term", "HĐLĐ (ký lần 1)"),
-        ("contract1_no", "Số HĐLĐ (lần 1)"),
-        ("contract1_sign_date", "Ngày ký (lần 1)"),
-        ("contract1_expire_date", "Ngày hết hạn (lần 1)"),
-        ("contract2_indefinite", "HĐLĐ ký không thời hạn"),
-        ("contract2_no", "Số HĐLĐ (không thời hạn)"),
-        ("contract2_sign_date", "Ngày ký (không thời hạn)"),
-        ("children_count", "Số con"),
-        ("child_dob_1", "Ngày sinh con 1"),
-        ("child_dob_2", "Ngày sinh con 2"),
-        ("child_dob_3", "Ngày sinh con 3"),
-        ("child_dob_4", "Ngày sinh con 4"),
-        ("employment_status", "Hiện trạng"),
-        ("note", "Ghi chú"),
+    # Each tuple: (key, header_label, min_width_px)
+    COLUMNS: list[tuple[str, str, int]] = [
+        ("id", "ID", 0),
+        ("stt", "STT", 70),
+        ("employee_code", "MÃ NV", 110),
+        ("mcc_code", "Mã CC", 0),
+        ("full_name", "HỌ VÀ TÊN", 200),
+        ("name_on_mcc", "Tên trên MCC", 0),
+        ("start_date", "Ngày vào làm", 120),
+        ("title_name", "Chức Vụ", 140),
+        ("department_name", "Phòng Ban", 160),
+        ("date_of_birth", "Ngày Sinh", 120),
+        ("gender", "Giới tính", 110),
+        ("national_id", "CCCD/CMND", 140),
+        ("id_issue_date", "Ngày Cấp", 120),
+        ("id_issue_place", "Nơi Cấp", 150),
+        ("address", "Địa chỉ", 180),
+        ("phone", "Số điện thoại", 120),
+        ("insurance_no", "Số Bảo Hiểm", 140),
+        ("tax_code", "Mã số Thuế TNCN", 160),
+        ("degree", "Bằng cấp", 140),
+        ("major", "Chuyên ngành", 140),
+        ("contract1_term", "HĐLĐ (ký lần 1)", 150),
+        ("contract1_no", "Số HĐLĐ (lần 1)", 150),
+        ("contract1_sign_date", "Ngày ký (lần 1)", 140),
+        ("contract1_expire_date", "Ngày hết hạn (lần 1)", 160),
+        ("contract2_indefinite", "HĐLĐ ký không thời hạn", 170),
+        ("contract2_no", "Số HĐLĐ (không thời hạn)", 190),
+        ("contract2_sign_date", "Ngày ký (không thời hạn)", 190),
+        ("children_count", "Số con", 90),
+        ("child_dob_1", "Ngày sinh con 1", 140),
+        ("child_dob_2", "Ngày sinh con 2", 140),
+        ("child_dob_3", "Ngày sinh con 3", 140),
+        ("child_dob_4", "Ngày sinh con 4", 140),
+        ("employment_status", "Hiện trạng", 140),
+        ("note", "Ghi chú", 180),
     ]
 
     def __init__(self, parent: QObject | None = None) -> None:  # type: ignore[name-defined]
         super().__init__(parent)
-        self._df: pd.DataFrame = pd.DataFrame(columns=[k for k, _ in self.COLUMNS])
+        self._df: pd.DataFrame = pd.DataFrame(
+            columns=[k for k, _label, _minw in self.COLUMNS]
+        )
 
         self._date_keys: set[str] = {
             "start_date",
@@ -472,6 +478,24 @@ class _EmployeeTableModel(QAbstractTableModel):
             "child_dob_3",
             "child_dob_4",
         }
+
+        self._align_overrides: dict[str, Qt.AlignmentFlag] = {}
+        self._default_font_size: int | None = None
+        self._default_font_weight: QFont.Weight | None = None
+        self._column_bold_overrides: dict[str, bool] = {}
+
+    def set_ui_overrides(
+        self,
+        *,
+        align_by_key: dict[str, Qt.AlignmentFlag] | None = None,
+        font_size: int | None = None,
+        font_weight: QFont.Weight | None = None,
+        column_bold: dict[str, bool] | None = None,
+    ) -> None:
+        self._align_overrides = dict(align_by_key or {})
+        self._default_font_size = int(font_size) if font_size is not None else None
+        self._default_font_weight = font_weight
+        self._column_bold_overrides = dict(column_bold or {})
 
     def _format_vn_date(self, value) -> str:
         if value is None:
@@ -518,7 +542,7 @@ class _EmployeeTableModel(QAbstractTableModel):
         return s
 
     def set_rows(self, rows: list[dict]) -> None:
-        cols = [k for k, _ in self.COLUMNS]
+        cols = [k for k, _label, _minw in self.COLUMNS]
         if not rows:
             self.beginResetModel()
             self._df = pd.DataFrame(columns=cols)
@@ -591,9 +615,33 @@ class _EmployeeTableModel(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
             key = self.COLUMNS[col][0]
+            if key in self._align_overrides:
+                try:
+                    return int(self._align_overrides[key])
+                except Exception:
+                    pass
             if key in {"stt", "employee_code"}:
                 return int(Qt.AlignmentFlag.AlignCenter)
             return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+
+        if role == Qt.ItemDataRole.FontRole:
+            key = self.COLUMNS[col][0]
+            size = self._default_font_size
+            weight = self._default_font_weight
+            col_bold = self._column_bold_overrides.get(str(key), None)
+            try:
+                f = QFont()
+                if size is not None and int(size) > 0:
+                    f.setPointSize(int(size))
+                if col_bold is True:
+                    f.setWeight(QFont.Weight.DemiBold)
+                elif col_bold is False:
+                    f.setWeight(QFont.Weight.Normal)
+                elif weight is not None:
+                    f.setWeight(weight)
+                return f
+            except Exception:
+                return None
 
         if role != Qt.ItemDataRole.DisplayRole:
             return None
@@ -607,13 +655,56 @@ class _EmployeeTableModel(QAbstractTableModel):
             return ""
         if key in self._date_keys:
             return self._format_vn_date(v)
+
+        if key == "children_count":
+            # Normalize Excel-style numbers (e.g. 1.0) and hide 0.
+            try:
+                if isinstance(v, bool):
+                    return ""
+                if isinstance(v, int):
+                    return "" if v <= 0 else str(v)
+                if isinstance(v, float):
+                    if v <= 0:
+                        return ""
+                    if float(v).is_integer():
+                        return str(int(v))
+                    return ""
+                s = str(v).strip()
+                if not s:
+                    return ""
+                try:
+                    f = float(s)
+                    if f <= 0:
+                        return ""
+                    if f.is_integer():
+                        return str(int(f))
+                    return ""
+                except Exception:
+                    return s
+            except Exception:
+                return ""
+
+        if key == "contract2_indefinite":
+            # Show as text, avoid displaying False/0.
+            try:
+                if isinstance(v, bool):
+                    return "Không xác định thời hạn" if v else ""
+                if isinstance(v, (int, float)):
+                    return "Không xác định thời hạn" if int(v) == 1 else ""
+                s = str(v).strip().lower()
+                if s in {"1", "true", "yes", "x", "co", "có", "không xác định thời hạn", "khong xac dinh thoi han"}:
+                    return "Không xác định thời hạn"
+                return ""
+            except Exception:
+                return ""
+
         return str(v)
 
     def get_row_dict(self, row: int) -> dict | None:
         if int(row) < 0 or int(row) >= int(len(self._df)):
             return None
         s = self._df.iloc[int(row)]
-        return {k: s.get(k) for k, _ in self.COLUMNS}
+        return {k: s.get(k) for k, _label, _minw in self.COLUMNS}
 
 
 class _FilterHeaderView(QHeaderView):
@@ -745,7 +836,7 @@ class _FilterHeaderView(QHeaderView):
                     f"QMenu {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QMenu::item {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; border-bottom: 0px; }}",
                     f"QMenu::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
-                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QMenu::separator {{ height: 1px; background: {COLOR_BORDER}; margin: 4px 8px; }}",
                 ]
             )
@@ -870,6 +961,8 @@ class EmployeeTable(QTableView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
+        self._always_hidden_keys: set[str] = {"id", "mcc_code", "name_on_mcc"}
+
         self._model = _EmployeeTableModel(self)
         self._proxy = _EmployeeFilterProxy(self)
         self._proxy.setSourceModel(self._model)
@@ -892,13 +985,13 @@ class EmployeeTable(QTableView):
         self.setModel(self._proxy)
 
         # Table font (data rows)
-        body_font = QFont(UI_FONT, int(CONTENT_FONT) + 3)
+        body_font = QFont(UI_FONT, int(CONTENT_FONT) + 1)
         if FONT_WEIGHT_NORMAL >= 400:
             body_font.setWeight(QFont.Weight.Normal)
         self.setFont(body_font)
 
         # Header font & header dropdown on main header
-        header_font = QFont(UI_FONT, int(CONTENT_FONT) + 3)
+        header_font = QFont(UI_FONT, int(CONTENT_FONT) + 1)
         if FONT_WEIGHT_SEMIBOLD >= 500:
             header_font.setWeight(QFont.Weight.DemiBold)
 
@@ -907,10 +1000,15 @@ class EmployeeTable(QTableView):
         self.setHorizontalHeader(main_header)
         self.horizontalHeader().setVisible(True)
         self.horizontalHeader().setFixedHeight(ROW_HEIGHT)
+        self._enforcing_min_width = False
+        try:
+            self.horizontalHeader().sectionResized.connect(self._on_section_resized)
+        except Exception:
+            pass
 
         # Delegate for main (padding-left 10px)
         self.setItemDelegate(
-            _LeftPaddingDelegate(10, selected_weight=QFont.Weight.Medium, parent=self)
+            _LeftPaddingDelegate(0, selected_weight=QFont.Weight.Medium, parent=self)
         )
 
         # Unified style (single table)
@@ -918,18 +1016,57 @@ class EmployeeTable(QTableView):
 
         self._configure_columns()
 
+        # Apply UI settings and live-update when changed.
+        self.apply_ui_settings()
+        try:
+            ui_settings_bus.changed.connect(self.apply_ui_settings)
+        except Exception:
+            pass
+
     def _col_index(self, key: str) -> int:
         k = str(key or "").strip()
-        for i, (col_key, _label) in enumerate(self._model.COLUMNS):
+        for i, (col_key, _label, _minw) in enumerate(self._model.COLUMNS):
             if col_key == k:
                 return int(i)
         return -1
 
     def show_all_columns(self) -> None:
-        """Show all columns except the hidden ID column."""
-        for i, (k, _label) in enumerate(self._model.COLUMNS):
+        """Show all visible columns (keep some technical columns hidden)."""
+        for i, (k, _label, _minw) in enumerate(self._model.COLUMNS):
             self.setColumnHidden(int(i), False)
-        self.setColumnHidden(self._col_index("id"), True)
+        for k in self._always_hidden_keys:
+            self.setColumnHidden(self._col_index(k), True)
+
+    def _min_width_for_column(self, col: int) -> int:
+        try:
+            key = str(self._model.COLUMNS[int(col)][0] or "").strip()
+            if key in self._always_hidden_keys:
+                return 0
+            minw = int(self._model.COLUMNS[int(col)][2])
+            if minw <= 0:
+                return 0
+            return max(20, minw)
+        except Exception:
+            return 0
+
+    def _on_section_resized(self, logicalIndex: int, _oldSize: int, newSize: int) -> None:
+        if self._enforcing_min_width:
+            return
+        try:
+            col = int(logicalIndex)
+        except Exception:
+            return
+        if col < 0:
+            return
+        min_w = self._min_width_for_column(col)
+        if min_w <= 0:
+            return
+        if int(newSize) < int(min_w):
+            try:
+                self._enforcing_min_width = True
+                self.setColumnWidth(col, int(min_w))
+            finally:
+                self._enforcing_min_width = False
 
     def _apply_table_style_main(self) -> None:
         self.setStyleSheet(
@@ -937,10 +1074,10 @@ class EmployeeTable(QTableView):
                 [
                     f"QTableView {{ background-color: {ODD_ROW_BG_COLOR}; alternate-background-color: {EVEN_ROW_BG_COLOR}; gridline-color: {GRID_LINES_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 0px; border-right: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; padding-right: 22px; }}",
-                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QTableView::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     f"QTableView::item:selected:active {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
-                    "QTableView::item { padding-left: 10px; padding-right: 0px; border: 0px; }",
+                    "QTableView::item { padding-left: 0px; padding-right: 0px; border: 0px; }",
                     "QTableView::item:focus { outline: none; }",
                     "QTableView:focus { outline: none; }",
                 ]
@@ -949,23 +1086,82 @@ class EmployeeTable(QTableView):
 
     def _configure_columns(self) -> None:
         # Hide ID + MCC columns in the main table.
-        self.setColumnHidden(self._col_index("id"), True)
-        self.setColumnHidden(self._col_index("mcc_code"), True)
-        self.setColumnHidden(self._col_index("name_on_mcc"), True)
+        for k in self._always_hidden_keys:
+            self.setColumnHidden(self._col_index(k), True)
 
-        # Column widths
-        self.setColumnWidth(self._col_index("stt"), 70)
-        self.setColumnWidth(self._col_index("employee_code"), 120)
-        self.setColumnWidth(self._col_index("full_name"), 220)
+        # Column widths (use min widths as baseline)
+        for i, (k, _label, minw) in enumerate(self._model.COLUMNS):
+            try:
+                if str(k or "").strip() in self._always_hidden_keys:
+                    continue
+                if int(minw) <= 0:
+                    continue
+                self.setColumnWidth(int(i), int(minw))
+            except Exception:
+                pass
 
         # Main columns sizing
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.horizontalHeader().setDefaultSectionSize(160)
-        # Some wider columns
+        # Some wider columns (override baseline)
         self.setColumnWidth(self._col_index("address"), 240)
         self.setColumnWidth(self._col_index("note"), 260)
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+    def apply_ui_settings(self) -> None:
+        ui = get_employee_table_ui()
+
+        # Table body font
+        body_font = QFont(UI_FONT, int(ui.font_size))
+        if ui.font_weight == "bold":
+            body_font.setWeight(QFont.Weight.DemiBold)
+        else:
+            body_font.setWeight(QFont.Weight.Normal)
+        self.setFont(body_font)
+
+        # Header font
+        header_font = QFont(UI_FONT, int(ui.font_size))
+        if ui.font_weight == "bold":
+            header_font.setWeight(QFont.Weight.DemiBold)
+        else:
+            header_font.setWeight(QFont.Weight.Normal)
+        try:
+            self.horizontalHeader().setFont(header_font)
+        except Exception:
+            pass
+
+        # Per-column alignment/bold
+        align_map: dict[str, Qt.AlignmentFlag] = {}
+        for k, v in (ui.column_align or {}).items():
+            ks = str(k or "").strip()
+            vs = str(v or "").strip().lower()
+            if not ks:
+                continue
+            if vs == "left":
+                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+            elif vs == "center":
+                align_map[ks] = Qt.AlignmentFlag.AlignCenter
+            elif vs == "right":
+                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+
+        self._model.set_ui_overrides(
+            align_by_key=align_map,
+            font_size=int(ui.font_size),
+            font_weight=(QFont.Weight.DemiBold if ui.font_weight == "bold" else QFont.Weight.Normal),
+            column_bold=ui.column_bold,
+        )
+
+        # Trigger refresh
+        try:
+            if self._model.rowCount() > 0 and self._model.columnCount() > 0:
+                top_left = self._model.index(0, 0)
+                bottom_right = self._model.index(
+                    self._model.rowCount() - 1, self._model.columnCount() - 1
+                )
+                self._model.dataChanged.emit(top_left, bottom_right)
+        except Exception:
+            pass
 
     def clear(self) -> None:
         self._model.set_rows([])
@@ -1168,7 +1364,7 @@ class MainContent(QWidget):
                 [
                     f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
                     "QPushButton::icon { margin-right: 10px; }",
-                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_LIGHT}; }}",
                 ]
             )
         )

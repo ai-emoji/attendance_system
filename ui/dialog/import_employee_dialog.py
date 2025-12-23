@@ -237,6 +237,7 @@ class ImportEmployeeDialog(QDialog):
         self._set_status(msg, ok=ok)
         if not ok:
             return
+        rows = self._normalize_import_rows(rows)
         self._preview_rows = rows
         self.table.set_rows(rows)
 
@@ -248,6 +249,7 @@ class ImportEmployeeDialog(QDialog):
             if not ok:
                 self._set_status(msg, ok=False)
                 return
+            rows = self._normalize_import_rows(rows)
             self._preview_rows = rows
             self.table.set_rows(rows)
 
@@ -378,3 +380,85 @@ class ImportEmployeeDialog(QDialog):
 
         if ok:
             self.accept()
+
+    @staticmethod
+    def _normalize_import_rows(rows: list[dict] | None) -> list[dict]:
+        def _to_int_or_none(value):
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, int):
+                return None if value <= 0 else int(value)
+            if isinstance(value, float):
+                if value == 0:
+                    return None
+                if float(value).is_integer():
+                    v = int(value)
+                    return None if v <= 0 else v
+                return None
+
+            s = str(value).strip()
+            if not s:
+                return None
+            # Accept "1.0" (common from Excel) -> 1
+            try:
+                f = float(s)
+                if f == 0:
+                    return None
+                if f.is_integer():
+                    v = int(f)
+                    return None if v <= 0 else v
+                return None
+            except Exception:
+                return None
+
+        def _to_bool_or_none(value):
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                return True if value else None
+            if isinstance(value, (int, float)):
+                try:
+                    return True if int(value) == 1 else None
+                except Exception:
+                    return None
+
+            s = str(value).strip().lower()
+            if not s:
+                return None
+            truthy = {
+                "1",
+                "true",
+                "yes",
+                "y",
+                "x",
+                "✓",
+                "co",
+                "có",
+                "dong y",
+                "đồng ý",
+                "khong xac dinh thoi han",
+                "không xác định thời hạn",
+            }
+            falsy = {"0", "false", "no", "n", "khong", "không", "ko"}
+            if s in truthy:
+                return True
+            if s in falsy:
+                return None
+            return None
+
+        norm: list[dict] = []
+        for r in rows or []:
+            item = dict(r)
+            if "children_count" in item:
+                item["children_count"] = _to_int_or_none(item.get("children_count"))
+
+            # Keep value boolean for DB import, but avoid showing False in preview.
+            if "contract2_indefinite" in item:
+                item["contract2_indefinite"] = _to_bool_or_none(
+                    item.get("contract2_indefinite")
+                )
+
+            norm.append(item)
+        return norm

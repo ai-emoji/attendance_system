@@ -30,6 +30,9 @@
      DROP TABLE IF EXISTS hr_attendance.devices;
      DROP TABLE IF EXISTS hr_attendance.holidays;
      DROP TABLE IF EXISTS hr_attendance.work_shifts;
+     DROP TABLE IF EXISTS hr_attendance.arrange_schedule_details;
+     DROP TABLE IF EXISTS hr_attendance.arrange_schedules;
+     DROP TABLE IF EXISTS hr_attendance.arrange_schedule_day_types;
      DROP TABLE IF EXISTS hr_attendance.company;
 
      DROP TABLE IF EXISTS hr_attendance.attendance_symbols;
@@ -191,6 +194,7 @@
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
 
         attendance_code VARCHAR(50) NOT NULL COMMENT 'Employee attendance code',
+        name_on_mcc VARCHAR(255) NULL COMMENT 'Employee name from machine (or resolved name)',
         work_date DATE NOT NULL,
 
         time_in_1 TIME NULL,
@@ -229,6 +233,7 @@
         id BIGINT AUTO_INCREMENT PRIMARY KEY,
 
         attendance_code VARCHAR(50) NOT NULL COMMENT 'Employee attendance code',
+        name_on_mcc VARCHAR(255) NULL COMMENT 'Employee name from machine (or resolved name)',
         work_date DATE NOT NULL,
 
         time_in_1 TIME NULL,
@@ -281,6 +286,145 @@
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_work_shifts_shift_code (shift_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+    /* Seed ca mặc định (nếu chưa có) để module Sắp xếp lịch trình dùng ngay */
+    INSERT INTO hr_attendance.work_shifts (shift_code, time_in, time_out, work_count)
+    SELECT v.shift_code, v.time_in, v.time_out, v.work_count
+    FROM (
+        SELECT 'HC'  AS shift_code, '08:00:00' AS time_in, '17:00:00' AS time_out, 1.0 AS work_count
+        UNION ALL SELECT 'SA', '08:00:00', '12:00:00', 0.5
+        UNION ALL SELECT 'CH', '13:00:00', '17:00:00', 0.5
+        UNION ALL SELECT 'Ca1','06:00:00', '14:00:00', 1.0
+        UNION ALL SELECT 'Ca2','14:00:00', '22:00:00', 1.0
+    ) v
+    LEFT JOIN hr_attendance.work_shifts s ON s.shift_code = v.shift_code
+    WHERE s.shift_code IS NULL;
+
+
+    -- =========================
+    -- Sắp xếp ca theo lịch trình
+    -- =========================
+
+    -- Danh mục loại ngày (seed cố định) để UI hiển thị Thứ 2..Chủ nhật + Ngày lễ
+    CREATE TABLE IF NOT EXISTS hr_attendance.arrange_schedule_day_types (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        day_key VARCHAR(20) NOT NULL,
+        day_name VARCHAR(20) NOT NULL,
+        day_order INT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_arrange_schedule_day_types_key (day_key),
+        UNIQUE KEY uq_arrange_schedule_day_types_order (day_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+    INSERT INTO hr_attendance.arrange_schedule_day_types (day_key, day_name, day_order)
+    SELECT v.day_key, v.day_name, v.day_order
+    FROM (
+        SELECT 'mon' AS day_key, 'Thứ 2' AS day_name, 1 AS day_order
+        UNION ALL SELECT 'tue', 'Thứ 3', 2
+        UNION ALL SELECT 'wed', 'Thứ 4', 3
+        UNION ALL SELECT 'thu', 'Thứ 5', 4
+        UNION ALL SELECT 'fri', 'Thứ 6', 5
+        UNION ALL SELECT 'sat', 'Thứ 7', 6
+        UNION ALL SELECT 'sun', 'Chủ nhật', 7
+        UNION ALL SELECT 'holiday', 'Ngày lễ', 8
+    ) v
+    LEFT JOIN hr_attendance.arrange_schedule_day_types t ON t.day_key = v.day_key
+    WHERE t.day_key IS NULL;
+
+
+    -- Bảng lịch trình
+    CREATE TABLE IF NOT EXISTS hr_attendance.arrange_schedules (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        schedule_name VARCHAR(255) NOT NULL,
+        -- in|out (cách chọn vào/ra)
+        in_out_mode VARCHAR(10) NULL,
+        ignore_absent_sat TINYINT(1) NOT NULL DEFAULT 0,
+        ignore_absent_sun TINYINT(1) NOT NULL DEFAULT 0,
+        ignore_absent_holiday TINYINT(1) NOT NULL DEFAULT 0,
+        holiday_count_as_work TINYINT(1) NOT NULL DEFAULT 0,
+        day_is_out_time TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_arrange_schedules_name (schedule_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- Chi tiết lịch trình theo từng ngày
+    CREATE TABLE IF NOT EXISTS hr_attendance.arrange_schedule_details (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        schedule_id INT NOT NULL,
+        day_key VARCHAR(20) NOT NULL,
+        day_name VARCHAR(20) NOT NULL,
+        day_order INT NOT NULL,
+        shift1_id INT NULL,
+        shift2_id INT NULL,
+        shift3_id INT NULL,
+        shift4_id INT NULL,
+        shift5_id INT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_arrange_schedule_details_schedule_day (schedule_id, day_key),
+        KEY idx_arrange_schedule_details_schedule (schedule_id),
+        CONSTRAINT fk_arrange_schedule_details_schedule
+            FOREIGN KEY (schedule_id)
+            REFERENCES hr_attendance.arrange_schedules (id)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
+        CONSTRAINT fk_arrange_schedule_details_shift1
+            FOREIGN KEY (shift1_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE,
+        CONSTRAINT fk_arrange_schedule_details_shift2
+            FOREIGN KEY (shift2_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE,
+        CONSTRAINT fk_arrange_schedule_details_shift3
+            FOREIGN KEY (shift3_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
+        ,
+        CONSTRAINT fk_arrange_schedule_details_shift4
+            FOREIGN KEY (shift4_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
+        ,
+        CONSTRAINT fk_arrange_schedule_details_shift5
+            FOREIGN KEY (shift5_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- Danh sách ca theo từng ngày (không giới hạn số ca)
+    -- Lưu theo thứ tự position = 1..n
+    CREATE TABLE IF NOT EXISTS hr_attendance.arrange_schedule_detail_shifts (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        schedule_id INT NOT NULL,
+        day_key VARCHAR(20) NOT NULL,
+        position INT NOT NULL,
+        shift_id INT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_arrange_schedule_detail_shifts_sched_day_pos (schedule_id, day_key, position),
+        KEY idx_arrange_schedule_detail_shifts_schedule (schedule_id),
+        KEY idx_arrange_schedule_detail_shifts_day_key (day_key),
+        CONSTRAINT fk_arrange_schedule_detail_shifts_schedule
+            FOREIGN KEY (schedule_id)
+            REFERENCES hr_attendance.arrange_schedules (id)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE,
+        CONSTRAINT fk_arrange_schedule_detail_shifts_shift
+            FOREIGN KEY (shift_id)
+            REFERENCES hr_attendance.work_shifts (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -409,6 +553,107 @@
     -- =========================
     -- Ghi chú migrate thủ công
     -- =========================
+    -- Migrate cho bản cũ của module "Sắp xếp ca theo lịch trình":
+    -- Nếu DB hiện tại thiếu 2 cột "Tên ca 4", "Tên ca 5" (tương ứng shift4_id, shift5_id)
+    -- thì chạy các lệnh bên dưới (KHÔNG cần DROP TABLE, không mất dữ liệu).
+    --
+    -- Lưu ý:
+    -- - Các lệnh dưới đây dùng prepared statement để tránh lỗi khi đã tồn tại cột/FK.
+    -- - Chạy trong database hr_attendance.
+
+    -- Add columns shift4_id / shift5_id if missing
+    SET @col_shift4 := (
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'arrange_schedule_details'
+          AND COLUMN_NAME = 'shift4_id'
+    );
+    SET @sql_add_shift4 := IF(
+        @col_shift4 = 0,
+        'ALTER TABLE hr_attendance.arrange_schedule_details ADD COLUMN shift4_id INT NULL AFTER shift3_id',
+        'SELECT 1'
+    );
+    PREPARE stmt FROM @sql_add_shift4; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+    SET @col_shift5 := (
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'arrange_schedule_details'
+          AND COLUMN_NAME = 'shift5_id'
+    );
+    SET @sql_add_shift5 := IF(
+        @col_shift5 = 0,
+        'ALTER TABLE hr_attendance.arrange_schedule_details ADD COLUMN shift5_id INT NULL AFTER shift4_id',
+        'SELECT 1'
+    );
+    PREPARE stmt FROM @sql_add_shift5; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+    -- Add foreign keys for shift4_id / shift5_id if missing
+    SET @fk_shift4 := (
+        SELECT COUNT(*)
+        FROM information_schema.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'arrange_schedule_details'
+          AND CONSTRAINT_NAME = 'fk_arrange_schedule_details_shift4'
+          AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+    );
+    SET @sql_fk_shift4 := IF(
+        @fk_shift4 = 0,
+        'ALTER TABLE hr_attendance.arrange_schedule_details\n'
+        '  ADD CONSTRAINT fk_arrange_schedule_details_shift4\n'
+        '  FOREIGN KEY (shift4_id) REFERENCES hr_attendance.work_shifts (id)\n'
+        '  ON DELETE SET NULL ON UPDATE CASCADE',
+        'SELECT 1'
+    );
+    PREPARE stmt FROM @sql_fk_shift4; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+    SET @fk_shift5 := (
+        SELECT COUNT(*)
+        FROM information_schema.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'arrange_schedule_details'
+          AND CONSTRAINT_NAME = 'fk_arrange_schedule_details_shift5'
+          AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+    );
+    SET @sql_fk_shift5 := IF(
+        @fk_shift5 = 0,
+        'ALTER TABLE hr_attendance.arrange_schedule_details\n'
+        '  ADD CONSTRAINT fk_arrange_schedule_details_shift5\n'
+        '  FOREIGN KEY (shift5_id) REFERENCES hr_attendance.work_shifts (id)\n'
+        '  ON DELETE SET NULL ON UPDATE CASCADE',
+        'SELECT 1'
+    );
+    PREPARE stmt FROM @sql_fk_shift5; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+    -- Create table arrange_schedule_detail_shifts if missing (unlimited shifts)
+    SET @tbl_shifts := (
+        SELECT COUNT(*)
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'arrange_schedule_detail_shifts'
+    );
+    SET @sql_create_tbl_shifts := IF(
+        @tbl_shifts = 0,
+        'CREATE TABLE hr_attendance.arrange_schedule_detail_shifts (\n'
+        '  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\n'
+        '  schedule_id INT NOT NULL,\n'
+        '  day_key VARCHAR(20) NOT NULL,\n'
+        '  position INT NOT NULL,\n'
+        '  shift_id INT NULL,\n'
+        '  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n'
+        '  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n'
+        '  UNIQUE KEY uq_arrange_schedule_detail_shifts_sched_day_pos (schedule_id, day_key, position),\n'
+        '  KEY idx_arrange_schedule_detail_shifts_schedule (schedule_id),\n'
+        '  KEY idx_arrange_schedule_detail_shifts_day_key (day_key),\n'
+        '  CONSTRAINT fk_arrange_schedule_detail_shifts_schedule FOREIGN KEY (schedule_id) REFERENCES hr_attendance.arrange_schedules (id) ON DELETE CASCADE ON UPDATE CASCADE,\n'
+        '  CONSTRAINT fk_arrange_schedule_detail_shifts_shift FOREIGN KEY (shift_id) REFERENCES hr_attendance.work_shifts (id) ON DELETE SET NULL ON UPDATE CASCADE\n'
+        ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
+        'SELECT 1'
+    );
+    PREPARE stmt FROM @sql_create_tbl_shifts; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
     -- Nếu bạn đang dùng bản cũ (attendance_symbols dạng 1 dòng nhiều cột), cần migrate thủ công:
     -- 1) Đổi tên bảng cũ để backup: RENAME TABLE attendance_symbols TO attendance_symbols_old;
     -- 2) Chạy lại đoạn CREATE + INSERT attendance_symbols (mới) bên trên.

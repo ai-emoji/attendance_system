@@ -157,6 +157,7 @@ class EmployeeService:
 
         employee_code: str | None = None
         full_name: str | None = None
+        mcc_code: str | None = None
         sort_order: int | None = None
 
         if search_text and search_by:
@@ -167,6 +168,8 @@ class EmployeeService:
                     sort_order = None
             elif search_by == "full_name":
                 full_name = search_text
+            elif search_by == "mcc_code":
+                mcc_code = search_text
             else:
                 employee_code = search_text
         else:
@@ -175,6 +178,7 @@ class EmployeeService:
 
         return self._repo.list_employees(
             employee_code=employee_code,
+            mcc_code=mcc_code,
             full_name=full_name,
             sort_order=sort_order,
             employment_status=employment_status,

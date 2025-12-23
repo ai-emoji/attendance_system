@@ -48,9 +48,15 @@ class DownloadAttendanceRepository:
         where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 
         query = (
-            "SELECT attendance_code, work_date, time_in_1, time_out_1, time_in_2, time_out_2, time_in_3, time_out_3, device_name "
-            f"FROM {self._TABLE_TEMP}{where_sql} "
-            "ORDER BY work_date ASC, attendance_code ASC"
+            "SELECT "
+            "t.attendance_code, "
+            "COALESCE(t.name_on_mcc, e.name_on_mcc, e.full_name, '') AS name_on_mcc, "
+            "t.work_date, t.time_in_1, t.time_out_1, t.time_in_2, t.time_out_2, t.time_in_3, t.time_out_3, "
+            "t.device_name "
+            f"FROM {self._TABLE_TEMP} t "
+            "LEFT JOIN employees e ON (e.mcc_code = t.attendance_code OR e.employee_code = t.attendance_code) "
+            f"{where_sql} "
+            "ORDER BY t.work_date ASC, t.attendance_code ASC"
         )
 
         cursor = None
@@ -97,11 +103,12 @@ class DownloadAttendanceRepository:
 
         query = (
             f"INSERT INTO {table} ("
-            "attendance_code, work_date, time_in_1, time_out_1, time_in_2, time_out_2, time_in_3, time_out_3, "
+            "attendance_code, name_on_mcc, work_date, time_in_1, time_out_1, time_in_2, time_out_2, time_in_3, time_out_3, "
             "device_no, device_id, device_name"
             ") VALUES ("
-            "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
+            "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
             ") ON DUPLICATE KEY UPDATE "
+            "name_on_mcc = VALUES(name_on_mcc), "
             "time_in_1 = VALUES(time_in_1), "
             "time_out_1 = VALUES(time_out_1), "
             "time_in_2 = VALUES(time_in_2), "
@@ -117,6 +124,7 @@ class DownloadAttendanceRepository:
             params.append(
                 (
                     str(r.get("attendance_code") or ""),
+                    str(r.get("name_on_mcc") or ""),
                     str(r.get("work_date") or ""),
                     r.get("time_in_1"),
                     r.get("time_out_1"),

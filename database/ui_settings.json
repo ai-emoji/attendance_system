@@ -1,0 +1,76 @@
+{
+  "employee_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "column_align": {
+      "stt": "center",
+      "employee_code": "center",
+      "department_name": "center",
+      "title_name": "center",
+      "date_of_birth": "center",
+      "gender": "center",
+      "national_id": "center",
+      "id_issue_date": "center",
+      "phone": "center",
+      "insurance_no": "center",
+      "tax_code": "center",
+      "degree": "center",
+      "major": "center",
+      "contract1_term": "center",
+      "start_date": "center"
+    },
+    "column_bold": {}
+  },
+  "shift_attendance_table": {
+    "column_visible": {
+      "in_2": true,
+      "employee_code": true,
+      "leave_plus": true,
+      "total": true,
+      "tc2": true,
+      "tc3": true,
+      "tc1": true,
+      "work_plus": true,
+      "hours_plus": true,
+      "leave": true,
+      "mcc_code": true,
+      "title_name": true,
+      "department_name": true,
+      "start_date": true,
+      "full_name": true,
+      "hours": true
+    },
+    "font_size": 11,
+    "font_weight": "normal",
+    "column_align": {
+      "employee_code": "center",
+      "leave_plus": "left",
+      "mcc_code": "center",
+      "title_name": "center",
+      "department_name": "center",
+      "start_date": "center",
+      "full_name": "center"
+    },
+    "column_bold": {}
+  },
+  "download_attendance": {
+    "table_font_size": 12,
+    "combo_font_size": 13,
+    "calendar_font_size": 12,
+    "column_visible": {
+      "attendance_code": true
+    },
+    "input_height": 28,
+    "button_height": 28,
+    "device_width": 200,
+    "search_by_width": 150,
+    "search_text_min_width": 150,
+    "download_button_width": 180,
+    "time_button_width": 100,
+    "layout_mode": "space_between",
+    "layout_margin": 10,
+    "layout_spacing": 5,
+    "clock_icon_size": 18,
+    "date_width": 180
+  }
+}

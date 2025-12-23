@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from core.resource import ICON_SETTINGS
+
 
 @dataclass(frozen=True)
 class HeaderAction:
@@ -109,6 +111,7 @@ class HeaderController:
                 HeaderAction("Kết nối\nCSDL SQL", "login.svg"),
                 HeaderAction("Sao lưu\nDữ liệu", "backup.svg"),
                 HeaderAction("Khôi phục\nDữ liệu", "absence_restore.svg"),
+                HeaderAction("Cài đặt", ICON_SETTINGS),
             ]
 
         # Fallback: coi như "Khai báo"

@@ -20,7 +20,7 @@ _APP_ICON = None
 # 1️⃣ KÍCH THƯỚC CỬA SỔ CHÍNH
 # ============================================================================
 MIN_MAINWINDOW_WIDTH = 1600
-MIN_MAINWINDOW_HEIGHT = 768
+MIN_MAINWINDOW_HEIGHT = 900
 
 # Dialog Thông tin công ty
 COMPANY_DIALOG_WIDTH = 500
@@ -48,6 +48,7 @@ MESSAGE_DIALOG_HEIGHT = 150
 
 # cấu trúc Container
 CONTAINER_MIN_HEIGHT = 588
+CONTAINER_SHIFT_ATTENDANCE = 274
 MAIN_CONTENT_MIN_HEIGHT = 508
 TITLE_HEIGHT = 40
 BG_TITLE_1_HEIGHT = "#E6E6E6"

@@ -220,6 +220,23 @@ class AttendanceSymbolDialog(QDialog):
         )
         return inp
 
+    @staticmethod
+    def _emoji_checked(checked: bool) -> str:
+        return "✅" if checked else "❌"
+
+    def _setup_emoji_checkbox(self, chk: QCheckBox) -> None:
+        # Hide old checkbox indicator, show emoji only
+        chk.setStyleSheet(
+            "\n".join(
+                [
+                    "QCheckBox { spacing: 0px; padding: 0px; margin: 0px; background: transparent; }",
+                    "QCheckBox::indicator { image: none; width: 0px; height: 0px; }",
+                ]
+            )
+        )
+        chk.setText(self._emoji_checked(chk.isChecked()))
+        chk.toggled.connect(lambda v, c=chk: c.setText(self._emoji_checked(v)))
+
     def _mk_center_widget(self, w: QWidget) -> QWidget:
         wrap = QWidget(self.table)
         wrap.setStyleSheet("background: transparent;")
@@ -257,6 +274,7 @@ class AttendanceSymbolDialog(QDialog):
         chk = QCheckBox("")
         chk.setCursor(Qt.CursorShape.PointingHandCursor)
         chk.setChecked(True)
+        self._setup_emoji_checkbox(chk)
 
         self.table.setCellWidget(row, 2, desc_inp)
         self.table.setCellWidget(row, 3, sym_inp)

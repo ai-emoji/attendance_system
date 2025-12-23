@@ -199,6 +199,23 @@ class WeekendDialog(QDialog):
         lay.addStretch(1)
         return wrap
 
+    @staticmethod
+    def _emoji_checked(checked: bool) -> str:
+        return "✅" if checked else "❌"
+
+    def _setup_emoji_checkbox(self, chk: QCheckBox) -> None:
+        # Hide old checkbox indicator, show emoji only
+        chk.setStyleSheet(
+            "\n".join(
+                [
+                    "QCheckBox { spacing: 0px; padding: 0px; margin: 0px; background: transparent; }",
+                    "QCheckBox::indicator { image: none; width: 0px; height: 0px; }",
+                ]
+            )
+        )
+        chk.setText(self._emoji_checked(chk.isChecked()))
+        chk.toggled.connect(lambda v, c=chk: c.setText(self._emoji_checked(v)))
+
     def _init_row(self, row: int, day_name: str, font: QFont) -> None:
         # ID hidden
         id_item = QTableWidgetItem("")
@@ -220,6 +237,7 @@ class WeekendDialog(QDialog):
 
         chk = QCheckBox("")
         chk.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._setup_emoji_checkbox(chk)
         self.table.setCellWidget(row, 2, self._mk_center_widget(chk))
 
     def set_status(self, message: str, ok: bool = True) -> None:
