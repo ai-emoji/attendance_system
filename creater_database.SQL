@@ -62,9 +62,11 @@
     CREATE TABLE IF NOT EXISTS hr_attendance.job_titles (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         title_name VARCHAR(255) NOT NULL,
+        department_id INT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_job_titles_title_name (title_name)
+        UNIQUE KEY uq_job_titles_title_name (title_name),
+        KEY idx_job_titles_department_id (department_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 

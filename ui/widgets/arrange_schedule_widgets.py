@@ -300,6 +300,7 @@ class MainLeft(QWidget):
             stretch_all=True,
             horizontal_scroll=Qt.ScrollBarPolicy.ScrollBarAlwaysOff,
         )
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # Hide ID column
         self.table.setColumnHidden(0, True)
 
@@ -490,6 +491,7 @@ class MainRight(QWidget):
         # Bảng chỉ "được tạo" (setup headers/rows) khi Áp dụng hoặc khi load lịch trình.
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
+        self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.table.setStyleSheet(
             "\n".join(
                 [

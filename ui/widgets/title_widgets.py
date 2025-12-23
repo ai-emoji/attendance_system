@@ -371,6 +371,22 @@ class MainContent(QWidget):
             else:
                 self._set_row_data(r, None, None, "")
 
+        # Default state: do not auto-select any row
+        prev_row = self.table.currentRow()
+        try:
+            self.table.blockSignals(True)
+            self.table.clearSelection()
+            self.table.setCurrentItem(None)
+        finally:
+            self.table.blockSignals(False)
+
+        if prev_row is not None and int(prev_row) >= 0:
+            try:
+                self._apply_row_font(int(prev_row), self._font_normal)
+            except Exception:
+                pass
+        self._last_selected_row = -1
+
     def get_selected_title(self) -> tuple[int, str] | None:
         """Trả về (id, title_name) của dòng đang chọn."""
 

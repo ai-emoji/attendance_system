@@ -18,7 +18,6 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QFont, QIcon, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QCheckBox,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -442,13 +441,18 @@ class MainContent1(QWidget):
         b.setContentsMargins(0, 0, 0, 0)
         b.setSpacing(10)
 
-        self.chk_remove_prev_night = QCheckBox(bottom)
+        self.chk_remove_prev_night = QPushButton(bottom)
         self.chk_remove_prev_night.setFont(_mk_font_normal())
+        self.chk_remove_prev_night.setCheckable(True)
+        self.chk_remove_prev_night.setChecked(False)
+        self.chk_remove_prev_night.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_remove_prev_night.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_remove_prev_night.setStyleSheet(
             "\n".join(
                 [
-                    f"QCheckBox {{ color: {COLOR_TEXT_PRIMARY}; }}",
-                    "QCheckBox::indicator { width: 0px; height: 0px; }",
+                    f"QPushButton {{ border: 0px; background: transparent; color: {COLOR_TEXT_PRIMARY}; padding: 6px 8px; text-align: left; }}",
+                    f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: #FFFFFF; border-radius: 6px; }}",
+                    "QPushButton:focus { outline: none; }",
                 ]
             )
         )
@@ -457,9 +461,7 @@ class MainContent1(QWidget):
         _apply_chk_text = lambda: self.chk_remove_prev_night.setText(
             f"✅ {base}" if self.chk_remove_prev_night.isChecked() else f"❌ {base}"
         )
-        self.chk_remove_prev_night.stateChanged.connect(
-            lambda _=None: _apply_chk_text()
-        )
+        self.chk_remove_prev_night.toggled.connect(lambda _=None: _apply_chk_text())
         _apply_chk_text()
 
         self.inp_calc_from = _mk_line_edit(self, INPUT_HEIGHT_DEFAULT)

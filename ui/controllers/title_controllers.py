@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from services.department_services import DepartmentService
 from services.title_services import TitleService
 from ui.dialog.title_dialog import MessageDialog, TitleDialog
 
@@ -48,11 +49,32 @@ class TitleController:
             self._content.set_titles([])
             self._title_bar2.set_total(0)
 
+    def _list_departments_dropdown(self) -> list[tuple[int, str]]:
+        try:
+            models = DepartmentService().list_departments()
+            items: list[tuple[int, str]] = []
+            for m in models:
+                try:
+                    items.append((int(m.id), str(m.department_name)))
+                except Exception:
+                    continue
+            items.sort(key=lambda x: x[1].lower())
+            return items
+        except Exception:
+            return []
+
     def on_add(self) -> None:
-        dialog = TitleDialog(mode="add", parent=self._parent_window)
+        dialog = TitleDialog(
+            mode="add",
+            departments=self._list_departments_dropdown(),
+            parent=self._parent_window,
+        )
 
         def _save() -> None:
-            ok, msg, _new_id = self._service.create_title(dialog.get_title_name())
+            ok, msg, _new_id = self._service.create_title(
+                dialog.get_title_name(),
+                department_id=dialog.get_department_id(),
+            )
             dialog.set_status(msg, ok=ok)
             if ok:
                 dialog.accept()
@@ -72,12 +94,21 @@ class TitleController:
             return
 
         title_id, current_name = selected
+        current = self._service.get_title(title_id)
         dialog = TitleDialog(
-            mode="edit", title_name=current_name, parent=self._parent_window
+            mode="edit",
+            title_name=current_name,
+            departments=self._list_departments_dropdown(),
+            department_id=(current.department_id if current else None),
+            parent=self._parent_window,
         )
 
         def _save() -> None:
-            ok, msg = self._service.update_title(title_id, dialog.get_title_name())
+            ok, msg = self._service.update_title(
+                title_id,
+                dialog.get_title_name(),
+                department_id=dialog.get_department_id(),
+            )
             dialog.set_status(msg, ok=ok)
             if ok:
                 dialog.accept()

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QProgressDialog
 
 from services.employee_services import EmployeeService
+from services.title_services import TitleService
 from ui.dialog.employee_dialog import EmployeeDialog
 from ui.dialog.employee_list_dialog import EmployeeListDialog
 from ui.dialog.import_employee_dialog import ImportEmployeeDialog
@@ -34,7 +35,13 @@ class EmployeeController:
         # Load department tree
         try:
             dept_rows = self._service.list_departments_tree_rows()
-            self._content.department_tree.set_departments(dept_rows)
+            try:
+                title_models = TitleService().list_titles()
+                title_rows = [(t.id, t.department_id, t.title_name) for t in title_models]
+            except Exception:
+                title_rows = []
+
+            self._content.department_tree.set_departments(dept_rows, titles=title_rows)
         except Exception:
             logger.exception("Không thể tải cây phòng ban")
 
@@ -74,50 +81,38 @@ class EmployeeController:
             if not unicodedata.combining(ch)
         )
 
-    def _resolve_title_id_by_name(self, title_name: str) -> int | None:
-        title_name = str(title_name or "").strip()
-        if not title_name:
-            return None
+    def _apply_tree_filters(self, filters: dict) -> dict:
+        """Apply tree selection to filters.
 
-        target = self._norm_text(title_name)
-        try:
-            for tid, tname in self._service.list_titles_dropdown() or []:
-                if self._norm_text(tname) == target:
-                    try:
-                        return int(tid)
-                    except Exception:
-                        return None
-        except Exception:
-            return None
-        return None
-
-    def _apply_parent_child_filters(self, filters: dict) -> dict:
-        """Apply rule: parent node -> department_id, child node -> title_id."""
+        - Department node -> department_id
+        - Title node -> title_id
+        """
 
         filters = dict(filters or {})
-        filters["title_id"] = None
+        filters.setdefault("department_id", None)
+        filters.setdefault("title_id", None)
 
         ctx = None
         try:
-            ctx = self._content.department_tree.get_selected_department_context()
+            ctx = self._content.department_tree.get_selected_node_context()
         except Exception:
             ctx = None
 
-        parent_id = (ctx or {}).get("parent_id")
-        is_child = parent_id is not None
+        if not ctx:
+            return filters
 
-        if is_child:
-            # Child nodes filter by title_id (not department_id)
+        if ctx.get("type") == "title":
             filters["department_id"] = None
-            filters["title_id"] = self._resolve_title_id_by_name(
-                str((ctx or {}).get("name") or "").strip()
-            )
+            filters["title_id"] = ctx.get("id")
+        else:
+            filters["department_id"] = ctx.get("id")
+            filters["title_id"] = None
 
         return filters
 
     def refresh(self) -> None:
         try:
-            filters = self._apply_parent_child_filters(self._content.get_filters())
+            filters = self._apply_tree_filters(self._content.get_filters())
             rows = self._service.list_employees(filters)
             self._content.table.set_rows(rows)
 
@@ -146,7 +141,7 @@ class EmployeeController:
         if selected_rows:
             ok, msg = self._service.export_xlsx_rows(file_path, selected_rows)
         else:
-            filters = self._apply_parent_child_filters(self._content.get_filters())
+            filters = self._apply_tree_filters(self._content.get_filters())
             ok, msg = self._service.export_xlsx(file_path, filters)
         MessageDialog.info(self._parent_window, "Xuất danh sách", msg)
 

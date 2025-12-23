@@ -10,7 +10,7 @@ Yêu cầu:
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import QTimer, Qt, QSize
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QComboBox,
@@ -56,6 +56,7 @@ class DepartmentDialog(QDialog):
         selected_parent_id: int | None = None,
         exclude_parent_ids: set[int] | None = None,
         department_name: str = "",
+        scope: str | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -63,6 +64,7 @@ class DepartmentDialog(QDialog):
         self._is_formatting_text = False
         self._exclude_parent_ids = exclude_parent_ids or set()
         self._init_ui()
+        self.set_scope(scope)
         self.set_parent_options(parent_options or [], selected_parent_id)
         self.set_department_name(department_name)
 
@@ -131,9 +133,37 @@ class DepartmentDialog(QDialog):
             )
         )
 
-        # Thứ tự input: Tên phòng ban -> Phòng ban cha
-        form.addRow("Tên Phòng ban", self.input_department_name)
-        form.addRow("Phòng ban cha", self.combo_parent)
+        # Labels (đồng bộ width)
+        self.label_name = QLabel("Tên")
+        self.label_name.setFont(font_normal)
+        self.label_parent = QLabel("Phòng ban cha")
+        self.label_parent.setFont(font_normal)
+        self.label_scope = QLabel("Loại")
+        self.label_scope.setFont(font_normal)
+
+        form.addRow(self.label_name, self.input_department_name)
+        form.addRow(self.label_parent, self.combo_parent)
+
+        # Dropdown chọn loại (thay cho checkbox)
+        self.combo_scope = QComboBox()
+        self.combo_scope.setFont(font_normal)
+        self.combo_scope.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.combo_scope.setMinimumWidth(INPUT_WIDTH_DEFAULT)
+        self.combo_scope.setToolTip("Chọn: Phòng ban hoặc Chức danh (mặc định chưa chọn).")
+        self.combo_scope.setIconSize(QSize(18, 18))
+        self.combo_scope.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.combo_scope.setStyleSheet(
+            "\n".join(
+                [
+                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
+                ]
+            )
+        )
+        self.combo_scope.addItem("— Chưa chọn —", None)
+        self.combo_scope.addItem("Phòng ban", "department")
+        self.combo_scope.addItem("Chức danh", "title")
+        form.addRow(self.label_scope, self.combo_scope)
 
         self.label_status = QLabel("")
         self.label_status.setWordWrap(True)
@@ -196,6 +226,14 @@ class DepartmentDialog(QDialog):
         self.input_department_name.returnPressed.connect(self.btn_save.click)
         self.input_department_name.setFocus()
 
+        self._apply_scope_ui(self.get_scope())
+        self.combo_scope.currentIndexChanged.connect(
+            lambda *_: self._apply_scope_ui(self.get_scope())
+        )
+
+        # Sync label widths after layout is computed
+        QTimer.singleShot(0, self._sync_form_label_widths)
+
     def set_status(self, message: str, ok: bool = True) -> None:
         self.label_status.setStyleSheet(
             f"color: {COLOR_SUCCESS if ok else COLOR_ERROR};"
@@ -214,6 +252,12 @@ class DepartmentDialog(QDialog):
         # Option: không có cha
         self.combo_parent.addItem("— Không có —")
         self.combo_parent.setItemData(0, None)
+
+        # Ensure stable order (old -> new) regardless of caller order.
+        try:
+            rows = sorted(rows, key=lambda x: int(x[0]))
+        except Exception:
+            rows = list(rows or [])
 
         by_parent: dict[int | None, list[tuple[int, int | None, str]]] = {}
         for dept_id, parent_id, name in rows:
@@ -269,14 +313,86 @@ class DepartmentDialog(QDialog):
         except Exception:
             return None
 
+    def get_scope(self) -> str | None:
+        data = self.combo_scope.currentData()
+        s = str(data).strip() if data is not None else ""
+        return s or None
+
+    def set_scope(self, scope: str | None) -> None:
+        scope = str(scope or "").strip() or None
+        # Keep default state if invalid
+        if scope not in ("department", "title"):
+            return
+        for i in range(self.combo_scope.count()):
+            if self.combo_scope.itemData(i) == scope:
+                try:
+                    self.combo_scope.blockSignals(True)
+                    self.combo_scope.setCurrentIndex(i)
+                finally:
+                    try:
+                        self.combo_scope.blockSignals(False)
+                    except Exception:
+                        pass
+                self._apply_scope_ui(self.get_scope())
+                return
+
     def get_department_name(self) -> str:
         return (self.input_department_name.text() or "").strip()
+
+    def _apply_scope_ui(self, scope: str | None) -> None:
+        scope = str(scope or "").strip() or None
+
+        if scope == "department":
+            self.label_name.setText("Tên Phòng ban")
+            self.input_department_name.setPlaceholderText(
+                "Nhập tên phòng ban (ví dụ: Phòng Kế Toán)"
+            )
+            self.input_department_name.setToolTip(
+                "Tên phòng ban sẽ tự viết hoa chữ cái đầu mỗi từ"
+            )
+            return
+
+        if scope == "title":
+            self.label_name.setText("Tên Chức danh")
+            self.input_department_name.setPlaceholderText("(ví dụ: Trưởng Phòng)")
+            self.input_department_name.setToolTip(
+                "Tên chức danh sẽ tự viết hoa chữ cái đầu mỗi từ"
+            )
+            return
+
+        # Default: chưa chọn
+        self.label_name.setText("Tên")
+        self.input_department_name.setPlaceholderText(
+            "Chọn Loại: Phòng ban hoặc Chức danh"
+        )
+        self.input_department_name.setToolTip("")
+
+    def _sync_form_label_widths(self) -> None:
+        labels = [
+            getattr(self, "label_name", None),
+            getattr(self, "label_parent", None),
+            getattr(self, "label_scope", None),
+        ]
+        labels = [lb for lb in labels if isinstance(lb, QLabel)]
+        if not labels:
+            return
+
+        try:
+            max_w = max(int(lb.sizeHint().width()) for lb in labels)
+        except Exception:
+            return
+
+        # Add a small padding so Vietnamese diacritics don't clip
+        max_w = int(max_w) + 6
+        for lb in labels:
+            lb.setFixedWidth(max_w)
 
     def set_department_name(self, value: str) -> None:
         self.input_department_name.setText(value or "")
         self.input_department_name.setCursorPosition(
             len(self.input_department_name.text())
         )
+
 
     def _ensure_title_case(self, line_edit: QLineEdit) -> None:
         if self._is_formatting_text:

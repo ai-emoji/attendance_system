@@ -31,10 +31,13 @@ from PySide6.QtWidgets import QTableWidgetItem
 
 from core.resource import (
     COLOR_BORDER,
+    COLOR_BUTTON_PRIMARY_HOVER,
+    HOVER_ROW_BG_COLOR,
     COLOR_TEXT_PRIMARY,
     CONTENT_FONT,
     FONT_WEIGHT_SEMIBOLD,
     UI_FONT,
+    COLOR_TEXT_LIGHT,
 )
 
 from core.database import Database
@@ -74,11 +77,15 @@ class ArrangeScheduleDialog(QDialog):
         def _mk_list() -> QListWidget:
             lw = QListWidget(self)
             lw.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+            lw.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             lw.setStyleSheet(
                 "\n".join(
                     [
                         f"QListWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
                         "QListWidget::item { padding: 8px; }",
+                        f"QListWidget::item:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                        "QListWidget::item:focus { outline: none; }",
+                        "QListWidget:focus { outline: none; }",
                     ]
                 )
             )
@@ -202,11 +209,15 @@ class ArrangeScheduleDialog(QDialog):
         self.tree_selected = QTreeWidget(self.group_apply)
         self.tree_selected.setHeaderHidden(True)
         self.tree_selected.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
+        self.tree_selected.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tree_selected.setStyleSheet(
             "\n".join(
                 [
                     f"QTreeWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
                     "QTreeWidget::item { padding: 6px; }",
+                    f"QTreeWidget::item:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                    "QTreeWidget::item:focus { outline: none; }",
+                    "QTreeWidget:focus { outline: none; }",
                 ]
             )
         )
@@ -221,6 +232,13 @@ class ArrangeScheduleDialog(QDialog):
         self.btn_delete_all = QPushButton("Xóa tất cả ca")
         self.btn_apply = QPushButton("Áp dụng")
 
+        btn_style = "\n".join(
+            [
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; color: {COLOR_TEXT_PRIMARY}; padding: 0 10px; border-radius: 6px; }}",
+                f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; border: 1px solid {COLOR_BORDER}; }}",
+            ]
+        )
+
         for b in (
             self.btn_apply_selected,
             self.btn_delete_selected,
@@ -229,6 +247,7 @@ class ArrangeScheduleDialog(QDialog):
         ):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setFixedHeight(34)
+            b.setStyleSheet(btn_style)
             btns.addWidget(b)
 
         g3.addWidget(self.tree_selected, 1)
@@ -241,8 +260,19 @@ class ArrangeScheduleDialog(QDialog):
         root.addWidget(top, 1)
 
         # Toggle behavior with emoji ✅
-        self.list_shifts.itemClicked.connect(lambda item: _toggle_item(item))
-        self.list_days.itemClicked.connect(lambda item: _toggle_item(item))
+        def _on_list_item_clicked(lw: QListWidget, item: QListWidgetItem) -> None:
+            _toggle_item(item)
+            try:
+                lw.setCurrentRow(-1)
+            except Exception:
+                pass
+
+        self.list_shifts.itemClicked.connect(
+            lambda item: _on_list_item_clicked(self.list_shifts, item)
+        )
+        self.list_days.itemClicked.connect(
+            lambda item: _on_list_item_clicked(self.list_days, item)
+        )
 
         def _tree_set_checked(item: QTreeWidgetItem, checked: bool) -> None:
             meta = item.data(0, Qt.ItemDataRole.UserRole) or {}

@@ -841,7 +841,10 @@ class EmployeeService:
 
             # Auto-create missing department/title so import does not silently drop values.
             if title_name and not title_id:
-                ok, _msg, new_id = self._title_service.create_title(str(title_name))
+                ok, _msg, new_id = self._title_service.create_title(
+                    str(title_name),
+                    department_id=None,
+                )
                 if ok and new_id:
                     title_id = int(new_id)
                     title_map[title_key] = int(new_id)

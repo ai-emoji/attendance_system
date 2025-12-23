@@ -1112,6 +1112,34 @@ class EmployeeRepository:
             )
         return out
 
+    def count_employees_by_department(self, department_id: int) -> int:
+        self.ensure_import_schema()
+        with Database.connect() as conn:
+            cursor = Database.get_cursor(conn, dictionary=True)
+            cursor.execute(
+                "SELECT COUNT(*) AS c FROM employees WHERE department_id = %s",
+                (int(department_id),),
+            )
+            row = cursor.fetchone() or {}
+            try:
+                return int(row.get("c") or 0)
+            except Exception:
+                return 0
+
+    def count_employees_by_title(self, title_id: int) -> int:
+        self.ensure_import_schema()
+        with Database.connect() as conn:
+            cursor = Database.get_cursor(conn, dictionary=True)
+            cursor.execute(
+                "SELECT COUNT(*) AS c FROM employees WHERE title_id = %s",
+                (int(title_id),),
+            )
+            row = cursor.fetchone() or {}
+            try:
+                return int(row.get("c") or 0)
+            except Exception:
+                return 0
+
     def upsert_many(self, items: list[dict[str, Any]]) -> tuple[int, int]:
         """Upsert by employee_code. Returns (inserted_or_updated, skipped)."""
 

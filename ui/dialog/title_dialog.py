@@ -12,6 +12,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFormLayout,
     QHBoxLayout,
@@ -35,6 +36,7 @@ from core.resource import (
     CONTENT_FONT,
     FONT_WEIGHT_NORMAL,
     FONT_WEIGHT_SEMIBOLD,
+    ICON_DROPDOWN,
     INPUT_COLOR_BG,
     INPUT_COLOR_BORDER,
     INPUT_COLOR_BORDER_FOCUS,
@@ -43,6 +45,7 @@ from core.resource import (
     TITLE_DIALOG_HEIGHT,
     TITLE_DIALOG_WIDTH,
     UI_FONT,
+    resource_path,
 )
 
 
@@ -51,13 +54,18 @@ class TitleDialog(QDialog):
         self,
         mode: str = "add",
         title_name: str = "",
+        departments: list[tuple[int, str]] | None = None,
+        department_id: int | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self._mode = mode
         self._is_formatting_text = False
+        self._departments: list[tuple[int, str]] = list(departments or [])
         self._init_ui()
         self.set_title_name(title_name)
+        self._load_departments()
+        self.set_department_id(department_id)
 
     def _init_ui(self) -> None:
         self.setModal(True)
@@ -108,6 +116,25 @@ class TitleDialog(QDialog):
         )
 
         form.addRow("Tên Chức Danh", self.input_title_name)
+
+        dropdown_icon_url = resource_path(ICON_DROPDOWN).replace("\\", "/")
+
+        combo_style = "\n".join(
+            [
+                # Chừa chỗ bên phải cho nút dropdown
+                f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; padding-right: 30px; border-radius: 6px; }}",
+                f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
+                f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 26px; border-left: 1px solid {INPUT_COLOR_BORDER}; background: {INPUT_COLOR_BG}; }}",
+                f'QComboBox::down-arrow {{ image: url("{dropdown_icon_url}"); width: 10px; height: 10px; }}',
+            ]
+        )
+
+        self.cbo_department = QComboBox()
+        self.cbo_department.setFont(font_normal)
+        self.cbo_department.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.cbo_department.setMinimumWidth(INPUT_WIDTH_DEFAULT)
+        self.cbo_department.setStyleSheet(combo_style)
+        form.addRow("Phòng ban", self.cbo_department)
 
         self.label_status = QLabel("")
         self.label_status.setWordWrap(True)
@@ -182,9 +209,51 @@ class TitleDialog(QDialog):
     def get_title_name(self) -> str:
         return (self.input_title_name.text() or "").strip()
 
+    def get_department_id(self) -> int | None:
+        try:
+            value = self.cbo_department.currentData()
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
     def set_title_name(self, value: str) -> None:
         self.input_title_name.setText(value or "")
         self.input_title_name.setCursorPosition(len(self.input_title_name.text()))
+
+    def set_department_id(self, department_id: int | None) -> None:
+        # Match by itemData
+        try:
+            target = int(department_id) if department_id is not None else None
+        except Exception:
+            target = None
+
+        for i in range(self.cbo_department.count()):
+            if self.cbo_department.itemData(i) == target:
+                self.cbo_department.setCurrentIndex(i)
+                return
+        # fallback: first item
+        if self.cbo_department.count() > 0:
+            self.cbo_department.setCurrentIndex(0)
+
+    def _load_departments(self) -> None:
+        if not hasattr(self, "cbo_department"):
+            return
+
+        self.cbo_department.clear()
+        self.cbo_department.addItem("Chưa chọn", None)
+
+        items = list(self._departments or [])
+        try:
+            items.sort(key=lambda x: str(x[1]).lower())
+        except Exception:
+            pass
+
+        for dept_id, dept_name in items:
+            try:
+                self.cbo_department.addItem(str(dept_name), int(dept_id))
+            except Exception:
+                continue
+        self.cbo_department.setCurrentIndex(0)
 
     def _ensure_title_case(self, line_edit: QLineEdit) -> None:
         if self._is_formatting_text:

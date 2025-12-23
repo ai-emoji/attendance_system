@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class TitleModel:
     id: int
     title_name: str
+    department_id: int | None = None
 
 
 class TitleService:
@@ -37,6 +38,11 @@ class TitleService:
                     TitleModel(
                         id=int(r.get("id")),
                         title_name=str(r.get("title_name") or ""),
+                        department_id=(
+                            int(r.get("department_id"))
+                            if r.get("department_id") is not None
+                            else None
+                        ),
                     )
                 )
             except Exception:
@@ -44,7 +50,32 @@ class TitleService:
                 continue
         return result
 
-    def create_title(self, title_name: str) -> tuple[bool, str, int | None]:
+    def get_title(self, title_id: int) -> TitleModel | None:
+        if not title_id:
+            return None
+        try:
+            row = self._repo.get_title(int(title_id))
+        except Exception:
+            logger.exception("Service get_title thất bại")
+            return None
+        if not row:
+            return None
+        try:
+            return TitleModel(
+                id=int(row.get("id")),
+                title_name=str(row.get("title_name") or ""),
+                department_id=(
+                    int(row.get("department_id"))
+                    if row.get("department_id") is not None
+                    else None
+                ),
+            )
+        except Exception:
+            return None
+
+    def create_title(
+        self, title_name: str, department_id: int | None = None
+    ) -> tuple[bool, str, int | None]:
         title_name = (title_name or "").strip()
         if not title_name:
             return False, "Vui lòng nhập Tên Chức Danh.", None
@@ -52,7 +83,7 @@ class TitleService:
             return False, f"Tên Chức Danh tối đa {TITLE_NAME_MAX_LENGTH} ký tự.", None
 
         try:
-            new_id = self._repo.create_title(title_name)
+            new_id = self._repo.create_title(title_name, department_id=department_id)
             return True, "Thêm mới thành công.", new_id
         except Exception as exc:
             if self._is_duplicate_key(exc):
@@ -60,7 +91,9 @@ class TitleService:
             logger.exception("Service create_title thất bại")
             return False, "Không thể thêm mới. Vui lòng thử lại.", None
 
-    def update_title(self, title_id: int, title_name: str) -> tuple[bool, str]:
+    def update_title(
+        self, title_id: int, title_name: str, department_id: int | None = None
+    ) -> tuple[bool, str]:
         title_name = (title_name or "").strip()
         if not title_id:
             return False, "Không tìm thấy dòng cần sửa."
@@ -70,7 +103,9 @@ class TitleService:
             return False, f"Tên Chức Danh tối đa {TITLE_NAME_MAX_LENGTH} ký tự."
 
         try:
-            affected = self._repo.update_title(int(title_id), title_name)
+            affected = self._repo.update_title(
+                int(title_id), title_name, department_id=department_id
+            )
             if affected <= 0:
                 return False, "Không có thay đổi."
             return True, "Sửa đổi thành công."

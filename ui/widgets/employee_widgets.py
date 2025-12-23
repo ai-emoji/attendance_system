@@ -152,6 +152,7 @@ class DepartmentTreePreview(QWidget):
             self._font_semibold.setWeight(QFont.Weight.DemiBold)
 
         self._dept_icon = QIcon(resource_path("assets/images/department.svg"))
+        self._title_icon = QIcon(resource_path("assets/images/job_title.svg"))
 
         # Cache for quick lookup
         self._dept_parent_by_id: dict[int, int | None] = {}
@@ -181,7 +182,7 @@ class DepartmentTreePreview(QWidget):
                 [
                     f"QTreeWidget {{ background-color: {MAIN_CONTENT_BG_COLOR}; color: {COLOR_TEXT_PRIMARY};}}",
                     f"QTreeWidget::item {{ padding-left: 8px; padding-right: 8px; height: {ROW_HEIGHT}px; }}",
-                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QTreeWidget::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTreeWidget::item:focus { outline: none; }",
                     "QTreeWidget:focus { outline: none; }",
@@ -200,8 +201,13 @@ class DepartmentTreePreview(QWidget):
         # Ensure filtering triggers even when the user clicks the same item again.
         self.selection_changed.emit()
 
-    def set_departments(self, rows: list[tuple[int, int | None, str, str]]) -> None:
+    def set_departments(
+        self,
+        rows: list[tuple[int, int | None, str, str]],
+        titles: list[tuple[int, int | None, str]] | None = None,
+    ) -> None:
         self.tree.clear()
+        titles = titles or []
 
         # Build lookup maps for parent/name
         self._dept_parent_by_id.clear()
@@ -226,14 +232,32 @@ class DepartmentTreePreview(QWidget):
         for k in list(by_parent.keys()):
             by_parent[k].sort(key=lambda x: x[0])
 
+        titles_by_department: dict[int | None, list[tuple[int, str]]] = defaultdict(list)
+        for title_id, department_id, title_name in titles or []:
+            try:
+                tid = int(title_id)
+            except Exception:
+                continue
+            did = int(department_id) if department_id is not None else None
+            titles_by_department[did].append((tid, str(title_name or "").strip()))
+
+        for k in list(titles_by_department.keys()):
+            titles_by_department[k].sort(key=lambda x: x[0])
+
         def build(
             parent_item: QTreeWidgetItem | None,
             parent_id: int | None,
             prefix_parts: list[str],
         ) -> None:
-            children = by_parent.get(parent_id, [])
-            for idx, (dept_id, _p, name) in enumerate(children):
-                is_last = idx == (len(children) - 1)
+            dept_children = by_parent.get(parent_id, [])
+            title_children = titles_by_department.get(parent_id, [])
+
+            combined: list[tuple[str, int, str]] = []
+            combined.extend([("dept", d_id, d_name) for (d_id, _p, d_name) in dept_children])
+            combined.extend([("title", t_id, t_name) for (t_id, t_name) in title_children])
+
+            for idx, (node_type, node_id, name) in enumerate(combined):
+                is_last = idx == (len(combined) - 1)
                 connector = "└── " if is_last else "├── "
 
                 prefix = "".join(prefix_parts) + connector
@@ -241,10 +265,13 @@ class DepartmentTreePreview(QWidget):
 
                 item = QTreeWidgetItem([display_name])
                 item.setFont(0, self._font_normal)
-                item.setIcon(0, self._dept_icon)
-                item.setData(0, Qt.ItemDataRole.UserRole, int(dept_id))
+                item.setIcon(
+                    0, self._dept_icon if node_type == "dept" else self._title_icon
+                )
+                item.setData(0, Qt.ItemDataRole.UserRole, int(node_id))
                 item.setData(0, Qt.ItemDataRole.UserRole + 1, name or "")
-                item.setData(0, Qt.ItemDataRole.UserRole + 2, parent_id)
+                item.setData(0, Qt.ItemDataRole.UserRole + 2, node_type)
+                item.setData(0, Qt.ItemDataRole.UserRole + 3, parent_id)
 
                 if parent_item is None:
                     self.tree.addTopLevelItem(item)
@@ -257,14 +284,21 @@ class DepartmentTreePreview(QWidget):
                 else:
                     next_prefix_parts = ["    " if is_last else "│   "]
 
-                build(item, dept_id, next_prefix_parts)
+                if node_type == "dept":
+                    build(item, int(node_id), next_prefix_parts)
 
         build(None, None, [])
         self.tree.expandAll()
 
     def get_selected_department(self) -> tuple[int, str] | None:
-        ctx = self.get_selected_department_context()
-        if not ctx:
+        ctx = self.get_selected_node_context()
+        if not ctx or ctx.get("type") != "dept":
+            return None
+        return int(ctx["id"]), str(ctx["name"])
+
+    def get_selected_title(self) -> tuple[int, str] | None:
+        ctx = self.get_selected_node_context()
+        if not ctx or ctx.get("type") != "title":
             return None
         return int(ctx["id"]), str(ctx["name"])
 
@@ -278,40 +312,52 @@ class DepartmentTreePreview(QWidget):
             if not unicodedata.combining(ch)
         )
 
-    def get_selected_department_context(self) -> dict | None:
+    def get_selected_node_context(self) -> dict | None:
         """Return selection context used for filtering.
 
-        Keys: id, name, parent_id, parent_name, parent_name_norm.
+        Keys:
+        - type: 'dept' | 'title'
+        - id, name
+        - parent_id (for dept)
+        - department_id (for title)
         """
         item = self.tree.currentItem()
         if item is None:
             return None
 
         try:
-            dept_id = int(item.data(0, Qt.ItemDataRole.UserRole) or 0)
+            node_id = int(item.data(0, Qt.ItemDataRole.UserRole) or 0)
         except Exception:
             return None
-        if dept_id <= 0:
+        if node_id <= 0:
             return None
 
         name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "").strip()
 
-        parent_id_raw = item.data(0, Qt.ItemDataRole.UserRole + 2)
+        node_type = str(item.data(0, Qt.ItemDataRole.UserRole + 2) or "dept")
+        if node_type not in ("dept", "title"):
+            node_type = "dept"
+
+        parent_id_raw = item.data(0, Qt.ItemDataRole.UserRole + 3)
         try:
             parent_id = int(parent_id_raw) if parent_id_raw is not None else None
         except Exception:
             parent_id = None
 
-        parent_name = ""
-        if parent_id is not None:
-            parent_name = str(self._dept_name_by_id.get(int(parent_id)) or "").strip()
+        if node_type == "dept":
+            return {
+                "type": "dept",
+                "id": node_id,
+                "name": name,
+                "parent_id": parent_id,
+            }
 
+        # title
         return {
-            "id": dept_id,
+            "type": "title",
+            "id": node_id,
             "name": name,
-            "parent_id": parent_id,
-            "parent_name": parent_name,
-            "parent_name_norm": self._norm_text(parent_name),
+            "department_id": parent_id,
         }
 
     def clear_selection(self) -> None:
@@ -779,7 +825,11 @@ class _FilterHeaderView(QHeaderView):
 
         series = self._model._df[key]
         try:
-            values = [str(v) for v in series.dropna().astype(str).unique().tolist()]
+            raw_values = series.dropna().tolist()
+            if key in getattr(self._model, "_date_keys", set()):
+                values = [self._model._format_vn_date(v) for v in raw_values]
+            else:
+                values = [str(v) for v in series.dropna().astype(str).unique().tolist()]
         except Exception:
             values = []
         values = [v.strip() for v in values if str(v).strip()]
@@ -836,7 +886,7 @@ class _FilterHeaderView(QHeaderView):
                     f"QMenu {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QMenu::item {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; border-bottom: 0px; }}",
                     f"QMenu::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
-                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QMenu::separator {{ height: 1px; background: {COLOR_BORDER}; margin: 4px 8px; }}",
                 ]
             )
@@ -1074,7 +1124,7 @@ class EmployeeTable(QTableView):
                 [
                     f"QTableView {{ background-color: {ODD_ROW_BG_COLOR}; alternate-background-color: {EVEN_ROW_BG_COLOR}; gridline-color: {GRID_LINES_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
                     f"QHeaderView::section {{ background-color: {BG_TITLE_2_HEIGHT}; color: {COLOR_TEXT_PRIMARY}; border-top: 1px solid {GRID_LINES_COLOR}; border-bottom: 1px solid {GRID_LINES_COLOR}; border-left: 0px; border-right: 1px solid {GRID_LINES_COLOR}; height: {ROW_HEIGHT}px; padding-right: 22px; }}",
-                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QTableView::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QTableView::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     f"QTableView::item:selected:active {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; border: 0px; }}",
                     "QTableView::item { padding-left: 0px; padding-right: 0px; border: 0px; }",
@@ -1493,6 +1543,11 @@ class MainContent(QWidget):
 
     def get_filters(self) -> dict:
         dept = self.department_tree.get_selected_department()
+        title = None
+        try:
+            title = self.department_tree.get_selected_title()
+        except Exception:
+            title = None
 
         search_text = self.inp_search_text.text().strip()
         search_by = self.cbo_search_by.currentData()
@@ -1501,4 +1556,5 @@ class MainContent(QWidget):
             "search_by": search_by,
             "search_text": search_text,
             "department_id": dept[0] if dept else None,
+            "title_id": title[0] if title else None,
         }

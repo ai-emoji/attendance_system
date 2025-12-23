@@ -195,6 +195,7 @@ class MainContent(QWidget):
         layout.setSpacing(0)
 
         self._dept_icon = QIcon(resource_path("assets/images/department.svg"))
+        self._title_icon = QIcon(resource_path("assets/images/job_title.svg"))
 
         self.tree = QTreeWidget(self)
         self.tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -259,14 +260,20 @@ class MainContent(QWidget):
         # Click vào khoảng trống -> bỏ chọn
         self.tree.viewport().installEventFilter(self)
 
-    def set_departments(self, rows: list[tuple[int, int | None, str, str]]) -> None:
-        """Nạp dữ liệu phòng ban vào cây.
+    def set_departments(
+        self,
+        rows: list[tuple[int, int | None, str, str]],
+        titles: list[tuple[int, int | None, str]] | None = None,
+    ) -> None:
+        """Nạp dữ liệu phòng ban + chức danh vào cây.
 
-        rows: (id, parent_id, name, note)
+        rows: (department_id, parent_id, department_name, note)
+        titles: (title_id, department_id, title_name)
         """
 
         self.tree.clear()
-        self._rows_data_count = len(rows or [])
+        titles = titles or []
+        self._rows_data_count = len(rows or []) + len(titles)
 
         by_parent: dict[int | None, list[tuple[int, int | None, str]]] = defaultdict(
             list
@@ -280,25 +287,46 @@ class MainContent(QWidget):
         for k in list(by_parent.keys()):
             by_parent[k].sort(key=lambda x: x[0])
 
+        titles_by_department: dict[int | None, list[tuple[int, str]]] = defaultdict(list)
+        for title_id, department_id, title_name in titles or []:
+            title_id_i = int(title_id)
+            dept_id_i = int(department_id) if department_id is not None else None
+            titles_by_department[dept_id_i].append((title_id_i, title_name or ""))
+
+        for k in list(titles_by_department.keys()):
+            titles_by_department[k].sort(key=lambda x: x[0])
+
         def build(
             parent_item: QTreeWidgetItem | None,
             parent_id: int | None,
             prefix_parts: list[str],
         ) -> None:
-            children = by_parent.get(parent_id, [])
-            for idx, (dept_id, _p, name) in enumerate(children):
-                is_last = idx == (len(children) - 1)
+            dept_children = by_parent.get(parent_id, [])
+            title_children = titles_by_department.get(parent_id, [])
+
+            combined: list[tuple[str, int, str]] = []
+            combined.extend([("dept", d_id, d_name) for (d_id, _p, d_name) in dept_children])
+            combined.extend([("title", t_id, t_name) for (t_id, t_name) in title_children])
+
+            for idx, (node_type, node_id, node_name) in enumerate(combined):
+                is_last = idx == (len(combined) - 1)
                 connector = "└── " if is_last else "├── "
 
                 # Luôn hiển thị connector (kể cả root) theo yêu cầu
                 prefix = "".join(prefix_parts) + connector
-                display_name = f"{prefix}{name}"
+                display_name = f"{prefix}{node_name}"
 
                 item = QTreeWidgetItem([display_name])
                 item.setFont(0, self._font_normal)
-                item.setIcon(0, self._dept_icon)
-                item.setData(0, Qt.ItemDataRole.UserRole, int(dept_id))
-                item.setData(0, Qt.ItemDataRole.UserRole + 1, name or "")
+                item.setIcon(
+                    0, self._dept_icon if node_type == "dept" else self._title_icon
+                )
+                item.setData(0, Qt.ItemDataRole.UserRole, int(node_id))
+                item.setData(0, Qt.ItemDataRole.UserRole + 1, node_name or "")
+                item.setData(0, Qt.ItemDataRole.UserRole + 2, node_type)
+                # For departments: parent_id is their parent department
+                # For titles: parent_id is the owning department_id
+                item.setData(0, Qt.ItemDataRole.UserRole + 3, parent_id)
 
                 if parent_item is None:
                     self.tree.addTopLevelItem(item)
@@ -311,7 +339,8 @@ class MainContent(QWidget):
                 else:
                     next_prefix_parts = ["    " if is_last else "│   "]
 
-                build(item, dept_id, next_prefix_parts)
+                if node_type == "dept":
+                    build(item, int(node_id), next_prefix_parts)
 
         build(None, None, [])
         self.tree.expandAll()
@@ -336,11 +365,13 @@ class MainContent(QWidget):
         self._apply_item_font(current, selected=True)
 
         try:
-            dept_id = int(current.data(0, Qt.ItemDataRole.UserRole) or 0)
+            node_type = str(current.data(0, Qt.ItemDataRole.UserRole + 2) or "dept")
+            node_id = int(current.data(0, Qt.ItemDataRole.UserRole) or 0)
         except Exception:
-            dept_id = 0
+            node_type = "dept"
+            node_id = 0
 
-        self._last_selected_id = dept_id if dept_id > 0 else None
+        self._last_selected_id = node_id if (node_type == "dept" and node_id > 0) else None
 
     def _apply_item_font(self, item: QTreeWidgetItem, selected: bool) -> None:
         font = self._font_semibold if selected else self._font_normal
@@ -351,6 +382,10 @@ class MainContent(QWidget):
         if item is None:
             return None
 
+        node_type = str(item.data(0, Qt.ItemDataRole.UserRole + 2) or "dept")
+        if node_type != "dept":
+            return None
+
         try:
             dept_id = int(item.data(0, Qt.ItemDataRole.UserRole) or 0)
         except Exception:
@@ -358,6 +393,49 @@ class MainContent(QWidget):
 
         raw_name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "")
         return dept_id, raw_name
+
+    def get_selected_node_context(self) -> dict | None:
+        """Return selection context.
+
+        Keys:
+        - type: 'dept' | 'title'
+        - id, name
+        - parent_id (dept)
+        - department_id (title)
+        """
+
+        item = self.tree.currentItem()
+        if item is None:
+            return None
+
+        node_type = str(item.data(0, Qt.ItemDataRole.UserRole + 2) or "dept")
+        if node_type not in ("dept", "title"):
+            node_type = "dept"
+
+        try:
+            node_id = int(item.data(0, Qt.ItemDataRole.UserRole) or 0)
+        except Exception:
+            return None
+        if node_id <= 0:
+            return None
+
+        node_name = str(item.data(0, Qt.ItemDataRole.UserRole + 1) or "").strip()
+
+        parent_raw = item.data(0, Qt.ItemDataRole.UserRole + 3)
+        try:
+            parent_id = int(parent_raw) if parent_raw is not None else None
+        except Exception:
+            parent_id = None
+
+        if node_type == "dept":
+            return {"type": "dept", "id": node_id, "name": node_name, "parent_id": parent_id}
+
+        return {
+            "type": "title",
+            "id": node_id,
+            "name": node_name,
+            "department_id": parent_id,
+        }
 
     def eventFilter(self, obj, event) -> bool:
         if obj is self.tree.viewport() and event.type() == QEvent.Type.MouseButtonPress:
