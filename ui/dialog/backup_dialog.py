@@ -8,6 +8,8 @@ Dialog "Sao lưu Dữ liệu".
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
@@ -43,6 +45,19 @@ class BackupDialog(QDialog):
         super().__init__(parent)
         self._init_ui()
 
+    def _normalize_sql_path(self, raw: str) -> str:
+        s = str(raw or "").strip().strip('"').strip("'")
+        if not s:
+            return ""
+        try:
+            p = Path(s)
+            if p.suffix.lower() != ".sql":
+                p = p.with_suffix(".sql")
+            return str(p)
+        except Exception:
+            # Fallback: minimal normalization
+            return s if s.lower().endswith(".sql") else f"{s}.sql"
+
     def _init_ui(self) -> None:
         self.setModal(True)
         self.setWindowTitle("Sao lưu Dữ liệu")
@@ -62,12 +77,13 @@ class BackupDialog(QDialog):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(10)
 
-        lbl = QLabel("File backup")
+        lbl = QLabel("File .sql")
         lbl.setFont(font_label)
         lbl.setFixedWidth(120)
 
         self.inp_path = QLineEdit()
         self.inp_path.setFixedHeight(INPUT_HEIGHT_DEFAULT)
+        self.inp_path.setPlaceholderText("backup.sql")
 
         self.btn_browse = QPushButton("Chọn")
         self.btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -91,6 +107,7 @@ class BackupDialog(QDialog):
         self.btn_backup.setFont(font_button)
         self.btn_backup.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_backup.setFixedHeight(36)
+        self.btn_backup.setDefault(True)
         self.btn_backup.setStyleSheet(
             "\n".join(
                 [
@@ -130,16 +147,20 @@ class BackupDialog(QDialog):
 
         self.btn_browse.clicked.connect(self._on_browse)
         self.btn_exit.clicked.connect(self.reject)
+        self.inp_path.editingFinished.connect(self._on_path_edited)
+
+    def _on_path_edited(self) -> None:
+        self.inp_path.setText(self._normalize_sql_path(self.inp_path.text()))
 
     def _on_browse(self) -> None:
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Chọn file backup",
-            self.inp_path.text().strip() or "backup.sql",
+            self._normalize_sql_path(self.inp_path.text()) or "backup.sql",
             "SQL (*.sql)",
         )
         if file_path:
-            self.inp_path.setText(file_path)
+            self.inp_path.setText(self._normalize_sql_path(file_path))
 
     def set_status(self, message: str, ok: bool) -> None:
         self.label_status.setText(message)
@@ -148,7 +169,7 @@ class BackupDialog(QDialog):
         )
 
     def get_path(self) -> str:
-        return self.inp_path.text().strip()
+        return self._normalize_sql_path(self.inp_path.text())
 
     def set_path(self, path: str) -> None:
-        self.inp_path.setText(path or "")
+        self.inp_path.setText(self._normalize_sql_path(path))

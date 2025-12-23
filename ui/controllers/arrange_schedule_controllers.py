@@ -91,8 +91,12 @@ class ArrangeScheduleController:
 
             self._right.chk_ignore_sat.setChecked(bool(header.ignore_absent_sat))
             self._right.chk_ignore_sun.setChecked(bool(header.ignore_absent_sun))
-            self._right.chk_ignore_holiday.setChecked(bool(header.ignore_absent_holiday))
-            self._right.chk_holiday_as_work.setChecked(bool(header.holiday_count_as_work))
+            self._right.chk_ignore_holiday.setChecked(
+                bool(header.ignore_absent_holiday)
+            )
+            self._right.chk_holiday_as_work.setChecked(
+                bool(header.holiday_count_as_work)
+            )
             self._right.chk_day_is_out.setChecked(bool(header.day_is_out_time))
 
             def _norm_day(s: str) -> str:
@@ -119,7 +123,9 @@ class ArrangeScheduleController:
             max_cols = 0
             for d in details:
                 try:
-                    max_cols = max(max_cols, len(list(getattr(d, "shift_ids", []) or [])))
+                    max_cols = max(
+                        max_cols, len(list(getattr(d, "shift_ids", []) or []))
+                    )
                 except Exception:
                     pass
 
@@ -274,7 +280,12 @@ class ArrangeScheduleController:
     def _set_in_out_mode(self, mode: str | None) -> None:
         if self._right is None:
             return
-        target = mode if mode in ("in", "out") else None
+        # New synced values: auto/device/first_last
+        # Backward-compat: old values (in/out) map to device.
+        if mode in ("in", "out"):
+            target = "device"
+        else:
+            target = mode if mode in ("auto", "device", "first_last") else None
         cb = self._right.cbo_in_out_mode
         for i in range(cb.count()):
             if cb.itemData(i) == target:

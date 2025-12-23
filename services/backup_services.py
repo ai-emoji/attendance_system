@@ -130,8 +130,11 @@ class BackupService:
             "--databases",
             database,
             "--single-transaction",
+            "--triggers",
             "--routines",
             "--events",
+            "--add-drop-database",
+            "--add-drop-table",
         ]
 
         try:
@@ -146,7 +149,24 @@ class BackupService:
             if proc.returncode != 0:
                 err = (proc.stderr or b"").decode(errors="ignore").strip()
                 return False, f"Backup thất bại: {err or 'Không rõ lỗi.'}"
-            return True, f"Backup thành công: {output_path}"
+
+            # Basic completeness check: file exists and is not empty
+            try:
+                if not output_path.exists():
+                    return False, "Backup thất bại: không tạo được file .sql."
+                size = int(output_path.stat().st_size or 0)
+                if size <= 0:
+                    return False, "Backup thất bại: file .sql rỗng."
+                if size < 1024:
+                    # Very small dump is suspicious (often means error was redirected elsewhere)
+                    return (
+                        False,
+                        "Backup không đầy đủ: file .sql quá nhỏ. Vui lòng kiểm tra lại cấu hình/mysqldump.",
+                    )
+                size_mb = size / (1024 * 1024)
+                return True, f"Backup thành công: {output_path} ({size_mb:.2f} MB)"
+            except Exception:
+                return True, f"Backup thành công: {output_path}"
         except FileNotFoundError:
             return (
                 False,

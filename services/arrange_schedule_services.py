@@ -94,7 +94,9 @@ class ArrangeScheduleService:
         ]
         return fallback
 
-    def get_schedule(self, schedule_id: int) -> tuple[ArrangeScheduleHeader | None, list[ArrangeScheduleDetail]]:
+    def get_schedule(
+        self, schedule_id: int
+    ) -> tuple[ArrangeScheduleHeader | None, list[ArrangeScheduleDetail]]:
         if not schedule_id:
             return None, []
 
@@ -105,7 +107,11 @@ class ArrangeScheduleService:
         header = ArrangeScheduleHeader(
             id=int(header_row.get("id")),
             schedule_name=str(header_row.get("schedule_name") or ""),
-            in_out_mode=(str(header_row.get("in_out_mode")) if header_row.get("in_out_mode") is not None else None),
+            in_out_mode=(
+                str(header_row.get("in_out_mode"))
+                if header_row.get("in_out_mode") is not None
+                else None
+            ),
             ignore_absent_sat=int(header_row.get("ignore_absent_sat") or 0),
             ignore_absent_sun=int(header_row.get("ignore_absent_sun") or 0),
             ignore_absent_holiday=int(header_row.get("ignore_absent_holiday") or 0),
@@ -128,7 +134,13 @@ class ArrangeScheduleService:
 
                 # Fallback to legacy columns if new table empty for this day
                 if not shift_ids:
-                    for k in ("shift1_id", "shift2_id", "shift3_id", "shift4_id", "shift5_id"):
+                    for k in (
+                        "shift1_id",
+                        "shift2_id",
+                        "shift3_id",
+                        "shift4_id",
+                        "shift5_id",
+                    ):
                         v = r.get(k)
                         if v is not None:
                             try:
@@ -141,11 +153,31 @@ class ArrangeScheduleService:
                         day_key=day_key,
                         day_name=str(r.get("day_name") or ""),
                         day_order=int(r.get("day_order") or 0),
-                        shift1_id=(int(r.get("shift1_id")) if r.get("shift1_id") is not None else None),
-                        shift2_id=(int(r.get("shift2_id")) if r.get("shift2_id") is not None else None),
-                        shift3_id=(int(r.get("shift3_id")) if r.get("shift3_id") is not None else None),
-                        shift4_id=(int(r.get("shift4_id")) if r.get("shift4_id") is not None else None),
-                        shift5_id=(int(r.get("shift5_id")) if r.get("shift5_id") is not None else None),
+                        shift1_id=(
+                            int(r.get("shift1_id"))
+                            if r.get("shift1_id") is not None
+                            else None
+                        ),
+                        shift2_id=(
+                            int(r.get("shift2_id"))
+                            if r.get("shift2_id") is not None
+                            else None
+                        ),
+                        shift3_id=(
+                            int(r.get("shift3_id"))
+                            if r.get("shift3_id") is not None
+                            else None
+                        ),
+                        shift4_id=(
+                            int(r.get("shift4_id"))
+                            if r.get("shift4_id") is not None
+                            else None
+                        ),
+                        shift5_id=(
+                            int(r.get("shift5_id"))
+                            if r.get("shift5_id") is not None
+                            else None
+                        ),
                         shift_ids=shift_ids,
                     )
                 )
@@ -172,8 +204,12 @@ class ArrangeScheduleService:
         if len(schedule_name) > 255:
             return False, "Tên lịch trình tối đa 255 ký tự.", None
 
-        in_out_mode = (in_out_mode or None)
-        if in_out_mode not in (None, "in", "out"):
+        in_out_mode = in_out_mode or None
+        # New synced values: auto/device/first_last
+        # Backward-compat: old values (in/out) map to device.
+        if in_out_mode in ("in", "out"):
+            in_out_mode = "device"
+        if in_out_mode not in (None, "auto", "device", "first_last"):
             in_out_mode = None
 
         try:
@@ -234,7 +270,9 @@ class ArrangeScheduleService:
                 dt = name_to_type.get(day_name)
                 if not dt:
                     continue
-                self._repo.replace_schedule_day_shifts(int(saved_id), dt.day_key, list(shifts or []))
+                self._repo.replace_schedule_day_shifts(
+                    int(saved_id), dt.day_key, list(shifts or [])
+                )
             return True, "Lưu thành công.", int(saved_id)
         except Exception as exc:
             # Duplicate schedule name

@@ -44,6 +44,7 @@ from ui.controllers.title_controllers import TitleController
 from ui.controllers.download_attendance_controllers import DownloadAttendanceController
 from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
 from ui.controllers.arrange_schedule_controllers import ArrangeScheduleController
+from ui.controllers.declare_time_controllers import DeclareTimeController
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
 from ui.widgets.department_widgets import MainContent as DepartmentContent
@@ -76,6 +77,11 @@ from ui.widgets.shift_attendance_widgets import (
     MainContent2 as ShiftAttendanceContent2,
 )
 from ui.widgets.arrange_schedule_widgets import ArrangeScheduleView
+from ui.widgets.declare_time_widgets import (
+    DeclareTimeView,
+    TitleBar1 as DeclareTimeTitleBar1,
+    TitleBar2 as DeclareTimeTitleBar2,
+)
 from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
 from ui.dialog.settings_dialog import SettingsDialog
 
@@ -101,6 +107,7 @@ class Container(QWidget):
         self._download_attendance_controller: DownloadAttendanceController | None = None
         self._shift_attendance_controller: ShiftAttendanceController | None = None
         self._arrange_schedule_controller: ArrangeScheduleController | None = None
+        self._declare_time_controller: DeclareTimeController | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -273,6 +280,21 @@ class Container(QWidget):
         )
         self._arrange_schedule_controller.bind()
 
+    def show_declare_time_view(self) -> None:
+        """Hiển thị màn hình Khai báo giờ Vào/Ra."""
+
+        title1 = DeclareTimeTitleBar1(
+            "Khai báo giờ Vào/Ra", "assets/images/declare_time.svg", self
+        )
+        title2 = DeclareTimeTitleBar2("Tổng: 0", self)
+        view = DeclareTimeView(self)
+        self.set_container_widgets([title1, title2, view])
+
+        self._declare_time_controller = DeclareTimeController(
+            self.window(), title2, view.content1, view.content2
+        )
+        self._declare_time_controller.bind()
+
 
 class Footer(CommonFooter):
     """Footer của ứng dụng (kế thừa triển khai trong ui.common.footer)."""
@@ -414,6 +436,10 @@ class MainWindow(QMainWindow):
             self.container.show_arrange_schedule_view()
             return
 
+        if action_text == "Khai báo\ngiờ Vào/Ra":
+            self.container.show_declare_time_view()
+            return
+
         if action_text == "Thoát\nỨng dụng":
             QApplication.quit()
             return
@@ -437,6 +463,7 @@ class MainWindow(QMainWindow):
             dlg = SettingsDialog(self)
             dlg.exec()
             return
+
     def _center_window(self) -> None:
         """Căn giữa cửa sổ trên màn hình."""
         screen_geometry = self.screen().geometry()

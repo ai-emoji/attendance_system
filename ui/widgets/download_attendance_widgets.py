@@ -733,7 +733,11 @@ class MainContent(QWidget):
         QTimer.singleShot(0, self._ensure_rows_fit_viewport)
 
     def _ensure_rows_fit_viewport(self) -> None:
-        viewport_h = self.table.viewport().height()
+        try:
+            viewport_h = self.table.viewport().height()
+        except RuntimeError:
+            # QTableWidget already deleted (view switched/closed)
+            return
         if viewport_h <= 0:
             return
         desired = max(1, int(viewport_h // ROW_HEIGHT))
@@ -766,18 +770,22 @@ class MainContent(QWidget):
     ) -> None:
         """rows: [(code, name_on_mcc, date_str, in1, out1, in2, out2, in3, out3, device_name)]"""
 
-        self._rows_data_count = len(rows or [])
+        try:
+            self._rows_data_count = len(rows or [])
 
-        viewport_h = self.table.viewport().height()
-        desired = max(1, int(viewport_h // ROW_HEIGHT)) if viewport_h > 0 else 1
-        needed = max(desired, self._rows_data_count, 1)
-        self._ensure_row_count(needed)
+            viewport_h = self.table.viewport().height()
+            desired = max(1, int(viewport_h // ROW_HEIGHT)) if viewport_h > 0 else 1
+            needed = max(desired, self._rows_data_count, 1)
+            self._ensure_row_count(needed)
 
-        for r in range(self.table.rowCount()):
-            if r < self._rows_data_count:
-                self._set_row_data(r, *rows[r])
-            else:
-                self._set_row_data(r, "", "", "", "", "", "", "", "", "", "")
+            for r in range(self.table.rowCount()):
+                if r < self._rows_data_count:
+                    self._set_row_data(r, *rows[r])
+                else:
+                    self._set_row_data(r, "", "", "", "", "", "", "", "", "", "")
+        except RuntimeError:
+            # QTableWidget already deleted (view switched/closed)
+            return
 
     def _set_row_data(
         self,

@@ -38,7 +38,9 @@
       "department_name": true,
       "start_date": true,
       "full_name": true,
-      "hours": true
+      "hours": true,
+      "out_1": true,
+      "in_1": true
     },
     "font_size": 11,
     "font_weight": "normal",
@@ -49,7 +51,9 @@
       "title_name": "center",
       "department_name": "center",
       "start_date": "center",
-      "full_name": "center"
+      "full_name": "center",
+      "out_1": "center",
+      "in_1": "center"
     },
     "column_bold": {}
   },

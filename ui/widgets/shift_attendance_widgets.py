@@ -45,6 +45,7 @@ from PySide6.QtWidgets import QHeaderView
 
 from core.resource import (
     ICON_CHECK,
+    ICON_CLOCK,
     BG_TITLE_1_HEIGHT,
     BG_TITLE_2_HEIGHT,
     COLOR_BORDER,
@@ -77,6 +78,9 @@ from core.ui_settings import (
     update_shift_attendance_table_ui,
 )
 from ui.dialog.shift_attendance_settings_dialog import ShiftAttendanceSettingsDialog
+from ui.controllers.import_shift_attendance_controllers import (
+    ImportShiftAttendanceController,
+)
 
 
 _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
@@ -253,7 +257,9 @@ def _mk_date(parent: QWidget | None = None, height: int = 32) -> QDateEdit:
     return de
 
 
-def _mk_btn_outline(text: str, icon_path: str | None = None, height: int = 32) -> QPushButton:
+def _mk_btn_outline(
+    text: str, icon_path: str | None = None, height: int = 32
+) -> QPushButton:
     btn = QPushButton(text)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.setFixedHeight(height)
@@ -265,7 +271,7 @@ def _mk_btn_outline(text: str, icon_path: str | None = None, height: int = 32) -
             [
                 f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
                 "QPushButton::icon { margin-right: 10px; }",
-                f"QPushButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_PRIMARY}; }}",
+                f"QPushButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_LIGHT}; }}",
             ]
         )
     )
@@ -350,6 +356,7 @@ class MainContent1(QWidget):
     view_clicked = Signal()
     search_changed = Signal()
     department_changed = Signal()
+    title_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -372,6 +379,10 @@ class MainContent1(QWidget):
         self.cbo_department.setMinimumWidth(220)
         self.cbo_department.addItem("Tất cả phòng ban", None)
 
+        self.cbo_title = _mk_combo(self)
+        self.cbo_title.setMinimumWidth(220)
+        self.cbo_title.addItem("Tất cả chức vụ", None)
+
         self.cbo_search_by = _mk_combo(self)
         self.cbo_search_by.setMinimumWidth(160)
         self.cbo_search_by.addItem("Mã nhân viên", "employee_code")
@@ -384,9 +395,13 @@ class MainContent1(QWidget):
 
         self.btn_refresh = _mk_btn_outline("Làm mới", ICON_REFRESH)
 
+        self.btn_import = _mk_btn_outline("Import dữ liệu chấm công")
+
         self.total_icon = QLabel("")
         self.total_icon.setFixedSize(18, 18)
-        self.total_icon.setPixmap(QIcon(resource_path(ICON_TOTAL)).pixmap(QSize(18, 18)))
+        self.total_icon.setPixmap(
+            QIcon(resource_path(ICON_TOTAL)).pixmap(QSize(18, 18))
+        )
 
         self.label_total = QLabel("Tổng: 0")
         self.label_total.setFont(_mk_font_normal())
@@ -395,9 +410,11 @@ class MainContent1(QWidget):
         )
 
         h.addWidget(self.cbo_department)
+        h.addWidget(self.cbo_title)
         h.addWidget(self.cbo_search_by)
         h.addWidget(self.inp_search_text, 1)
         h.addWidget(self.btn_refresh)
+        h.addWidget(self.btn_import)
         h.addStretch(1)
         h.addWidget(self.total_icon)
         h.addWidget(self.label_total)
@@ -407,6 +424,8 @@ class MainContent1(QWidget):
         _setup_table(
             self.table,
             [
+                "",
+                "STT",
                 "Mã NV",
                 "Tên nhân viên",
                 "Mã chấm công",
@@ -419,11 +438,18 @@ class MainContent1(QWidget):
             horizontal_scroll=Qt.ScrollBarPolicy.ScrollBarAlwaysOff,
         )
 
-        # Chia đều kích thước các cột theo chiều rộng bảng
+        # Keep checkbox + STT compact; stretch the rest.
         _h = self.table.horizontalHeader()
         _h.setStretchLastSection(True)
-        for _col in range(self.table.columnCount()):
-            _h.setSectionResizeMode(_col, QHeaderView.ResizeMode.Stretch)
+        try:
+            _h.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            _h.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+            self.table.setColumnWidth(0, 42)
+            self.table.setColumnWidth(1, 60)
+            for _col in range(2, self.table.columnCount()):
+                _h.setSectionResizeMode(_col, QHeaderView.ResizeMode.Stretch)
+        except Exception:
+            pass
 
         # Footer
         footer = QWidget(self)
@@ -455,12 +481,19 @@ class MainContent1(QWidget):
         layout.addWidget(footer)
 
         self.btn_refresh.clicked.connect(self.refresh_clicked.emit)
+        self.btn_import.clicked.connect(self._open_import_dialog)
         self.btn_view.clicked.connect(self.view_clicked.emit)
         self.cbo_department.currentIndexChanged.connect(
             lambda *_: self.department_changed.emit()
         )
-        self.cbo_search_by.currentIndexChanged.connect(lambda *_: self.search_changed.emit())
+        self.cbo_title.currentIndexChanged.connect(lambda *_: self.title_changed.emit())
+        self.cbo_search_by.currentIndexChanged.connect(
+            lambda *_: self.search_changed.emit()
+        )
         self.inp_search_text.textChanged.connect(lambda *_: self.search_changed.emit())
+
+        # Emoji checkbox toggle on click
+        self.table.cellClicked.connect(self._on_cell_clicked)
 
         # Apply UI settings and live-update when changed.
         self.apply_ui_settings()
@@ -468,6 +501,68 @@ class MainContent1(QWidget):
             ui_settings_bus.changed.connect(self.apply_ui_settings)
         except Exception:
             pass
+
+    def _on_cell_clicked(self, row: int, col: int) -> None:
+        if int(col) != 0:
+            return
+        try:
+            item = self.table.item(int(row), 0)
+            if item is None:
+                return
+            cur = str(item.text() or "").strip()
+            item.setText("✅" if cur != "✅" else "❌")
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
+
+    def get_checked_employee_keys(self) -> tuple[list[int], list[str]]:
+        """Returns (employee_ids, attendance_codes) for checked rows."""
+        emp_ids: list[int] = []
+        codes: list[str] = []
+        try:
+            for r in range(self.table.rowCount()):
+                item = self.table.item(int(r), 0)
+                if item is None:
+                    continue
+                if str(item.text() or "").strip() != "✅":
+                    continue
+
+                emp_id = item.data(Qt.ItemDataRole.UserRole)
+                if emp_id is not None:
+                    try:
+                        emp_ids.append(int(emp_id))
+                    except Exception:
+                        pass
+
+                code = item.data(Qt.ItemDataRole.UserRole + 1)
+                if code is not None:
+                    s = str(code or "").strip()
+                    if s:
+                        codes.append(s)
+        except Exception:
+            return ([], [])
+
+        # De-dup while keeping order
+        seen_i: set[int] = set()
+        uniq_ids: list[int] = []
+        for i in emp_ids:
+            if i in seen_i:
+                continue
+            seen_i.add(i)
+            uniq_ids.append(i)
+
+        seen_s: set[str] = set()
+        uniq_codes: list[str] = []
+        for s in codes:
+            if s in seen_s:
+                continue
+            seen_s.add(s)
+            uniq_codes.append(s)
+
+        return (uniq_ids, uniq_codes)
+
+    def _open_import_dialog(self) -> None:
+        ImportShiftAttendanceController(parent=self).open()
 
     def apply_ui_settings(self) -> None:
         ui = get_shift_attendance_table_ui()
@@ -512,11 +607,15 @@ class MainContent1(QWidget):
             if not ks:
                 continue
             if vs == "left":
-                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+                align_map[ks] = (
+                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+                )
             elif vs == "center":
                 align_map[ks] = Qt.AlignmentFlag.AlignCenter
             elif vs == "right":
-                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                align_map[ks] = (
+                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                )
 
         for row in range(self.table.rowCount()):
             for col in range(ncols):
@@ -583,6 +682,49 @@ class MainContent2(QWidget):
         self.btn_export_grid = _mk_btn_outline("Xuất lưới", ICON_EXCEL)
         self.btn_detail = _mk_btn_outline("Xuất chi tiết", ICON_EXCEL)
 
+        # Time format buttons (HH:MM / HH:MM:SS)
+        self._show_seconds: bool = True
+
+        def _mk_time_btn(text: str) -> QPushButton:
+            b = QPushButton(text, self)
+            b.setCheckable(True)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setFixedHeight(32)
+            b.setStyleSheet(
+                "\n".join(
+                    [
+                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                        f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                        f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; }}",
+                        f"QPushButton:checked:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                    ]
+                )
+            )
+            try:
+                b.setIcon(QIcon(resource_path(ICON_CLOCK)))
+                b.setIconSize(QSize(16, 16))
+            except Exception:
+                pass
+            return b
+
+        self.btn_hhmm = _mk_time_btn("HH:MM")
+        self.btn_hhmmss = _mk_time_btn("HH:MM:SS")
+        self.btn_hhmmss.setChecked(True)
+
+        def _set_time_mode(show_seconds: bool) -> None:
+            self.btn_hhmm.blockSignals(True)
+            self.btn_hhmmss.blockSignals(True)
+            try:
+                self.btn_hhmm.setChecked(not show_seconds)
+                self.btn_hhmmss.setChecked(bool(show_seconds))
+            finally:
+                self.btn_hhmm.blockSignals(False)
+                self.btn_hhmmss.blockSignals(False)
+            self.set_time_show_seconds(bool(show_seconds))
+
+        self.btn_hhmm.clicked.connect(lambda: _set_time_mode(False))
+        self.btn_hhmmss.clicked.connect(lambda: _set_time_mode(True))
+
         self.label_columns = _mk_label("Hiển thị cột")
 
         # Nút chọn cột hiển thị (checkbox trong menu) - như cũ
@@ -591,16 +733,14 @@ class MainContent2(QWidget):
         self.btn_columns.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_columns.setFixedHeight(32)
         self.btn_columns.setPopupMode(QToolButton.ToolButtonPopupMode.DelayedPopup)
-        self.btn_columns.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-        )
+        self.btn_columns.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.btn_columns.setIcon(QIcon(resource_path(ICON_DROPDOWN)))
         self.btn_columns.setIconSize(QSize(14, 14))
         self.btn_columns.setStyleSheet(
             "\n".join(
                 [
                     f"QToolButton {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 10px; border-radius: 6px; }}",
-                    f"QToolButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QToolButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_LIGHT}; }}",
                 ]
             )
         )
@@ -609,12 +749,16 @@ class MainContent2(QWidget):
         h.addWidget(self.btn_detail)
         h.addStretch(1)
         h.addWidget(self.label_columns)
+        h.addWidget(self.btn_hhmm)
+        h.addWidget(self.btn_hhmmss)
         h.addWidget(self.btn_columns)
 
         self.table = QTableWidget(self)
         _setup_table(
             self.table,
             [
+                "",
+                "STT",
                 "Mã nv",
                 "Tên nhân viên",
                 "Ngày",
@@ -641,30 +785,43 @@ class MainContent2(QWidget):
             stretch_last=False,
             horizontal_scroll=Qt.ScrollBarPolicy.ScrollBarAsNeeded,
             column_widths=[
-                110,
-                200,
-                110,
-                70,
-                80,
-                80,
-                80,
-                80,
-                80,
-                80,
-                70,
-                70,
-                70,
-                70,
-                70,
-                70,
-                70,
-                70,
-                60,
-                60,
-                60,
-                70,
+                57,  # 42 + 15
+                75,  # 60 + 15
+                125,  # 110 + 15
+                215,  # 200 + 15
+                125,  # 110 + 15
+                85,  # 70 + 15
+                95,  # 80 + 15
+                95,  # 80 + 15
+                95,  # 80 + 15
+                95,  # 80 + 15
+                95,  # 80 + 15
+                95,  # 80 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                85,  # 70 + 15
+                75,  # 60 + 15
+                75,  # 60 + 15
+                75,  # 60 + 15
+                85,  # 70 + 15
             ],
         )
+
+        # Allow selecting multiple rows in MainContent2.
+        try:
+            self.table.setSelectionMode(
+                QAbstractItemView.SelectionMode.ExtendedSelection
+            )
+        except Exception:
+            pass
+
+        # Emoji checkbox toggle on click
+        self.table.cellClicked.connect(self._on_cell_clicked)
 
         layout.addWidget(header)
         layout.addWidget(self.table, 1)
@@ -683,9 +840,84 @@ class MainContent2(QWidget):
         except Exception:
             pass
 
+    def _format_time_value(self, value: object | None) -> str:
+        s = "" if value is None else str(value)
+        s = s.strip()
+        if not s:
+            return ""
+
+        # If datetime-like, keep last token (HH:MM:SS)
+        if " " in s:
+            s = s.split()[-1].strip()
+
+        # Defensive: remove trailing colon
+        while s.endswith(":"):
+            s = s[:-1]
+
+        parts = [p.strip() for p in s.split(":") if p.strip() != ""]
+        if len(parts) < 2:
+            return s
+
+        def _to_int(p: str) -> int:
+            try:
+                return int(p)
+            except Exception:
+                # handle '00.000000'
+                try:
+                    return int(float(p))
+                except Exception:
+                    return 0
+
+        hh = _to_int(parts[0])
+        mm = _to_int(parts[1])
+        ss = _to_int(parts[2][:2]) if len(parts) >= 3 else 0
+
+        if self._show_seconds:
+            return f"{hh:02d}:{mm:02d}:{ss:02d}"
+        return f"{hh:02d}:{mm:02d}"
+
+    def set_time_show_seconds(self, show_seconds: bool) -> None:
+        self._show_seconds = bool(show_seconds)
+
+        # Reformat existing table items for time columns.
+        time_keys = {"in_1", "out_1", "in_2", "out_2", "in_3", "out_3"}
+        col_map: dict[str, int] = {}
+        for k in time_keys:
+            idx = self._col_index(k)
+            if idx >= 0:
+                col_map[k] = idx
+
+        if not col_map:
+            return
+
+        for row in range(self.table.rowCount()):
+            for _k, col in col_map.items():
+                item = self.table.item(int(row), int(col))
+                if item is None:
+                    continue
+                raw = item.data(Qt.ItemDataRole.UserRole)
+                if raw is None:
+                    raw = item.text()
+                item.setText(self._format_time_value(raw))
+
     def _open_columns_buttons_window(self) -> None:
-        dlg = _ColumnsButtonsDialog(columns=self._COLUMNS, parent=self)
+        # Exclude fixed columns (checkbox + STT) from column chooser.
+        cols = [c for c in self._COLUMNS if c[0] not in {"__check", "stt"}]
+        dlg = _ColumnsButtonsDialog(columns=cols, parent=self)
         dlg.exec()
+
+    def _on_cell_clicked(self, row: int, col: int) -> None:
+        if int(col) != 0:
+            return
+        try:
+            item = self.table.item(int(row), 0)
+            if item is None:
+                return
+            cur = str(item.text() or "").strip()
+            item.setText("✅" if cur != "✅" else "❌")
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
 
     def _open_columns_dialog(self) -> None:
         # Kept for compatibility (other entry points may still open the full settings dialog)
@@ -742,11 +974,15 @@ class MainContent2(QWidget):
             if not ks:
                 continue
             if vs == "left":
-                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+                align_map[ks] = (
+                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
+                )
             elif vs == "center":
                 align_map[ks] = Qt.AlignmentFlag.AlignCenter
             elif vs == "right":
-                align_map[ks] = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                align_map[ks] = (
+                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+                )
 
         for row in range(self.table.rowCount()):
             for col in range(ncols):
@@ -790,6 +1026,8 @@ class MainContent2(QWidget):
 
 # Keep in sync with ShiftAttendanceSettingsDialog
 MainContent2._COLUMNS = [
+    ("__check", ""),
+    ("stt", "STT"),
     ("employee_code", "Mã nv"),
     ("full_name", "Tên nhân viên"),
     ("date", "Ngày"),
@@ -817,6 +1055,8 @@ MainContent2._COLUMNS = [
 
 # Keep in sync with ShiftAttendanceSettingsDialog
 MainContent1._COLUMNS = [
+    ("__check", ""),
+    ("stt", "STT"),
     ("employee_code", "Mã NV"),
     ("full_name", "Tên nhân viên"),
     ("mcc_code", "Mã chấm công"),

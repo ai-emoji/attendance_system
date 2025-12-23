@@ -24,6 +24,8 @@
 
      DROP TABLE IF EXISTS hr_attendance.download_attendance;
      DROP TABLE IF EXISTS hr_attendance.attendance_raw;
+     DROP TABLE IF EXISTS hr_attendance.attendance_audit;
+    DROP TABLE IF EXISTS hr_attendance.declare_time_settings;
      DROP TABLE IF EXISTS hr_attendance.employees;
      DROP TABLE IF EXISTS hr_attendance.departments;
      DROP TABLE IF EXISTS hr_attendance.job_titles;
@@ -261,6 +263,93 @@
             REFERENCES hr_attendance.devices (id)
             ON DELETE SET NULL
             ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- attendance_audit: dữ liệu chấm công theo ca đã tổng hợp (dùng cho màn "Chấm công Theo ca" - MainContent2)
+    -- Ghi chú:
+    -- - Đây là bảng lưu kết quả/tổng hợp để UI gọi lại từ DB
+    -- - Nếu chưa có dữ liệu, UI sẽ hiển thị rỗng
+    CREATE TABLE IF NOT EXISTS hr_attendance.attendance_audit (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+        attendance_code VARCHAR(50) NOT NULL,
+        device_no INT NOT NULL,
+        device_id INT NULL,
+        device_name VARCHAR(255) NULL,
+
+        employee_id INT NULL,
+        employee_code VARCHAR(50) NULL,
+        full_name VARCHAR(255) NULL,
+
+        work_date DATE NOT NULL,
+        weekday VARCHAR(20) NULL,
+
+        in_1 TIME NULL,
+        out_1 TIME NULL,
+        in_2 TIME NULL,
+        out_2 TIME NULL,
+        in_3 TIME NULL,
+        out_3 TIME NULL,
+
+        late VARCHAR(20) NULL,
+        early VARCHAR(20) NULL,
+
+        hours DECIMAL(10,2) NULL,
+        work DECIMAL(10,2) NULL,
+        `leave` DECIMAL(10,2) NULL,
+        hours_plus DECIMAL(10,2) NULL,
+        work_plus DECIMAL(10,2) NULL,
+        leave_plus DECIMAL(10,2) NULL,
+
+        tc1 VARCHAR(50) NULL,
+        tc2 VARCHAR(50) NULL,
+        tc3 VARCHAR(50) NULL,
+        total DECIMAL(10,2) NULL,
+
+        -- Nếu = 1: dữ liệu đã được chỉnh bằng "Import dữ liệu chấm công" -> không tự động ghi đè khi sync
+        import_locked TINYINT(1) NOT NULL DEFAULT 0,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        UNIQUE KEY uq_attendance_audit_code_date_device (attendance_code, work_date, device_no),
+
+        KEY idx_attendance_audit_work_date (work_date),
+        KEY idx_attendance_audit_employee_date (employee_id, work_date),
+        KEY idx_attendance_audit_employee_code_date (employee_code, work_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- declare_time_settings: khai báo cách chọn giờ Vào/Ra và các thông số chung
+    -- Ghi chú:
+    -- - code: mã cấu hình (unique)
+    -- - sort_type: cách chọn vào/ra ('in' hoặc 'out')
+    -- - các trường phút dùng INT
+    -- - các trường giờ dùng TIME
+    CREATE TABLE IF NOT EXISTS hr_attendance.declare_time_settings (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+
+        code VARCHAR(50) NOT NULL,
+        description VARCHAR(255) NULL,
+        sort_type VARCHAR(10) NULL,
+
+        min_between_in_out INT NULL,
+        max_between_in_out INT NULL,
+        gap_between_pairs INT NULL,
+
+        cycle_days INT NULL,
+        days_in_month INT NOT NULL DEFAULT 0,
+        cycle_end_time TIME NULL,
+
+        remove_prev_night TINYINT(1) NOT NULL DEFAULT 0,
+        calc_from TIME NULL,
+        calc_to TIME NULL,
+
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        UNIQUE KEY uq_declare_time_settings_code (code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 

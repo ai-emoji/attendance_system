@@ -72,6 +72,7 @@ from core.resource import (
 )
 
 from ui.dialog.arrange_schedule_dialog import ArrangeScheduleDialog
+from ui.widgets.declare_time_widgets import DECLARE_TIME_IN_OUT_MODE_OPTIONS
 
 
 _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
@@ -418,9 +419,8 @@ class MainRight(QWidget):
 
         self.cbo_in_out_mode = _mk_combo(self)
         self.cbo_in_out_mode.setMinimumWidth(200)
-        self.cbo_in_out_mode.addItem("Cách chọn vào/ra", None)
-        self.cbo_in_out_mode.addItem("Theo giờ vào", "in")
-        self.cbo_in_out_mode.addItem("Theo giờ ra", "out")
+        for label, value in DECLARE_TIME_IN_OUT_MODE_OPTIONS:
+            self.cbo_in_out_mode.addItem(label, value)
 
         # "Tên lịch trình" + "Chọn vào/ra" trên 1 cột (2 dòng)
         row_name = QHBoxLayout()

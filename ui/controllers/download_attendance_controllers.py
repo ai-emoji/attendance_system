@@ -155,7 +155,11 @@ class DownloadAttendanceController:
         except Exception:
             logger.exception("Không thể load bảng download_attendance")
             self._all_rows = []
-            self._content.set_attendance_rows([])
+            try:
+                self._content.set_attendance_rows([])
+            except RuntimeError:
+                # view already destroyed
+                return
             try:
                 if hasattr(self._title_bar2, "set_total"):
                     self._title_bar2.set_total(0)
@@ -225,23 +229,27 @@ class DownloadAttendanceController:
             else:
                 filtered = [u for u in self._all_rows if needle in str(u.code).lower()]
 
-        self._content.set_attendance_rows(
-            [
-                (
-                    u.code,
-                    u.name_on_mcc,
-                    u.date_str,
-                    self._fmt_time(u.in1),
-                    self._fmt_time(u.out1),
-                    self._fmt_time(u.in2),
-                    self._fmt_time(u.out2),
-                    self._fmt_time(u.in3),
-                    self._fmt_time(u.out3),
-                    u.device_name,
-                )
-                for u in filtered
-            ]
-        )
+        try:
+            self._content.set_attendance_rows(
+                [
+                    (
+                        u.code,
+                        u.name_on_mcc,
+                        u.date_str,
+                        self._fmt_time(u.in1),
+                        self._fmt_time(u.out1),
+                        self._fmt_time(u.in2),
+                        self._fmt_time(u.out2),
+                        self._fmt_time(u.in3),
+                        self._fmt_time(u.out3),
+                        u.device_name,
+                    )
+                    for u in filtered
+                ]
+            )
+        except RuntimeError:
+            # view already destroyed
+            return
         try:
             if hasattr(self._title_bar2, "set_total"):
                 self._title_bar2.set_total(len(filtered))

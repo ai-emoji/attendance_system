@@ -256,6 +256,7 @@ ICON_CHECKIN = "assets/images/checkin.svg"
 ICON_CHECKOUT = "assets/images/checkout.svg"
 ICON_CLOCK = "assets/images/clock.svg"
 ICON_CALENDAR = "assets/images/calendar.svg"
+ICON_DECLARE_TIME = "assets/images/declare_time.svg"
 
 # Icon User/Profile
 ICON_PROFILE = "assets/images/profile.svg"

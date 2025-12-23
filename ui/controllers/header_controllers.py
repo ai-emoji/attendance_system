@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from core.resource import ICON_SETTINGS
+from core.resource import ICON_DECLARE_TIME, ICON_SETTINGS
 
 
 @dataclass(frozen=True)
@@ -100,6 +100,7 @@ class HeaderController:
             return [
                 HeaderAction("Khai báo\nCa làm việc", "declare_work_shift.svg"),
                 HeaderAction("Sắp xếp lịch\nLàm việc", "arrange_schedule.svg"),
+                HeaderAction("Khai báo\ngiờ Vào/Ra", ICON_DECLARE_TIME),
                 HeaderAction("Ký hiệu\nChấm công", "attendance_symbol.svg"),
                 HeaderAction("Ký hiệu\nVắng", "absence_symbol.svg"),
                 HeaderAction("Chọn ngày\nCuối tuần", "weekend.svg"),

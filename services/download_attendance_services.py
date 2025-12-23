@@ -17,6 +17,7 @@ from datetime import date, datetime, time
 
 from repository.device_repository import DeviceRepository
 from repository.download_attendance_repository import DownloadAttendanceRepository
+from repository.attendance_audit_repository import AttendanceAuditRepository
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class DownloadAttendanceService:
     ) -> None:
         self._repo = repo or DownloadAttendanceRepository()
         self._device_repo = device_repo or DeviceRepository()
+        self._audit_repo = AttendanceAuditRepository()
 
     def list_devices_for_combo(self) -> list[tuple[int, str]]:
         rows = self._device_repo.list_devices()
@@ -327,6 +329,12 @@ class DownloadAttendanceService:
             # Upsert temp + raw
             self._repo.upsert_download_attendance(built)
             self._repo.upsert_attendance_raw(built)
+
+            # Copy directly to audit from downloaded data (best-effort)
+            try:
+                self._audit_repo.upsert_from_download_rows(built)
+            except Exception:
+                logger.exception("Không thể ghi attendance_audit khi tải dữ liệu")
 
             if progress_cb:
                 progress_cb("done", len(built), len(built), "Hoàn tất")
