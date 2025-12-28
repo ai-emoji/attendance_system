@@ -345,15 +345,62 @@
     DELIMITER $$
     CREATE PROCEDURE hr_attendance.sp_create_attendance_year_tables(IN p_year INT)
     BEGIN
+        DECLARE v_has_work_date_idx INT DEFAULT 0;
+        DECLARE v_has_employee_date_idx INT DEFAULT 0;
         SET @y := IFNULL(p_year, YEAR(CURDATE()));
         SET @tbl_raw := CONCAT('hr_attendance.attendance_raw_', @y);
         SET @tbl_audit := CONCAT('hr_attendance.attendance_audit_', @y);
+        SET @tbl_audit_name := CONCAT('attendance_audit_', @y);
 
         SET @sql_raw := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_raw, ' LIKE hr_attendance.attendance_raw');
         PREPARE stmt_raw FROM @sql_raw; EXECUTE stmt_raw; DEALLOCATE PREPARE stmt_raw;
 
         SET @sql_audit := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_audit, ' LIKE hr_attendance.attendance_audit');
         PREPARE stmt_audit FROM @sql_audit; EXECUTE stmt_audit; DEALLOCATE PREPARE stmt_audit;
+
+        -- Ensure mandatory indexes for large datasets (80K -> 1M records)
+        -- Requirement (by columns):
+        --  - (work_date)
+        --  - (employee_id, work_date)
+        -- Note: Table created via LIKE already copies indexes, but this block
+        --       protects older DBs where yearly tables were created without indexes.
+
+        -- Any index starting with work_date
+        SELECT COUNT(*) INTO v_has_work_date_idx
+        FROM (
+            SELECT s.index_name,
+                   SUM(s.seq_in_index = 1 AND s.column_name = 'work_date') AS ok
+            FROM information_schema.statistics s
+            WHERE s.table_schema = 'hr_attendance'
+              AND s.table_name = @tbl_audit_name
+              AND s.index_name <> 'PRIMARY'
+            GROUP BY s.index_name
+        ) t
+        WHERE t.ok = 1;
+
+        IF v_has_work_date_idx = 0 THEN
+            SET @sql_add_idx_work_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_work_date (work_date)');
+            PREPARE stmt_idx1 FROM @sql_add_idx_work_date; EXECUTE stmt_idx1; DEALLOCATE PREPARE stmt_idx1;
+        END IF;
+
+        -- Any index starting with (employee_id, work_date)
+        SELECT COUNT(*) INTO v_has_employee_date_idx
+        FROM (
+            SELECT s.index_name,
+                   SUM(s.seq_in_index = 1 AND s.column_name = 'employee_id') AS ok1,
+                   SUM(s.seq_in_index = 2 AND s.column_name = 'work_date') AS ok2
+            FROM information_schema.statistics s
+            WHERE s.table_schema = 'hr_attendance'
+              AND s.table_name = @tbl_audit_name
+              AND s.index_name <> 'PRIMARY'
+            GROUP BY s.index_name
+        ) t
+        WHERE t.ok1 = 1 AND t.ok2 = 1;
+
+        IF v_has_employee_date_idx = 0 THEN
+            SET @sql_add_idx_employee_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_employee_date (employee_id, work_date)');
+            PREPARE stmt_idx2 FROM @sql_add_idx_employee_date; EXECUTE stmt_idx2; DEALLOCATE PREPARE stmt_idx2;
+        END IF;
     END$$
     DELIMITER ;
 
