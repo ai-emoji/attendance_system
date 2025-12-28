@@ -226,6 +226,7 @@ class ImportShiftAttendanceDialog(QDialog):
             "TC2",
             "TC3",
             "Lịch NV",
+            "Ca",
         ]
         widths = [
             57,  # 42 + 15
@@ -252,6 +253,7 @@ class ImportShiftAttendanceDialog(QDialog):
             70,  # TC2
             70,  # TC3
             160,  # Lịch NV
+            90,  # Ca
         ]
         _setup_preview_table(self.table, headers, column_widths=widths)
         # Extra safety: ensure no focus rectangle on selection.
@@ -346,6 +348,7 @@ class ImportShiftAttendanceDialog(QDialog):
             "tc2",
             "tc3",
             "schedule",
+            "shift_code",
         ]
 
         # Header font: set both font and stylesheet to avoid QSS overriding.
@@ -450,7 +453,7 @@ class ImportShiftAttendanceDialog(QDialog):
 
         Expected keys follow MainContent2 naming:
         employee_code, full_name, work_date, weekday, in_1..out_3, late, early,
-        hours, work, leave, hours_plus, work_plus, leave_plus, tc1..tc3, schedule.
+        hours, work, leave, hours_plus, work_plus, leave_plus, tc1..tc3, schedule, shift_code.
         """
 
         self._preview_rows = list(rows or [])
@@ -512,6 +515,7 @@ class ImportShiftAttendanceDialog(QDialog):
                 _to_display(r.get("tc2")),
                 _to_display(r.get("tc3")),
                 _to_display(r.get("schedule")),
+                _to_display(r.get("shift_code") or r.get("ca") or r.get("shift")),
             ]
             for c_off, txt in enumerate(values):
                 it = QTableWidgetItem(txt)

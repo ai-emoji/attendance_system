@@ -73,7 +73,7 @@ class ImportShiftAttendanceRepository:
                         "  employee_id, employee_code, full_name, work_date, weekday, "
                         "  in_1, out_1, in_2, out_2, in_3, out_3, "
                         "  late, early, hours, work, `leave`, hours_plus, work_plus, leave_plus, "
-                        "  tc1, tc2, tc3, schedule, import_locked, updated_at "
+                        "  tc1, tc2, tc3, schedule, shift_code, import_locked, updated_at "
                         f"FROM {table} "
                         "WHERE (employee_code, work_date) IN (" + in_sql + ") "
                         "ORDER BY updated_at DESC, id DESC"
@@ -170,14 +170,14 @@ class ImportShiftAttendanceRepository:
             f"INSERT INTO {table} ("
             "attendance_code, device_no, device_id, device_name, "
             "employee_id, employee_code, full_name, work_date, weekday, "
-            "schedule, "
+            "schedule, shift_code, "
             "in_1, out_1, in_2, out_2, in_3, out_3, "
             "late, early, hours, work, `leave`, hours_plus, work_plus, leave_plus, "
             "tc1, tc2, tc3, import_locked"
             ") VALUES ("
             "%s,%s,%s,%s,"
             "%s,%s,%s,%s,%s,"
-            "%s,"
+            "%s,%s,"
             "%s,%s,%s,%s,%s,%s,"
             "%s,%s,%s,%s,%s,%s,%s,%s,"
             "%s,%s,%s,%s"
@@ -192,6 +192,7 @@ class ImportShiftAttendanceRepository:
             "full_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, full_name, COALESCE(NULLIF(VALUES(full_name), ''), full_name)), "
             "weekday = IF(import_locked = 1 AND VALUES(import_locked) = 0, weekday, COALESCE(NULLIF(VALUES(weekday), ''), weekday)), "
             "schedule = IF(import_locked = 1 AND VALUES(import_locked) = 0, schedule, COALESCE(NULLIF(VALUES(schedule), ''), schedule)), "
+            "shift_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, shift_code, COALESCE(NULLIF(VALUES(shift_code), ''), shift_code)), "
             "in_1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_1, COALESCE(VALUES(in_1), in_1)), "
             "out_1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, out_1, COALESCE(VALUES(out_1), out_1)), "
             "in_2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_2, COALESCE(VALUES(in_2), in_2)), "
@@ -229,6 +230,7 @@ class ImportShiftAttendanceRepository:
                     r.get("work_date"),
                     r.get("weekday"),
                     r.get("schedule"),
+                    r.get("shift_code"),
                     r.get("in_1"),
                     r.get("out_1"),
                     r.get("in_2"),

@@ -162,6 +162,7 @@ class ImportShiftAttendanceService:
             "TC2",
             "TC3",
             "Lịch NV",
+            "Ca",
         ]
 
         wb = Workbook()
@@ -234,6 +235,7 @@ class ImportShiftAttendanceService:
             "work_date": "work_date",
             "weekday": "weekday",
             "schedule": "schedule",
+            "shift_code": "shift_code",
             "in_1": "in_1",
             "out_1": "out_1",
             "in_2": "in_2",
@@ -258,6 +260,7 @@ class ImportShiftAttendanceService:
             "Họ và tên": "full_name",
             "Ngày": "work_date",
             "Thứ": "weekday",
+            "Ca": "shift_code",
             "Lịch NV": "schedule",
             "Vào 1": "in_1",
             "Ra 1": "out_1",
@@ -587,6 +590,7 @@ class ImportShiftAttendanceService:
             "tc1",
             "tc2",
             "tc3",
+            "shift_code",
         ]
 
         def normalize_for_compare(k: str, v: Any) -> Any:
@@ -759,6 +763,10 @@ class ImportShiftAttendanceService:
                     schedule = ""
             payload["schedule"] = schedule or None
 
+            # shift_code (Ca) is optional; upload only when provided.
+            shift_code = str(raw.get("shift_code") or "").strip()
+            payload["shift_code"] = shift_code or None
+
             # Mark as imported
             payload["import_locked"] = 1
 
@@ -802,6 +810,7 @@ class ImportShiftAttendanceService:
         try:
             if upsert_payloads:
                 affected_pairs: set[tuple[str, str]] = set()
+                provided_shift_code_by_pair: dict[tuple[str, str], str] = {}
                 att_codes: list[str] = []
                 emp_ids: list[int] = []
                 dates: list[str] = []
@@ -812,6 +821,9 @@ class ImportShiftAttendanceService:
                     if ec and wd:
                         affected_pairs.add((ec, wd))
                         dates.append(wd)
+                        sc = str(p.get("shift_code") or "").strip()
+                        if sc:
+                            provided_shift_code_by_pair[(ec, wd)] = sc
                     ac2 = str(p.get("attendance_code") or "").strip()
                     if ac2:
                         att_codes.append(ac2)
@@ -891,7 +903,8 @@ class ImportShiftAttendanceService:
                                     "tc3": r.get("tc3"),
                                     "total": total_v,
                                     "schedule": r.get("schedule"),
-                                    "shift_code": r.get("shift_code"),
+                                    "shift_code": provided_shift_code_by_pair.get((ec, wd))
+                                    or r.get("shift_code"),
                                 }
                             )
                         except Exception:
