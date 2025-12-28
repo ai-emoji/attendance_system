@@ -89,6 +89,35 @@ class EmployeeRepository:
 
         EmployeeRepository._import_schema_checked = True
 
+    def list_distinct_department_title_by_employee_codes(
+        self, employee_codes: list[str]
+    ) -> list[dict[str, Any]]:
+        """Return distinct department_name/title_name for the given employee codes."""
+
+        codes = [str(x or "").strip() for x in (employee_codes or [])]
+        codes = [c for c in codes if c]
+        if not codes:
+            return []
+
+        # De-duplicate while preserving order.
+        codes = list(dict.fromkeys(codes))
+
+        placeholders = ",".join(["%s"] * len(codes))
+        sql = f"""
+            SELECT DISTINCT
+                d.department_name,
+                jt.title_name
+            FROM employees e
+            LEFT JOIN departments d ON d.id = e.department_id
+            LEFT JOIN job_titles jt ON jt.id = e.title_id
+            WHERE e.employee_code IN ({placeholders})
+        """
+
+        with Database.connect() as conn:
+            cursor = Database.get_cursor(conn, dictionary=True)
+            cursor.execute(sql, tuple(codes))
+            return cursor.fetchall() or []
+
     def get_employee_by_code(self, employee_code: str) -> dict[str, Any] | None:
         self.ensure_import_schema()
         sql = """

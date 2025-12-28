@@ -38,6 +38,8 @@ def export_shift_attendance_details_xlsx(
     row_indexes: list[int] | None = None,
     force_exclude_headers: set[str] | None = None,
     in_out_mode_by_employee_code: dict[str, str | None] | None = None,
+    department_text: str | None = None,
+    title_text: str | None = None,
     company_name_style: dict | None = None,
     company_address_style: dict | None = None,
     company_phone_style: dict | None = None,
@@ -287,6 +289,9 @@ def export_shift_attendance_details_xlsx(
         if str(v or "").strip()
     }
 
+    col_department = header_lower_to_table_col.get("phòng ban")
+    col_title_name = header_lower_to_table_col.get("chức vụ")
+
     col_emp_code = header_lower_to_table_col.get("mã nv")
     col_full_name = header_lower_to_table_col.get("tên nhân viên")
     col_date = header_lower_to_table_col.get("ngày")
@@ -318,6 +323,38 @@ def export_shift_attendance_details_xlsx(
     rows_source = list(range(row_count))
     if row_indexes is not None:
         rows_source = [int(r) for r in (row_indexes or []) if 0 <= int(r) < row_count]
+
+    def _collect_unique_texts(col: int | None) -> list[str]:
+        if col is None:
+            return []
+        seen: set[str] = set()
+        out: list[str] = []
+        for rr in rows_source:
+            try:
+                it = table.item(int(rr), int(col))
+                txt = "" if it is None else str(it.text() or "").strip()
+            except Exception:
+                txt = ""
+            if not txt:
+                continue
+            if txt in seen:
+                continue
+            seen.add(txt)
+            out.append(txt)
+        return out
+
+    def _fmt_list(items: list[str]) -> str:
+        items = [str(x or "").strip() for x in (items or []) if str(x or "").strip()]
+        if not items:
+            return ""
+        return ", ".join(items)
+
+    dept_txt = _fmt_list(_collect_unique_texts(col_department))
+    title_txt = _fmt_list(_collect_unique_texts(col_title_name))
+    if not str(dept_txt or "").strip() and department_text is not None:
+        dept_txt = str(department_text or "").strip()
+    if not str(title_txt or "").strip() and title_text is not None:
+        title_txt = str(title_text or "").strip()
 
     # Decide whether we can export the monthly template (same month only)
     same_month = bool(
@@ -458,55 +495,27 @@ def export_shift_attendance_details_xlsx(
             ws.cell(row=row6, column=c).alignment = grid_center
             ws.cell(row=row7, column=c).alignment = grid_center
 
-        # Rows 8-9: merged labels (include values based on exported rows)
-        col_department = header_lower_to_table_col.get("phòng ban")
-        col_title_name = header_lower_to_table_col.get("chức vụ")
-
-        def _collect_unique_texts(col: int | None) -> list[str]:
-            if col is None:
-                return []
-            seen: set[str] = set()
-            out: list[str] = []
-            for rr in rows_source:
-                try:
-                    it = table.item(int(rr), int(col))
-                    txt = "" if it is None else str(it.text() or "").strip()
-                except Exception:
-                    txt = ""
-                if not txt:
-                    continue
-                if txt in seen:
-                    continue
-                seen.add(txt)
-                out.append(txt)
-            return out
-
-        def _fmt_list(items: list[str]) -> str:
-            items = [
-                str(x or "").strip() for x in (items or []) if str(x or "").strip()
-            ]
-            if not items:
-                return ""
-            if len(items) <= 6:
-                return ", ".join(items)
-            return ", ".join(items[:6]) + f" (+{len(items) - 6})"
-
-        dept_txt = _fmt_list(_collect_unique_texts(col_department))
-        title_txt = _fmt_list(_collect_unique_texts(col_title_name))
-
         _merge_row_full(8)
         ws.cell(
             row=8,
             column=1,
             value=(f"Phòng ban: {dept_txt}" if dept_txt else "Phòng ban:"),
-        ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+        ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        try:
+            ws.row_dimensions[8].height = max(30, int(ws.row_dimensions[8].height or 0))
+        except Exception:
+            pass
 
         _merge_row_full(9)
         ws.cell(
             row=9,
             column=1,
             value=(f"Chức vụ: {title_txt}" if title_txt else "Chức vụ:"),
-        ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+        ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        try:
+            ws.row_dimensions[9].height = max(30, int(ws.row_dimensions[9].height or 0))
+        except Exception:
+            pass
 
         # Collect source rows
         def _cell_text(r: int, c: int | None) -> str:
@@ -893,7 +902,31 @@ def export_shift_attendance_details_xlsx(
             cell.font = header_font
             cell.alignment = center
 
-        start_row = 7
+        # Rows 8-9: merged labels (include values based on exported rows)
+        try:
+            _merge_full_row(8)
+            ws.cell(
+                row=8,
+                column=1,
+                value=(f"Phòng ban: {dept_txt}" if dept_txt else "Phòng ban:"),
+            ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            ws.row_dimensions[8].height = max(30, int(ws.row_dimensions[8].height or 0))
+        except Exception:
+            pass
+
+        try:
+            _merge_full_row(9)
+            ws.cell(
+                row=9,
+                column=1,
+                value=(f"Chức vụ: {title_txt}" if title_txt else "Chức vụ:"),
+            ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            ws.row_dimensions[9].height = max(30, int(ws.row_dimensions[9].height or 0))
+        except Exception:
+            pass
+
+        # Data starts at row 10 to keep row 8/9 reserved for meta.
+        start_row = 10
         excel_col_by_table_col = {int(tc): int(ec) for ec, tc in enumerate(cols, start=1)}
 
         def _try_merge_pair_cols(excel_row: int, in_table_col: int | None, out_table_col: int | None) -> None:
@@ -1069,7 +1102,7 @@ def export_shift_attendance_details_xlsx(
     # Content rows: fixed height 15 (apply to data only)
     try:
         max_row = int(ws.max_row or 0)
-        data_start = 10 if can_monthly else 7
+        data_start = 10
         data_end = max_row
         try:
             if table_ranges:
@@ -1098,6 +1131,13 @@ def export_shift_attendance_details_xlsx(
         # Keep generic error message (caller will display).
         return False, "Không thể tạo thư mục để lưu file xuất."
 
+    # Freeze panes as requested (keep header + left columns visible)
+    # Excel notation: D10 freezes rows 1..9 and columns A..C.
+    try:
+        ws.freeze_panes = "D10"
+    except Exception:
+        pass
+
     try:
         wb.save(str(path))
     except PermissionError:
@@ -1108,5 +1148,14 @@ def export_shift_attendance_details_xlsx(
         )
     except Exception:
         return False, f"Không thể lưu file xuất: {path}"
+
+    # Auto-open exported file (best-effort)
+    try:
+        import os
+
+        if os.name == "nt":
+            os.startfile(str(path))  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
     return True, f"Đã xuất dữ liệu: {path}"

@@ -216,8 +216,8 @@ class ImportShiftAttendanceController:
                 detail_msg_parts.append("")
                 detail_msg_parts.append(f"Chi tiết đầy đủ đã lưu: {report_path}")
 
-            MessageDialog.info(
-                dlg, "Import dữ liệu chấm công", "\n".join(detail_msg_parts)
+            MessageDialog.info_scroll(
+                dlg, "Import dữ liệu chấm công", "\n".join(detail_msg_parts), width=600, height=500
             )
         except Exception:
             try:

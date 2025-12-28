@@ -382,5 +382,22 @@ def export_shift_attendance_grid_xlsx(
         pass
 
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Freeze panes as requested (keep headers + left columns visible)
+    # Excel notation: E7 freezes rows 1..6 and columns A..D.
+    try:
+        ws.freeze_panes = "E7"
+    except Exception:
+        pass
+
     wb.save(str(path))
+
+    # Auto-open exported file (best-effort)
+    try:
+        import os
+
+        if os.name == "nt":
+            os.startfile(str(path))  # type: ignore[attr-defined]
+    except Exception:
+        pass
     return True, f"Đã xuất dữ liệu: {path}"

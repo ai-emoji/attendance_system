@@ -13,6 +13,7 @@ Lưu ý:
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Any
 
 from core.database import Database
@@ -23,6 +24,301 @@ logger = logging.getLogger(__name__)
 
 class ShiftAttendanceMainContent2Repository:
     TABLE = "attendance_audit"
+
+    def update_computed_fields_by_id(
+        self,
+        items: list[dict[str, Any]],
+        *,
+        allow_import_locked: bool = False,
+    ) -> int:
+        """Batch update computed fields by attendance_audit.id.
+
+        Expected keys per item:
+        - id (required)
+        - work_date or date (required for routing to attendance_audit_YYYY)
+        - late, early, hours, work, hours_plus, work_plus,
+          tc1, tc2, tc3, total, schedule, shift_code
+
+        Notes:
+        - This method intentionally does NOT update in/out punch columns.
+        - For compatibility with older DB schemas, it will fall back when
+          columns like total/shift_code are missing.
+        """
+
+        cleaned: list[dict[str, Any]] = []
+        for it in items or []:
+            if not isinstance(it, dict):
+                continue
+            audit_id = it.get("id")
+            if audit_id is None:
+                continue
+            try:
+                aid = int(audit_id)
+            except Exception:
+                continue
+
+            wd = it.get("work_date")
+            if wd is None:
+                wd = it.get("date")
+            wd_s = str(wd).strip() if wd is not None else ""
+            if not wd_s:
+                continue
+
+            cleaned.append(
+                {
+                    "id": aid,
+                    "work_date": wd_s,
+                    "late": it.get("late"),
+                    "early": it.get("early"),
+                    "hours": it.get("hours"),
+                    "work": it.get("work"),
+                    "hours_plus": it.get("hours_plus"),
+                    "work_plus": it.get("work_plus"),
+                    "tc1": it.get("tc1"),
+                    "tc2": it.get("tc2"),
+                    "tc3": it.get("tc3"),
+                    "total": it.get("total"),
+                    "schedule": it.get("schedule"),
+                    "shift_code": it.get("shift_code"),
+                }
+            )
+
+        if not cleaned:
+            return 0
+
+        def _norm_str(v: Any) -> str | None:
+            if v is None:
+                return None
+            s = str(v).strip()
+            return s if s else None
+
+        def _norm_num(v: Any) -> Any:
+            if v is None:
+                return None
+            # Keep numeric types as-is; let mysql connector handle conversion.
+            if isinstance(v, (int, float)):
+                return v
+            s = str(v).strip()
+            if not s:
+                return None
+            try:
+                # Avoid importing Decimal here; keep dependency surface small.
+                return float(s)
+            except Exception:
+                return None
+
+        # Group updates by year table.
+        by_year: dict[int, list[tuple[Any, ...]]] = {}
+        legacy: list[tuple[Any, ...]] = []
+
+        for r in cleaned:
+            y = Database._year_from_work_date(r.get("work_date"))
+            tup = (
+                _norm_str(r.get("late")),
+                _norm_str(r.get("early")),
+                _norm_num(r.get("hours")),
+                _norm_num(r.get("work")),
+                _norm_num(r.get("hours_plus")),
+                _norm_num(r.get("work_plus")),
+                _norm_str(r.get("tc1")),
+                _norm_str(r.get("tc2")),
+                _norm_str(r.get("tc3")),
+                _norm_num(r.get("total")),
+                _norm_str(r.get("schedule")),
+                _norm_str(r.get("shift_code")),
+                int(r["id"]),
+            )
+            if y is None:
+                legacy.append(tup)
+            else:
+                by_year.setdefault(int(y), []).append(tup)
+
+        # Prefer full schema update (total + shift_code). Fall back if missing.
+        where_locked_sql = "" if bool(allow_import_locked) else " AND COALESCE(import_locked, 0) = 0"
+
+        update_full_tpl = (
+            "UPDATE {table} SET "
+            "late=%s, early=%s, hours=%s, work=%s, "
+            "hours_plus=%s, work_plus=%s, "
+            "tc1=%s, tc2=%s, tc3=%s, "
+            "total=%s, schedule=%s, shift_code=%s "
+            "WHERE id=%s" + where_locked_sql
+        )
+
+        update_no_shift_tpl = (
+            "UPDATE {table} SET "
+            "late=%s, early=%s, hours=%s, work=%s, "
+            "hours_plus=%s, work_plus=%s, "
+            "tc1=%s, tc2=%s, tc3=%s, "
+            "total=%s, schedule=%s "
+            "WHERE id=%s" + where_locked_sql
+        )
+
+        update_no_total_tpl = (
+            "UPDATE {table} SET "
+            "late=%s, early=%s, hours=%s, work=%s, "
+            "hours_plus=%s, work_plus=%s, "
+            "tc1=%s, tc2=%s, tc3=%s, "
+            "schedule=%s, shift_code=%s "
+            "WHERE id=%s" + where_locked_sql
+        )
+
+        update_min_tpl = (
+            "UPDATE {table} SET "
+            "late=%s, early=%s, hours=%s, work=%s, "
+            "hours_plus=%s, work_plus=%s, "
+            "tc1=%s, tc2=%s, tc3=%s, "
+            "schedule=%s "
+            "WHERE id=%s" + where_locked_sql
+        )
+
+        def _exec_many(cursor, table: str, payload: list[tuple[Any, ...]]) -> int:
+            if not payload:
+                return 0
+
+            def _try_add_column(col: str) -> bool:
+                """Best-effort add missing columns for older yearly tables."""
+
+                col_norm = str(col or "").strip().lower()
+                if not col_norm:
+                    return False
+                try:
+                    if col_norm == "shift_code":
+                        cursor.execute(
+                            f"ALTER TABLE `{table}` ADD COLUMN shift_code VARCHAR(255) NULL"
+                        )
+                        return True
+                    if col_norm == "total":
+                        cursor.execute(
+                            f"ALTER TABLE `{table}` ADD COLUMN total DECIMAL(10,2) NULL"
+                        )
+                        return True
+                except Exception:
+                    return False
+                return False
+
+            # Try in decreasing schema richness.
+            try:
+                cursor.executemany(update_full_tpl.format(table=table), payload)
+                return int(cursor.rowcount or 0)
+            except Exception as exc1:
+                msg1 = str(exc1)
+                # total missing OR shift_code missing
+                try:
+                    if "shift_code" in msg1 and "Unknown column" in msg1:
+                        # Attempt auto-migrate: add shift_code and retry full update once.
+                        if _try_add_column("shift_code"):
+                            try:
+                                cursor.executemany(
+                                    update_full_tpl.format(table=table), payload
+                                )
+                                return int(cursor.rowcount or 0)
+                            except Exception:
+                                pass
+                        # Drop shift_code (still keep total)
+                        payload2 = [
+                            (
+                                p[0],
+                                p[1],
+                                p[2],
+                                p[3],
+                                p[4],
+                                p[5],
+                                p[6],
+                                p[7],
+                                p[8],
+                                p[9],
+                                p[10],
+                                p[12],
+                            )
+                            for p in payload
+                        ]
+                        cursor.executemany(
+                            update_no_shift_tpl.format(table=table), payload2
+                        )
+                        return int(cursor.rowcount or 0)
+
+                    if "total" in msg1 and "Unknown column" in msg1:
+                        # Attempt auto-migrate: add total and retry full update once.
+                        if _try_add_column("total"):
+                            try:
+                                cursor.executemany(
+                                    update_full_tpl.format(table=table), payload
+                                )
+                                return int(cursor.rowcount or 0)
+                            except Exception:
+                                pass
+                        # Drop total (still keep shift_code)
+                        payload2 = [
+                            (
+                                p[0],
+                                p[1],
+                                p[2],
+                                p[3],
+                                p[4],
+                                p[5],
+                                p[6],
+                                p[7],
+                                p[8],
+                                p[10],
+                                p[11],
+                                p[12],
+                            )
+                            for p in payload
+                        ]
+                        cursor.executemany(
+                            update_no_total_tpl.format(table=table), payload2
+                        )
+                        return int(cursor.rowcount or 0)
+
+                    # If both missing or another schema mismatch, fall back to minimal.
+                    payload2 = [
+                        (
+                            p[0],
+                            p[1],
+                            p[2],
+                            p[3],
+                            p[4],
+                            p[5],
+                            p[6],
+                            p[7],
+                            p[8],
+                            p[10],
+                            p[12],
+                        )
+                        for p in payload
+                    ]
+                    cursor.executemany(update_min_tpl.format(table=table), payload2)
+                    return int(cursor.rowcount or 0)
+                except Exception:
+                    # Final fallback failed.
+                    raise
+
+        cursor = None
+        try:
+            with Database.connect() as conn:
+                cursor = Database.get_cursor(conn, dictionary=False)
+                total_updated = 0
+
+                if legacy:
+                    total_updated += _exec_many(cursor, self.TABLE, legacy)
+
+                for year in sorted(by_year.keys()):
+                    table = Database.ensure_year_table(conn, self.TABLE, int(year))
+                    total_updated += _exec_many(
+                        cursor, table, by_year.get(year, [])
+                    )
+                try:
+                    conn.commit()
+                except Exception:
+                    pass
+                return int(total_updated)
+        except Exception:
+            logger.exception("Lỗi update_computed_fields_by_id")
+            raise
+        finally:
+            if cursor is not None:
+                cursor.close()
 
     def update_shift_codes(self, items: list[tuple[Any, ...]]) -> int:
         """Batch update shift_code by attendance_audit.id.
@@ -80,8 +376,19 @@ class ShiftAttendanceMainContent2Repository:
 
                 # Backward-compat: update base table if year not provided/parsable.
                 if legacy:
-                    query0 = f"UPDATE {self.TABLE} SET shift_code = %s WHERE id = %s"
-                    cursor.executemany(query0, legacy)
+                    try:
+                        query0 = (
+                            f"UPDATE {self.TABLE} SET shift_code = %s "
+                            "WHERE id = %s AND COALESCE(import_locked, 0) = 0"
+                        )
+                        cursor.executemany(query0, legacy)
+                    except Exception as exc:
+                        msg = str(exc)
+                        if "import_locked" in msg and "Unknown column" in msg:
+                            query0 = f"UPDATE {self.TABLE} SET shift_code = %s WHERE id = %s"
+                            cursor.executemany(query0, legacy)
+                        else:
+                            raise
                     try:
                         total += int(cursor.rowcount or 0)
                     except Exception:
@@ -89,8 +396,19 @@ class ShiftAttendanceMainContent2Repository:
 
                 for year in sorted(by_year.keys()):
                     table = Database.ensure_year_table(conn, self.TABLE, int(year))
-                    query = f"UPDATE {table} SET shift_code = %s WHERE id = %s"
-                    cursor.executemany(query, by_year.get(year, []))
+                    try:
+                        query = (
+                            f"UPDATE {table} SET shift_code = %s "
+                            "WHERE id = %s AND COALESCE(import_locked, 0) = 0"
+                        )
+                        cursor.executemany(query, by_year.get(year, []))
+                    except Exception as exc:
+                        msg = str(exc)
+                        if "import_locked" in msg and "Unknown column" in msg:
+                            query = f"UPDATE {table} SET shift_code = %s WHERE id = %s"
+                            cursor.executemany(query, by_year.get(year, []))
+                        else:
+                            raise
                     try:
                         total += int(cursor.rowcount or 0)
                     except Exception:
@@ -150,6 +468,11 @@ class ShiftAttendanceMainContent2Repository:
         names: list[str] = []
         for n in schedule_names or []:
             s = str(n or "").strip()
+            if s:
+                try:
+                    s = unicodedata.normalize("NFC", s)
+                except Exception:
+                    pass
             if s:
                 names.append(s)
         names = list(dict.fromkeys(names))
@@ -451,6 +774,7 @@ class ShiftAttendanceMainContent2Repository:
             "SELECT "
             "a.id, "
             "a.attendance_code, a.employee_code, a.full_name, a.work_date AS date, a.weekday, "
+            "a.import_locked, "
             "a.in_1, a.out_1, a.in_2, a.out_2, a.in_3, a.out_3, "
             "a.late, a.early, a.hours, a.work, a.`leave`, a.`leave` AS kh, a.hours_plus, a.work_plus, a.leave_plus, "
             "CASE "
@@ -459,16 +783,19 @@ class ShiftAttendanceMainContent2Repository:
             "END AS total, "
             "a.tc1, a.tc2, a.tc3, "
             "a.shift_code AS shift_code_db, "
-            "COALESCE(("
-            "  SELECT s.schedule_name "
-            "  FROM hr_attendance.employee_schedule_assignments esa "
-            "  JOIN hr_attendance.arrange_schedules s ON s.id = esa.schedule_id "
-            "  WHERE esa.employee_id = e.id "
-            "    AND esa.effective_from <= a.work_date "
-            "    AND (esa.effective_to IS NULL OR esa.effective_to >= a.work_date) "
-            "  ORDER BY esa.effective_from DESC, esa.id DESC "
-            "  LIMIT 1"
-            "), a.schedule) AS schedule "
+            "CASE "
+            "  WHEN COALESCE(a.import_locked, 0) = 1 THEN a.schedule "
+            "  ELSE COALESCE(("
+            "    SELECT s.schedule_name "
+            "    FROM hr_attendance.employee_schedule_assignments esa "
+            "    JOIN hr_attendance.arrange_schedules s ON s.id = esa.schedule_id "
+            "    WHERE esa.employee_id = e.id "
+            "      AND esa.effective_from <= a.work_date "
+            "      AND (esa.effective_to IS NULL OR esa.effective_to >= a.work_date) "
+            "    ORDER BY esa.effective_from DESC, esa.id DESC "
+            "    LIMIT 1"
+            "  ), a.schedule) "
+            "END AS schedule "
             "FROM {FROM_SQL}"
             f"{join_sql}"
             f"{where_sql} "
@@ -479,6 +806,7 @@ class ShiftAttendanceMainContent2Repository:
             "SELECT "
             "a.id, "
             "a.attendance_code, a.employee_code, a.full_name, a.work_date AS date, a.weekday, "
+            "a.import_locked, "
             "a.in_1, a.out_1, a.in_2, a.out_2, a.in_3, a.out_3, "
             "a.late, a.early, a.hours, a.work, a.`leave`, a.`leave` AS kh, a.hours_plus, a.work_plus, a.leave_plus, "
             "CASE "
@@ -486,16 +814,19 @@ class ShiftAttendanceMainContent2Repository:
             "  ELSE (COALESCE(a.work, 0) + COALESCE(a.work_plus, 0)) "
             "END AS total, "
             "a.tc1, a.tc2, a.tc3, "
-            "COALESCE(("
-            "  SELECT s.schedule_name "
-            "  FROM hr_attendance.employee_schedule_assignments esa "
-            "  JOIN hr_attendance.arrange_schedules s ON s.id = esa.schedule_id "
-            "  WHERE esa.employee_id = e.id "
-            "    AND esa.effective_from <= a.work_date "
-            "    AND (esa.effective_to IS NULL OR esa.effective_to >= a.work_date) "
-            "  ORDER BY esa.effective_from DESC, esa.id DESC "
-            "  LIMIT 1"
-            "), a.schedule) AS schedule "
+            "CASE "
+            "  WHEN COALESCE(a.import_locked, 0) = 1 THEN a.schedule "
+            "  ELSE COALESCE(("
+            "    SELECT s.schedule_name "
+            "    FROM hr_attendance.employee_schedule_assignments esa "
+            "    JOIN hr_attendance.arrange_schedules s ON s.id = esa.schedule_id "
+            "    WHERE esa.employee_id = e.id "
+            "      AND esa.effective_from <= a.work_date "
+            "      AND (esa.effective_to IS NULL OR esa.effective_to >= a.work_date) "
+            "    ORDER BY esa.effective_from DESC, esa.id DESC "
+            "    LIMIT 1"
+            "  ), a.schedule) "
+            "END AS schedule "
             "FROM {FROM_SQL}"
             f"{join_sql}"
             f"{where_sql} "
@@ -521,6 +852,7 @@ class ShiftAttendanceMainContent2Repository:
                 rows = list(cursor.fetchall() or [])
                 for r in rows:
                     r.setdefault("shift_code_db", None)
+                    r.setdefault("import_locked", 0)
                 return rows
         except Exception:
             logger.exception("Lỗi list_rows (shift_attendance_maincontent2)")

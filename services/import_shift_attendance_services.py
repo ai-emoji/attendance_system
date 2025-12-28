@@ -31,6 +31,13 @@ from typing import Any, Callable
 from repository.import_shift_attendance_repository import (
     ImportShiftAttendanceRepository,
 )
+from repository.schedule_work_repository import ScheduleWorkRepository
+from repository.shift_attendance_maincontent2_repository import (
+    ShiftAttendanceMainContent2Repository,
+)
+from services.shift_attendance_maincontent2_services import (
+    ShiftAttendanceMainContent2Service,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -73,6 +80,47 @@ class ImportShiftAttendanceService:
                 )
             )
         )
+
+    @staticmethod
+    def _normalize_employee_code(
+        value: Any,
+        *,
+        pad_width: int | None = None,
+    ) -> str:
+        """Normalize employee_code read from Excel.
+
+        Excel often drops leading zeros and returns numeric types. If the file
+        contains other codes with leading zeros, we pad numeric-only codes to
+        the same width so matching/upsert works (e.g. 4 -> 00004).
+        """
+
+        if value is None:
+            return ""
+
+        # Handle numeric cells (int/float) that represent codes.
+        if isinstance(value, bool):
+            s = ""
+        elif isinstance(value, int):
+            s = str(value)
+        elif isinstance(value, float):
+            try:
+                if float(value).is_integer():
+                    s = str(int(value))
+                else:
+                    s = str(value)
+            except Exception:
+                s = str(value)
+        else:
+            s = str(value)
+
+        s = s.strip()
+        if not s:
+            return ""
+
+        if pad_width and pad_width > 0 and s.isdigit() and len(s) < int(pad_width):
+            return s.zfill(int(pad_width))
+
+        return s
 
     @staticmethod
     def export_shift_attendance_template_xlsx(file_path: str) -> tuple[bool, str]:
@@ -133,6 +181,15 @@ class ImportShiftAttendanceService:
 
         path.parent.mkdir(parents=True, exist_ok=True)
         wb.save(str(path))
+
+        # Auto-open exported template (best-effort)
+        try:
+            import os
+
+            if os.name == "nt":
+                os.startfile(str(path))  # type: ignore[attr-defined]
+        except Exception:
+            pass
         return True, f"Đã tạo file mẫu: {path}"
 
     def read_shift_attendance_from_xlsx(
@@ -379,6 +436,25 @@ class ImportShiftAttendanceService:
         msg = f"Đọc thành công {len(out)} dòng."
         if unknown_headers:
             msg += f" (Bỏ qua cột lạ: {', '.join(unknown_headers[:6])}{'...' if len(unknown_headers) > 6 else ''})"
+
+        # Normalize employee_code: if the sheet contains zero-padded numeric codes
+        # (e.g. '00010'), pad numeric codes like 4 -> '00004' to the same width.
+        try:
+            pad_width = 0
+            for it in out:
+                v = it.get("employee_code")
+                s = str(v or "").strip()
+                if s.isdigit() and s.startswith("0"):
+                    pad_width = max(pad_width, len(s))
+            if pad_width > 0:
+                for it in out:
+                    it["employee_code"] = self._normalize_employee_code(
+                        it.get("employee_code"),
+                        pad_width=pad_width,
+                    )
+        except Exception:
+            pass
+
         return True, msg, out
 
     def import_shift_attendance_rows(
@@ -389,6 +465,22 @@ class ImportShiftAttendanceService:
     ) -> ImportShiftAttendanceResult:
         if not rows:
             return ImportShiftAttendanceResult(False, "Không có dữ liệu để cập nhập.")
+
+        # Normalize employee_code first (rows may come from UI edits).
+        try:
+            pad_width = 0
+            for r0 in rows or []:
+                s0 = str(r0.get("employee_code") or "").strip()
+                if s0.isdigit() and s0.startswith("0"):
+                    pad_width = max(pad_width, len(s0))
+            if pad_width > 0:
+                for r0 in rows or []:
+                    r0["employee_code"] = self._normalize_employee_code(
+                        r0.get("employee_code"),
+                        pad_width=pad_width,
+                    )
+        except Exception:
+            pass
 
         # Build keys for existing lookup
         pairs: list[tuple[str, str]] = []
@@ -413,6 +505,46 @@ class ImportShiftAttendanceService:
             emp_lookup = self._repo.get_employees_by_codes(emp_codes)
         except Exception:
             emp_lookup = {}
+
+        # Schedule snapshot for each (employee_id, work_date).
+        # If Excel doesn't provide schedule, we resolve current assignment on that date
+        # and store it into attendance_audit to "chốt công".
+        schedule_by_emp_date: dict[tuple[int, str], str] = {}
+        try:
+            by_date_emp_ids: dict[str, list[int]] = {}
+            for r0 in rows:
+                wd0 = str(r0.get("work_date") or "").strip()
+                if not wd0:
+                    continue
+                ec0 = str(r0.get("employee_code") or "").strip()
+                if not ec0:
+                    continue
+                emp0 = emp_lookup.get(ec0.lower())
+                if not emp0 or emp0.get("id") is None:
+                    continue
+                try:
+                    eid0 = int(emp0.get("id"))
+                except Exception:
+                    continue
+                if eid0 <= 0:
+                    continue
+                by_date_emp_ids.setdefault(wd0, []).append(eid0)
+
+            sched_repo = ScheduleWorkRepository()
+            for wd0, emp_ids0 in by_date_emp_ids.items():
+                ids0 = list(dict.fromkeys([int(x) for x in emp_ids0 if int(x) > 0]))
+                if not ids0:
+                    continue
+                m0 = sched_repo.get_employee_schedule_name_map(
+                    employee_ids=ids0,
+                    on_date=str(wd0),
+                )
+                for eid0, name0 in (m0 or {}).items():
+                    sname0 = str(name0 or "").strip()
+                    if sname0:
+                        schedule_by_emp_date[(int(eid0), str(wd0))] = sname0
+        except Exception:
+            schedule_by_emp_date = {}
 
         def to_time_str(t: Any) -> str | None:
             if t is None:
@@ -526,6 +658,8 @@ class ImportShiftAttendanceService:
             existing = existing_map.get((emp_code, wd))
             import_locked = int(existing.get("import_locked") or 0) if existing else 0
 
+            # If not found in DB, we allow INSERT (create new row) from Excel import.
+
             # Determine whether changed (only when import_locked=1)
             changed = True
             if existing and import_locked == 1:
@@ -616,6 +750,13 @@ class ImportShiftAttendanceService:
 
             # schedule is a display field (varchar)
             schedule = str(raw.get("schedule") or "").strip()
+            if not schedule:
+                try:
+                    eid = payload.get("employee_id")
+                    if eid is not None:
+                        schedule = schedule_by_emp_date.get((int(eid), wd), "")
+                except Exception:
+                    schedule = ""
             payload["schedule"] = schedule or None
 
             # Mark as imported
@@ -623,9 +764,7 @@ class ImportShiftAttendanceService:
 
             # Decide action label
             if existing:
-                action = (
-                    "OVERWRITE_DOWNLOAD" if import_locked == 0 else "UPDATE_CHANGED"
-                )
+                action = "OVERWRITE_DOWNLOAD" if import_locked == 0 else "UPDATE_CHANGED"
                 updated += 1
             else:
                 action = "INSERT"
@@ -656,6 +795,116 @@ class ImportShiftAttendanceService:
                 skipped=skipped,
                 failed=(failed + max(0, len(upsert_payloads))),
             )
+
+        # After import: recompute derived/computed columns and persist back to DB.
+        # This ensures columns like late/early/hours/work/tc/shift_code are consistent
+        # with current schedule/shift rules whenever import changes punch times.
+        try:
+            if upsert_payloads:
+                affected_pairs: set[tuple[str, str]] = set()
+                att_codes: list[str] = []
+                emp_ids: list[int] = []
+                dates: list[str] = []
+
+                for p in upsert_payloads:
+                    ec = str(p.get("employee_code") or "").strip()
+                    wd = str(p.get("work_date") or "").strip()
+                    if ec and wd:
+                        affected_pairs.add((ec, wd))
+                        dates.append(wd)
+                    ac2 = str(p.get("attendance_code") or "").strip()
+                    if ac2:
+                        att_codes.append(ac2)
+                    try:
+                        eid = p.get("employee_id")
+                        if eid is not None:
+                            emp_ids.append(int(eid))
+                    except Exception:
+                        pass
+
+                att_codes = list(dict.fromkeys([s for s in att_codes if s]))
+                emp_ids = list(dict.fromkeys(emp_ids))
+                dates = [d for d in dates if d]
+                from_date = min(dates) if dates else None
+                to_date = max(dates) if dates else None
+
+                if from_date and to_date and affected_pairs:
+                    calc_service = ShiftAttendanceMainContent2Service()
+                    rows_calc = calc_service.list_attendance_audit_arranged(
+                        from_date=from_date,
+                        to_date=to_date,
+                        employee_ids=emp_ids or None,
+                        attendance_codes=att_codes or None,
+                        recompute_import_locked=True,
+                        overwrite_import_locked_computed=True,
+                    )
+
+                    # Persist only exact imported (employee_code, work_date) pairs.
+                    pending_updates: list[dict[str, Any]] = []
+
+                    def _to_num(v: Any) -> Any:
+                        if v is None:
+                            return None
+                        if isinstance(v, (int, float, Decimal)):
+                            return v
+                        s = str(v).strip()
+                        if not s:
+                            return None
+                        try:
+                            return Decimal(s)
+                        except Exception:
+                            try:
+                                return float(s)
+                            except Exception:
+                                return None
+
+                    for r in rows_calc or []:
+                        try:
+                            ec = str(r.get("employee_code") or "").strip()
+                            wd = str(r.get("date") or r.get("work_date") or "").strip()
+                            if not ec or not wd:
+                                continue
+                            if (ec, wd) not in affected_pairs:
+                                continue
+
+                            work_v = _to_num(r.get("work"))
+                            work_plus_v = _to_num(r.get("work_plus"))
+                            total_v = None
+                            if (work_v is not None) or (work_plus_v is not None):
+                                try:
+                                    total_v = (work_v or 0) + (work_plus_v or 0)
+                                except Exception:
+                                    total_v = None
+
+                            pending_updates.append(
+                                {
+                                    "id": r.get("id"),
+                                    "work_date": wd,
+                                    "late": r.get("late"),
+                                    "early": r.get("early"),
+                                    "hours": r.get("hours"),
+                                    "work": work_v,
+                                    "hours_plus": r.get("hours_plus"),
+                                    "work_plus": work_plus_v,
+                                    "tc1": r.get("tc1"),
+                                    "tc2": r.get("tc2"),
+                                    "tc3": r.get("tc3"),
+                                    "total": total_v,
+                                    "schedule": r.get("schedule"),
+                                    "shift_code": r.get("shift_code"),
+                                }
+                            )
+                        except Exception:
+                            continue
+
+                    if pending_updates:
+                        ShiftAttendanceMainContent2Repository().update_computed_fields_by_id(
+                            pending_updates,
+                            allow_import_locked=True,
+                        )
+        except Exception:
+            # Do not fail the whole import if recompute fails; import itself succeeded.
+            logger.exception("Không thể tính lại/cập nhật các cột tính toán sau import")
 
         msg = f"Hoàn tất import: Thêm {inserted}, Cập nhập {updated}, Bỏ qua {skipped}, Lỗi {failed}."
         return ImportShiftAttendanceResult(

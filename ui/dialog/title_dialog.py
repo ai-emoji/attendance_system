@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QPlainTextEdit,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -308,12 +309,22 @@ class MessageDialog(QDialog):
         cancel_text: str | None = None,
         destructive: bool = False,
         parent=None,
+        *,
+        fixed_size: tuple[int, int] | None = None,
+        scrollable: bool = False,
     ) -> None:
         super().__init__(parent)
         self._ok_clicked = False
 
         self.setModal(True)
-        self.setFixedSize(TITLE_DIALOG_WIDTH, TITLE_DIALOG_HEIGHT)
+        if fixed_size is not None:
+            try:
+                w, h = fixed_size
+                self.setFixedSize(int(w), int(h))
+            except Exception:
+                self.setFixedSize(TITLE_DIALOG_WIDTH, TITLE_DIALOG_HEIGHT)
+        else:
+            self.setFixedSize(TITLE_DIALOG_WIDTH, TITLE_DIALOG_HEIGHT)
         self.setWindowTitle(title or "")
 
         root = QVBoxLayout(self)
@@ -335,9 +346,29 @@ class MessageDialog(QDialog):
         header = QLabel(title or "")
         header.setFont(font_title)
 
-        msg = QLabel(message or "")
-        msg.setFont(font_normal)
-        msg.setWordWrap(True)
+        msg_widget: QWidget
+        if scrollable:
+            box = QPlainTextEdit(self)
+            box.setReadOnly(True)
+            box.setPlainText(message or "")
+            box.setFont(font_normal)
+            # Keep wrapping pleasant for long reports
+            try:
+                box.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+            except Exception:
+                pass
+            try:
+                box.setSizePolicy(
+                    QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+                )
+            except Exception:
+                pass
+            msg_widget = box
+        else:
+            lbl = QLabel(message or "")
+            lbl.setFont(font_normal)
+            lbl.setWordWrap(True)
+            msg_widget = lbl
 
         # Nút
         btn_row = QWidget(self)
@@ -399,10 +430,14 @@ class MessageDialog(QDialog):
             btn_layout.addWidget(self.btn_ok, 1)
             btn_layout.addWidget(self.btn_cancel, 1)
 
-        root.addWidget(header)
-        root.addWidget(msg)
-        root.addStretch(1)
-        root.addWidget(btn_row)
+        root.addWidget(header, 0)
+        if scrollable:
+            # Let the scroll area take all remaining space.
+            root.addWidget(msg_widget, 1)
+        else:
+            root.addWidget(msg_widget, 0)
+            root.addStretch(1)
+        root.addWidget(btn_row, 0)
 
     def _on_ok(self) -> None:
         self._ok_clicked = True
@@ -420,6 +455,28 @@ class MessageDialog(QDialog):
             ok_text=ok_text,
             cancel_text=None,
             parent=parent,
+        )
+        dlg.exec()
+
+    @classmethod
+    def info_scroll(
+        cls,
+        parent,
+        title: str,
+        message: str,
+        ok_text: str = "OK",
+        *,
+        width: int = 600,
+        height: int = 500,
+    ) -> None:
+        dlg = cls(
+            title=title,
+            message=message,
+            ok_text=ok_text,
+            cancel_text=None,
+            parent=parent,
+            fixed_size=(int(width), int(height)),
+            scrollable=True,
         )
         dlg.exec()
 

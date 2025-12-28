@@ -92,6 +92,9 @@ from core.resource import (
 # recreates widgets while switching tabs.
 _EMPLOYEE_VIEW_STATE: dict[str, object] = {}
 
+# Tránh treo khi chuyển tab: không cache/restore danh sách quá lớn (pandas + modelReset rất nặng).
+_STATE_ROWS_MAX = 800
+
 
 class TitleBar1(QWidget):
     def __init__(
@@ -1460,7 +1463,10 @@ class EmployeeTable(QTableView):
 
         # Save latest loaded rows for restore-on-tab-switch.
         try:
-            _EMPLOYEE_VIEW_STATE["rows"] = list(rows or [])
+            if rows is not None and len(rows) <= int(_STATE_ROWS_MAX):
+                _EMPLOYEE_VIEW_STATE["rows"] = list(rows or [])
+            else:
+                _EMPLOYEE_VIEW_STATE["rows"] = None
         except Exception:
             pass
 
@@ -1902,12 +1908,14 @@ class MainContent(QWidget):
                     self.table.set_column_filters_payload(col_filters)
             except Exception:
                 pass
+            restored_rows = False
             try:
                 rows = state.get("rows")
-                if isinstance(rows, list):
+                if isinstance(rows, list) and len(rows) <= int(_STATE_ROWS_MAX):
                     self.table.set_rows(rows)
+                    restored_rows = True
             except Exception:
-                pass
+                restored_rows = False
 
             try:
                 total_txt = str(state.get("total_text") or "")
@@ -1916,7 +1924,8 @@ class MainContent(QWidget):
             except Exception:
                 pass
 
-            return True
+            # Nếu không restore được rows (do quá lớn/không có), trả False để controller tự refresh.
+            return bool(restored_rows)
         finally:
             try:
                 self.inp_search_text.blockSignals(False)

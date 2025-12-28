@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import datetime as _dt
+import time
 
 from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QIcon
@@ -74,6 +75,9 @@ _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
 # In-memory state cache to avoid losing Schedule Work filters/tables when the main
 # window recreates the view while switching tabs.
 _SCHEDULE_WORK_STATE: dict[str, object] = {}
+
+# Tránh lag khi view bị recreate: không lưu/restore bảng quá lớn.
+_STATE_TABLE_MAX_ROWS = 200
 
 
 def _to_alignment_flag(align: str) -> Qt.AlignmentFlag:
@@ -276,6 +280,12 @@ class ScheduleWorkView(QWidget):
         try:
             rows = int(table.rowCount())
             cols = int(table.columnCount())
+        except Exception:
+            return None
+
+        try:
+            if rows > int(_STATE_TABLE_MAX_ROWS):
+                return None
         except Exception:
             return None
         data: list[list[dict[str, object]]] = []
@@ -1097,6 +1107,11 @@ class MainRight(QWidget):
             )
         except Exception:
             pass
+
+            self._render_timer: QTimer | None = None
+            self._render_rows: list[dict] | list[object] = []
+            self._render_schedule_map: dict[int, str] = {}
+            self._render_index: int = 0
         self.table.setAlternatingRowColors(True)
         self.table.setWordWrap(False)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1667,6 +1682,181 @@ class MainRight(QWidget):
         except Exception:
             pass
 
+    def cancel_render(self) -> None:
+        try:
+            if self._render_timer is not None and self._render_timer.isActive():
+                self._render_timer.stop()
+        except Exception:
+            pass
+        self._render_rows = []
+        self._render_schedule_map = {}
+        self._render_index = 0
+
+    def set_employees_chunked(
+        self,
+        rows: list[dict] | list[object],
+        schedule_by_employee_id: dict[int, str] | None = None,
+        *,
+        budget_ms: int = 12,
+    ) -> None:
+        """Render employees incrementally to keep UI responsive."""
+
+        self.cancel_render()
+        self.table.setRowCount(0)
+
+        if not rows:
+            try:
+                self._set_header_check_text("❌")
+            except Exception:
+                pass
+            return
+
+        def _key(x) -> int:
+            try:
+                if isinstance(x, dict):
+                    return int(x.get("id") or 0)
+                return int(getattr(x, "id", None) or 0)
+            except Exception:
+                return 0
+
+        self._render_rows = sorted(list(rows), key=_key)
+        self._render_schedule_map = dict(schedule_by_employee_id or {})
+        self._render_index = 0
+
+        self.table.setRowCount(len(self._render_rows))
+
+        if self._render_timer is None:
+            self._render_timer = QTimer(self)
+            self._render_timer.setTimerType(Qt.TimerType.PreciseTimer)
+            self._render_timer.timeout.connect(lambda: self._render_tick(budget_ms))
+
+        try:
+            self._render_timer.start(0)
+        except Exception:
+            self._render_tick(budget_ms)
+
+    def _render_tick(self, budget_ms: int) -> None:
+        if not self._render_rows:
+            try:
+                if self._render_timer is not None:
+                    self._render_timer.stop()
+            except Exception:
+                pass
+            return
+
+        start = time.perf_counter()
+        budget_s = max(0.001, float(budget_ms) / 1000.0)
+
+        try:
+            self.table.blockSignals(True)
+        except Exception:
+            pass
+
+        try:
+            while self._render_index < len(self._render_rows):
+                r = int(self._render_index)
+                item = self._render_rows[r]
+
+                def _get(key: str, default=""):
+                    if isinstance(item, dict):
+                        return item.get(key, default)
+                    return getattr(item, key, default)
+
+                emp_id_raw = _get("id")
+                emp_code = _get("employee_code")
+                mcc_code = _get("mcc_code")
+                full_name = _get("full_name")
+                department_name = _get("department_name", "")
+                title_name = _get("title_name", "")
+
+                schedule_name = ""
+                try:
+                    emp_id_i = int(emp_id_raw or 0)
+                    schedule_name = str(
+                        self._render_schedule_map.get(emp_id_i) or ""
+                    ).strip()
+                except Exception:
+                    schedule_name = str(_get("schedule_name", "") or "").strip()
+
+                chk = QTableWidgetItem("❌")
+                chk.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                try:
+                    f = QFont(UI_FONT, int(CONTENT_FONT) + 0)
+                    chk.setFont(f)
+                except Exception:
+                    pass
+                chk.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_CHECK, chk)
+
+                it_id = QTableWidgetItem(
+                    str(emp_id_raw if emp_id_raw is not None else "")
+                )
+                it_id.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_ID, it_id)
+
+                it_code = QTableWidgetItem(str(emp_code or ""))
+                it_code.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_EMP_CODE, it_code)
+
+                it_mcc = QTableWidgetItem(str(mcc_code or ""))
+                it_mcc.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_MCC_CODE, it_mcc)
+
+                it_name = QTableWidgetItem(str(full_name or ""))
+                it_name.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_FULL_NAME, it_name)
+
+                it_dept = QTableWidgetItem(str(department_name or ""))
+                it_dept.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_DEPARTMENT, it_dept)
+
+                it_title = QTableWidgetItem(str(title_name or ""))
+                it_title.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_TITLE, it_title)
+
+                it_sched = QTableWidgetItem(str(schedule_name or ""))
+                it_sched.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_SCHEDULE, it_sched)
+
+                try:
+                    self.table.setRowHeight(r, ROW_HEIGHT)
+                except Exception:
+                    pass
+
+                self._render_index += 1
+
+                if (time.perf_counter() - start) >= budget_s:
+                    break
+        finally:
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+
+        try:
+            self.table.viewport().update()
+        except Exception:
+            pass
+
+        if self._render_index >= len(self._render_rows):
+            try:
+                if self._render_timer is not None:
+                    self._render_timer.stop()
+            except Exception:
+                pass
+
+            try:
+                self.apply_ui_settings()
+            except Exception:
+                pass
+
+            try:
+                self._set_header_check_text("❌")
+            except Exception:
+                pass
+
+
+
     def get_checked_employee_ids(self) -> list[int]:
         ids: list[int] = []
         for r in range(self.table.rowCount()):
@@ -1924,6 +2114,10 @@ class TempScheduleContent(QWidget):
             )
         except Exception:
             pass
+
+        self._render_timer: QTimer | None = None
+        self._render_rows: list[dict] = []
+        self._render_index: int = 0
         self.table.setAlternatingRowColors(True)
         self.table.setWordWrap(False)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -2399,6 +2593,144 @@ class TempScheduleContent(QWidget):
             self._set_header_check_text("❌")
         except Exception:
             pass
+
+    def cancel_render(self) -> None:
+        try:
+            if self._render_timer is not None and self._render_timer.isActive():
+                self._render_timer.stop()
+        except Exception:
+            pass
+        self._render_rows = []
+        self._render_index = 0
+
+    def set_rows_chunked(self, rows: list[dict], *, budget_ms: int = 12) -> None:
+        """Render temp assignments incrementally to keep UI responsive."""
+
+        self.cancel_render()
+        self.table.setRowCount(0)
+        if not rows:
+            try:
+                self._set_header_check_text("❌")
+            except Exception:
+                pass
+            return
+
+        self._render_rows = list(rows or [])
+        self._render_index = 0
+        self.table.setRowCount(len(self._render_rows))
+
+        if self._render_timer is None:
+            self._render_timer = QTimer(self)
+            self._render_timer.setTimerType(Qt.TimerType.PreciseTimer)
+            self._render_timer.timeout.connect(lambda: self._render_tick(budget_ms))
+
+        try:
+            self._render_timer.start(0)
+        except Exception:
+            self._render_tick(budget_ms)
+
+    def _render_tick(self, budget_ms: int) -> None:
+        if not self._render_rows:
+            try:
+                if self._render_timer is not None:
+                    self._render_timer.stop()
+            except Exception:
+                pass
+            return
+
+        start = time.perf_counter()
+        budget_s = max(0.001, float(budget_ms) / 1000.0)
+
+        try:
+            self.table.blockSignals(True)
+        except Exception:
+            pass
+
+        try:
+            while self._render_index < len(self._render_rows):
+                r = int(self._render_index)
+                item = self._render_rows[r] or {}
+
+                assignment_id = item.get("id")
+                emp_code = item.get("employee_code")
+                full_name = item.get("full_name")
+                from_date = item.get("effective_from")
+                to_date = item.get("effective_to")
+                schedule_name = item.get("schedule_name")
+
+                it_id = QTableWidgetItem(
+                    str(assignment_id if assignment_id is not None else "")
+                )
+                it_id.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_ID, it_id)
+
+                chk = QTableWidgetItem("❌")
+                chk.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                try:
+                    f = QFont(UI_FONT, int(CONTENT_FONT) + 0)
+                    chk.setFont(f)
+                except Exception:
+                    pass
+                chk.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_CHECK, chk)
+
+                it_code = QTableWidgetItem(str(emp_code or ""))
+                it_code.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_EMP_CODE, it_code)
+
+                it_name = QTableWidgetItem(str(full_name or ""))
+                it_name.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_FULL_NAME, it_name)
+
+                it_from = QTableWidgetItem(self._fmt_date(from_date))
+                it_from.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_FROM_DATE, it_from)
+
+                it_to = QTableWidgetItem(self._fmt_date(to_date))
+                it_to.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_TO_DATE, it_to)
+
+                it_sched = QTableWidgetItem(str(schedule_name or ""))
+                it_sched.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                self.table.setItem(r, self.COL_SCHEDULE, it_sched)
+
+                try:
+                    self.table.setRowHeight(r, ROW_HEIGHT)
+                except Exception:
+                    pass
+
+                self._render_index += 1
+                if (time.perf_counter() - start) >= budget_s:
+                    break
+        finally:
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+
+        try:
+            self.table.viewport().update()
+        except Exception:
+            pass
+
+        if self._render_index >= len(self._render_rows):
+            try:
+                if self._render_timer is not None:
+                    self._render_timer.stop()
+            except Exception:
+                pass
+
+            try:
+                self.apply_ui_settings()
+            except Exception:
+                pass
+
+            try:
+                self._set_header_check_text("❌")
+            except Exception:
+                pass
+
+
 
     def get_selected_assignment_id(self) -> int | None:
         try:

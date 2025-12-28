@@ -118,6 +118,23 @@ class ShiftAttendanceMainContent2Service:
 
         return False
 
+    @staticmethod
+    def _norm_schedule_name(value: object | None) -> str:
+        s = str(value or "").strip()
+        if not s:
+            return ""
+        try:
+            # Normalize to NFC to avoid mismatches between precomposed/decomposed Vietnamese.
+            s = unicodedata.normalize("NFC", s)
+        except Exception:
+            pass
+        # Collapse internal whitespace
+        try:
+            s = " ".join(s.split())
+        except Exception:
+            pass
+        return s
+
     @classmethod
     def _calc_late_minutes_for_shift(
         cls,
@@ -934,7 +951,25 @@ class ShiftAttendanceMainContent2Service:
         # vì dễ tạo ra cặp giờ rác (ví dụ: 17:00:24 + 17:00:25).
         # Nếu không match được ca nào, fallback về auto đơn giản (đã dedupe).
         if not used_any:
-            cls._apply_mode_auto(row)
+            # IMPORTANT: do NOT call _apply_mode_auto(row) here because we've already
+            # cleared row in/out fields above; _apply_mode_auto() would see no punches.
+            # Instead, refill directly from the already-collected `punches` list.
+            sorted_vals = list(punches)
+
+            # If only 1 punch and it's in the afternoon, treat it as OUT (missing IN => UI shows KV).
+            try:
+                if len(sorted_vals) == 1:
+                    s0 = cls._time_to_seconds(sorted_vals[0])
+                    if s0 is not None and int(s0) >= 13 * 3600:
+                        row["in_1"] = None
+                        row["out_1"] = sorted_vals[0]
+                        return
+            except Exception:
+                pass
+
+            keys = ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
+            for i, k in enumerate(keys):
+                row[k] = sorted_vals[i] if i < len(sorted_vals) else None
             return
 
         if used_any:
@@ -1282,6 +1317,29 @@ class ShiftAttendanceMainContent2Service:
             punches, key=lambda v: int(cls._time_to_seconds(v) or 0)
         )
 
+        # Special case: only 1 punch in the day.
+        # If it is an afternoon punch (>= 13:00), treat it as OUT (missing IN => UI shows KV).
+        try:
+            if len(punches_sorted) == 1:
+                only = punches_sorted[0]
+                only_sec = cls._time_to_seconds(only)
+                if only_sec is not None and int(only_sec) >= 13 * 3600:
+                    row["in_1"] = None
+                    row["out_1"] = only
+                    # Best-effort label for downstream logic; later KV/KR handling may clear it.
+                    try:
+                        out_sh = _match_shift_for_out(only, in_punch=None)
+                        if out_sh is not None:
+                            code = str((out_sh or {}).get("shift_code") or "").strip()
+                            if code:
+                                row["shift_code"] = code
+                                row["_slot_shift_code_1"] = code
+                    except Exception:
+                        pass
+                    return
+        except Exception:
+            pass
+
         # OUT hint: latest punch in the day (even if it won't match any out-window)
         out_sec_hint: int | None = None
         try:
@@ -1536,6 +1594,16 @@ class ShiftAttendanceMainContent2Service:
             within_seconds=120,
             keep="first",
         )
+
+        if len(sorted_vals) == 1:
+            s0 = cls._time_to_seconds(sorted_vals[0])
+            if s0 is not None and int(s0) >= 13 * 3600:
+                # Reset all
+                for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
+                    row[k] = None
+                row["out_1"] = sorted_vals[0]
+                return
+
         keys = ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
         for i, k in enumerate(keys):
             row[k] = sorted_vals[i] if i < len(sorted_vals) else None
@@ -1552,6 +1620,13 @@ class ShiftAttendanceMainContent2Service:
             row[k] = None
         if not sorted_vals:
             return
+        # If only 1 punch and it's in the afternoon, treat it as OUT.
+        if len(sorted_vals) == 1:
+            s0 = cls._time_to_seconds(sorted_vals[0])
+            if s0 is not None and int(s0) >= 13 * 3600:
+                row["out_1"] = sorted_vals[0]
+                return
+
         row["in_1"] = sorted_vals[0]
         if len(sorted_vals) >= 2:
             row["out_1"] = sorted_vals[-1]
@@ -1570,6 +1645,8 @@ class ShiftAttendanceMainContent2Service:
         progress_cb: callable[[int, str], None] | None = None,
         progress_items_cb: callable[[int, int, str], None] | None = None,
         cancel_cb: callable[[], bool] | None = None,
+        recompute_import_locked: bool = False,
+        overwrite_import_locked_computed: bool = False,
     ) -> list[dict[str, Any]]:
         def _cancelled() -> bool:
             try:
@@ -1629,7 +1706,7 @@ class ShiftAttendanceMainContent2Service:
         # Map schedule_name -> {schedule_id, in_out_mode}
         schedule_names: list[str] = []
         for r in rows:
-            name = str(r.get("schedule") or "").strip()
+            name = self._norm_schedule_name(r.get("schedule"))
             if name:
                 schedule_names.append(name)
         schedule_names = list(dict.fromkeys(schedule_names))
@@ -1641,6 +1718,16 @@ class ShiftAttendanceMainContent2Service:
         except Exception:
             logger.exception("Không thể tải schedule_id/in_out_mode theo schedule_name")
             schedule_map = {}
+
+        # Also allow lookup by normalized schedule key.
+        schedule_map_norm: dict[str, dict[str, Any]] = {}
+        try:
+            for k, v in (schedule_map or {}).items():
+                nk = self._norm_schedule_name(k)
+                if nk:
+                    schedule_map_norm[nk] = v
+        except Exception:
+            schedule_map_norm = {}
 
         _progress(28, "Đang tải chi tiết lịch...")
         if _cancelled():
@@ -1756,8 +1843,20 @@ class ShiftAttendanceMainContent2Service:
             except Exception:
                 pass
 
-            schedule_name = str(r.get("schedule") or "").strip()
-            meta = schedule_map.get(schedule_name) or {}
+            # IMPORTANT: import_locked=1 means "chốt công".
+            # When viewing data, do not apply any recalculation or schedule/shift changes.
+            try:
+                is_locked = int(r.get("import_locked") or 0) == 1
+            except Exception:
+                is_locked = False
+
+            if is_locked and (not bool(recompute_import_locked)):
+                # Keep exactly what DB stores.
+                r["in_out_mode"] = "device"
+                continue
+
+            schedule_name = self._norm_schedule_name(r.get("schedule"))
+            meta = schedule_map.get(schedule_name) or schedule_map_norm.get(schedule_name) or {}
             mode = meta.get("in_out_mode")
             mode_norm = str(mode).strip().lower() if mode is not None else ""
             if mode_norm not in {"auto", "device", "first_last"}:
@@ -1814,6 +1913,24 @@ class ShiftAttendanceMainContent2Service:
                 pass
             r["day_key"] = day_key
 
+            # Keep flags for post-processing (single-day carryover).
+            try:
+                r["_ignore_absent_sat"] = int(ignore_absent_sat)
+            except Exception:
+                r["_ignore_absent_sat"] = 0
+            try:
+                r["_ignore_absent_sun"] = int(ignore_absent_sun)
+            except Exception:
+                r["_ignore_absent_sun"] = 0
+            try:
+                r["_ignore_absent_holiday"] = int(ignore_absent_holiday)
+            except Exception:
+                r["_ignore_absent_holiday"] = 0
+            try:
+                r["_is_holiday"] = bool(is_holiday)
+            except Exception:
+                r["_is_holiday"] = False
+
             schedule_id = meta.get("schedule_id")
             try:
                 r["schedule_id"] = int(schedule_id) if schedule_id is not None else None
@@ -1860,6 +1977,21 @@ class ShiftAttendanceMainContent2Service:
                             shifts.append(sh)
                     except Exception:
                         continue
+
+            try:
+                r["_has_shift1"] = bool(
+                    detail_for_day is not None and detail_for_day.get("shift1_id") is not None
+                )
+            except Exception:
+                r["_has_shift1"] = False
+
+            # Flags used for post-processing (e.g. overnight carryover).
+            try:
+                r["_has_overnight_shift"] = bool(
+                    [sh for sh in (shifts or []) if self._is_overnight_shift_def(sh)]
+                )
+            except Exception:
+                r["_has_overnight_shift"] = False
 
             expected_minutes, expected_work = self._sum_shift_minutes_and_work(shifts)
 
@@ -2179,8 +2311,72 @@ class ShiftAttendanceMainContent2Service:
                     except Exception:
                         import_locked = 0
 
-                    if import_locked == 1 and (
-                        r.get("hours") is not None or r.get("work") is not None
+                    def _worked_minutes_from_pairs(row0: dict[str, Any]) -> int:
+                        total_sec = 0
+                        for slot in (1, 2, 3):
+                            in_sec0 = self._time_to_seconds(row0.get(f"in_{slot}"))
+                            out_sec0 = self._time_to_seconds(row0.get(f"out_{slot}"))
+                            if in_sec0 is None or out_sec0 is None:
+                                continue
+                            try:
+                                in_eff = int(in_sec0)
+                                out_eff = int(out_sec0)
+                                if out_eff < in_eff:
+                                    out_eff += 86400
+                                total_sec += max(0, int(out_eff) - int(in_eff))
+                            except Exception:
+                                continue
+                        return max(0, int(total_sec) // 60)
+
+                    def _use_expected_minus_late_early(row0: dict[str, Any]) -> bool:
+                        """Return True when business wants actual = expected - late - early.
+
+                        Applied for:
+                        - HÀNH CHÍNH (HC)
+                        - THAI SẢN (TS)
+                        """
+
+                        try:
+                            code_norm = self._norm_text_no_diacritics(row0.get("shift_code"))
+                        except Exception:
+                            code_norm = ""
+                        code_norm = str(code_norm or "").strip().replace("_", "")
+                        return code_norm in {"hc", "hanhchinh", "thaisan"}
+
+                    def _out_after_13(row0: dict[str, Any]) -> bool:
+                        out_sec0 = self._time_to_seconds(row0.get("out_1"))
+                        if out_sec0 is None:
+                            return False
+                        try:
+                            return int(out_sec0) >= 13 * 3600
+                        except Exception:
+                            return False
+
+                    def _calc_actual_minutes(
+                        row0: dict[str, Any],
+                        *,
+                        expected_minutes0: int,
+                        late_minutes0: int,
+                        early_minutes0: int,
+                    ) -> int:
+                        """Business rule:
+                        - For HC/THAI SẢN with OUT>=13: actual = expected - late - early
+                        - Otherwise: actual = worked minutes from punch pairs (cap by expected)
+                        """
+
+                        expected_m = max(0, int(expected_minutes0 or 0))
+                        if _use_expected_minus_late_early(row0) and _out_after_13(row0):
+                            return max(0, expected_m - int(late_minutes0) - int(early_minutes0))
+
+                        worked_m = _worked_minutes_from_pairs(row0)
+                        if expected_m > 0:
+                            return min(int(worked_m), int(expected_m))
+                        return int(worked_m)
+
+                    if (
+                        import_locked == 1
+                        and (not bool(overwrite_import_locked_computed))
+                        and (r.get("hours") is not None or r.get("work") is not None)
                     ):
                         # Do not override imported values, but still compute the
                         # "full work" flag for UI symbol X.
@@ -2190,8 +2386,11 @@ class ShiftAttendanceMainContent2Service:
                         if int(m_minutes) > 0:
                             late_m = _to_minutes(r.get("late"))
                             early_m = _to_minutes(r.get("early"))
-                            actual_minutes = max(
-                                0, int(m_minutes) - int(late_m) - int(early_m)
+                            actual_minutes = _calc_actual_minutes(
+                                r,
+                                expected_minutes0=int(m_minutes),
+                                late_minutes0=int(late_m),
+                                early_minutes0=int(early_m),
                             )
                             r["_work_full"] = bool(
                                 int(actual_minutes) >= int(m_minutes)
@@ -2208,8 +2407,11 @@ class ShiftAttendanceMainContent2Service:
                         if int(m_minutes) > 0:
                             late_m = _to_minutes(r.get("late"))
                             early_m = _to_minutes(r.get("early"))
-                            actual_minutes = max(
-                                0, int(m_minutes) - int(late_m) - int(early_m)
+                            actual_minutes = _calc_actual_minutes(
+                                r,
+                                expected_minutes0=int(m_minutes),
+                                late_minutes0=int(late_m),
+                                early_minutes0=int(early_m),
                             )
                             r["hours"] = round(float(actual_minutes) / 60.0, 2)
                         if m_work is not None and int(m_minutes) > 0:
@@ -2249,6 +2451,7 @@ class ShiftAttendanceMainContent2Service:
         # và không hiển thị ở ngày kế tiếp.
         try:
             _progress(82, "Đang hậu xử lý ca Đêm...")
+            merge_count = 0
             by_emp: dict[str, list[dict[str, Any]]] = {}
             for r in rows:
                 key = str(
@@ -2272,6 +2475,40 @@ class ShiftAttendanceMainContent2Service:
                 except Exception:
                     return ""
 
+            def _parse_date(v: object | None) -> _dt.date | None:
+                if v is None:
+                    return None
+                s = str(v).strip()
+                if not s:
+                    return None
+                # Accept 'YYYY-MM-DD' (and datetime-like)
+                try:
+                    token = s.split()[0].strip()
+                except Exception:
+                    token = s
+                try:
+                    if "-" in token:
+                        return _dt.date.fromisoformat(token)
+                except Exception:
+                    pass
+                # Accept 'DD/MM/YYYY'
+                try:
+                    if "/" in token:
+                        return _dt.datetime.strptime(token, "%d/%m/%Y").date()
+                except Exception:
+                    pass
+                return None
+
+            def _is_next_day(prev_row: dict[str, Any], cur_row: dict[str, Any]) -> bool:
+                d1 = _parse_date(prev_row.get("date") or prev_row.get("work_date"))
+                d2 = _parse_date(cur_row.get("date") or cur_row.get("work_date"))
+                if d1 is None or d2 is None:
+                    return False
+                try:
+                    return d2 == (d1 + _dt.timedelta(days=1))
+                except Exception:
+                    return False
+
             def _row_time_values(row: dict[str, Any]) -> list[object]:
                 out: list[object] = []
                 for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
@@ -2282,6 +2519,16 @@ class ShiftAttendanceMainContent2Service:
                 return out
 
             MORNING_CUTOFF_SEC = 12 * 3600
+            EVENING_CUTOFF_SEC = 18 * 3600
+            MERGE_MAX_GAP_SEC = 10 * 60
+            # When viewing exactly 1 day, suppress early-morning-only orphan rows (carryover from previous night).
+            SINGLE_DAY_ORPHAN_MAX_SEC = 7 * 3600
+
+            def _is_single_day_view() -> bool:
+                try:
+                    return bool(from_date and to_date and str(from_date) == str(to_date))
+                except Exception:
+                    return False
 
             for emp_key, items in by_emp.items():
                 emp_idx += 1
@@ -2297,11 +2544,145 @@ class ShiftAttendanceMainContent2Service:
                     )
                 )
 
+                # Special case: user filters exactly 1 day.
+                # If the day only has early-morning punches, this is very often the OUT of an overnight shift
+                # that started the previous day. When filtering one day, we don't have the previous-day row
+                # to merge into, so we look back 1 day in DB to confirm and then hide this orphan row.
+                try:
+                    if _is_single_day_view() and items:
+                        first = items[0]
+                        first_times = _row_time_values(first)
+                        secs_first = [self._time_to_seconds(v) for v in first_times]
+                        secs_first2 = [int(s) for s in secs_first if s is not None]
+                        if secs_first2:
+                            is_morning_only = (
+                                max(secs_first2) < int(MORNING_CUTOFF_SEC)
+                                and max(secs_first2) <= int(SINGLE_DAY_ORPHAN_MAX_SEC)
+                                and (not [s for s in secs_first2 if int(s) >= int(EVENING_CUTOFF_SEC)])
+                            )
+                            if is_morning_only:
+                                # Confirm by checking previous day's punches in DB.
+                                prev_day = _parse_date(first.get("date") or first.get("work_date"))
+                                if prev_day is None:
+                                    try:
+                                        prev_day = _dt.date.fromisoformat(str(from_date))
+                                    except Exception:
+                                        prev_day = None
+                                prev_has_evening_db = False
+                                if prev_day is not None:
+                                    try:
+                                        prev_date_str = (prev_day - _dt.timedelta(days=1)).isoformat()
+                                        emp_id = first.get("employee_id")
+                                        att_code = (
+                                            first.get("attendance_code")
+                                            or first.get("employee_code")
+                                            or ""
+                                        )
+                                        emp_id_int = int(emp_id) if emp_id is not None else None
+                                        att_code_str = str(att_code).strip() or None
+                                        prev_rows_db = self._repo.list_rows(
+                                            from_date=prev_date_str,
+                                            to_date=prev_date_str,
+                                            employee_id=emp_id_int,
+                                            attendance_code=att_code_str,
+                                            employee_ids=None,
+                                            attendance_codes=None,
+                                            department_id=None,
+                                            title_id=None,
+                                        )
+
+                                        for pr in prev_rows_db or []:
+                                            pr_times = _row_time_values(pr)
+                                            pr_secs = [self._time_to_seconds(v) for v in pr_times]
+                                            pr_secs2 = [int(s) for s in pr_secs if s is not None]
+                                            if [s for s in pr_secs2 if int(s) >= int(EVENING_CUTOFF_SEC)]:
+                                                prev_has_evening_db = True
+                                                break
+                                    except Exception:
+                                        prev_has_evening_db = False
+
+                                # Hide when confirmed carryover OR schedule says there is an overnight shift.
+                                if prev_has_evening_db or bool(first.get("_has_overnight_shift")):
+                                    for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
+                                        first[k] = None
+
+                                    # Show OFF/V/Lễ like the normal "no-punch" rules.
+                                    sym_code: str | None = None
+                                    try:
+                                        if bool(first.get("_is_holiday")) and int(first.get("_ignore_absent_holiday") or 0) == 1:
+                                            sym_code = "C10"
+                                    except Exception:
+                                        sym_code = None
+
+                                    try:
+                                        dk = str(first.get("day_key") or "").strip()
+                                    except Exception:
+                                        dk = ""
+
+                                    if sym_code is None:
+                                        try:
+                                            if dk == "sat" and int(first.get("_ignore_absent_sat") or 0) == 1:
+                                                sym_code = "C09"
+                                            elif dk == "sun" and int(first.get("_ignore_absent_sun") or 0) == 1:
+                                                sym_code = "C09"
+                                        except Exception:
+                                            pass
+
+                                    if sym_code is None:
+                                        try:
+                                            sym_code = "C07" if bool(first.get("_has_shift1")) else "C09"
+                                        except Exception:
+                                            sym_code = "C09"
+
+                                    try:
+                                        sym_text = str(symbols_by_code.get(sym_code or "") or "").strip()
+                                    except Exception:
+                                        sym_text = ""
+                                    if sym_text:
+                                        first["in_1"] = sym_text
+
+                                    first["shift_code"] = None
+                                    first["hours"] = None
+                                    first["work"] = None
+                                    first["late"] = None
+                                    first["early"] = None
+                                    first["_work_full"] = False
+                                    try:
+                                        logger.info(
+                                            "POST_NIGHT_ORPHAN_HIDE emp=%s date=%s max_sec=%s prev_evening=%s overnight_flag=%s",
+                                            str(emp_key),
+                                            str(first.get("date") or first.get("work_date") or ""),
+                                            int(max(secs_first2)),
+                                            bool(prev_has_evening_db),
+                                            bool(first.get("_has_overnight_shift")),
+                                        )
+                                    except Exception:
+                                        pass
+                except Exception:
+                    pass
+
                 for i in range(1, len(items)):
                     prev = items[i - 1]
                     cur = items[i]
-                    if str(prev.get("shift_code") or "").strip() != "Đêm":
-                        continue
+
+                    # Nhận diện ca đêm qua ngày:
+                    # - Ưu tiên theo nhãn shift_code (Đêm/Đ),
+                    # - Hoặc suy luận theo punch: ngày trước có punch buổi tối (>= 18:00),
+                    #   ngày sau chỉ có punch buổi sáng (< 12:00).
+                    prev_code_raw = str(prev.get("shift_code") or "").strip()
+                    prev_code_norm = self._norm_text_no_diacritics(prev_code_raw)
+                    prev_times_all = _row_time_values(prev)
+                    prev_secs_all = [self._time_to_seconds(v) for v in prev_times_all]
+                    prev_secs2 = [int(s) for s in prev_secs_all if s is not None]
+                    prev_has_evening = bool(
+                        [s for s in prev_secs2 if int(s) >= int(EVENING_CUTOFF_SEC)]
+                    )
+                    is_label_night = ("đ" in prev_code_raw.casefold()) or ("dem" in prev_code_norm)
+
+                    if not is_label_night:
+                        # Chỉ merge khi thực sự là hai ngày liên tiếp.
+                        if not _is_next_day(prev, cur):
+                            continue
 
                     cur_times = _row_time_values(cur)
                     if not cur_times:
@@ -2316,6 +2697,9 @@ class ShiftAttendanceMainContent2Service:
                     if max(secs2) >= MORNING_CUTOFF_SEC:
                         continue
 
+                    if (not is_label_night) and (not prev_has_evening):
+                        continue
+
                     # Lấy punch buổi sáng muộn nhất để bổ sung cho giờ ra ca Đêm hôm trước (nếu cần).
                     best_time = max(
                         cur_times, key=lambda v: int(self._time_to_seconds(v) or 0)
@@ -2324,14 +2708,47 @@ class ShiftAttendanceMainContent2Service:
                     prev_out_sec = self._time_to_seconds(prev_out)
                     best_sec = self._time_to_seconds(best_time)
 
+                    merged = False
                     if best_sec is not None:
-                        if prev_out_sec is None or int(best_sec) > int(prev_out_sec):
-                            prev["out_1"] = best_time
+                        # Only merge when:
+                        # - explicit night label, OR
+                        # - previous out exists and the next-day morning punch is very close (noise/duplicate).
+                        gap_ok = False
+                        try:
+                            if prev_out_sec is not None and int(best_sec) >= int(prev_out_sec):
+                                gap_ok = (int(best_sec) - int(prev_out_sec)) <= int(MERGE_MAX_GAP_SEC)
+                        except Exception:
+                            gap_ok = False
 
-                    # Clear toàn bộ punch của ngày kế tiếp để tránh hiển thị sai (vd Chủ nhật có 06:xx).
-                    for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
-                        cur[k] = None
-                    cur["shift_code"] = None
+                        if is_label_night or gap_ok:
+                            if prev_out_sec is None or int(best_sec) > int(prev_out_sec):
+                                prev["out_1"] = best_time
+                            merged = True
+
+                    if merged:
+                        merge_count += 1
+                        try:
+                            logger.info(
+                                "POST_NIGHT_MERGE emp=%s prev_date=%s prev_out=%s best=%s gap_ok=%s label_night=%s",
+                                str(emp_key),
+                                str(prev.get("date") or prev.get("work_date") or ""),
+                                str(prev_out or ""),
+                                str(best_time or ""),
+                                bool(gap_ok),
+                                bool(is_label_night),
+                            )
+                        except Exception:
+                            pass
+                        # Clear toàn bộ punch của ngày kế tiếp để tránh hiển thị sai (vd Chủ nhật có 06:xx).
+                        for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
+                            cur[k] = None
+                        cur["shift_code"] = None
+            try:
+                if merge_count:
+                    logger.info("POST_NIGHT_MERGE total=%s", int(merge_count))
+            except Exception:
+                pass
+
         except Exception:
             logger.exception("Lỗi post-process ca Đêm qua ngày")
 

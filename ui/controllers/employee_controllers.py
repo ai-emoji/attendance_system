@@ -10,8 +10,9 @@ from pathlib import Path
 import unicodedata
 
 from core.ui_settings import get_last_save_dir, set_last_save_dir
+from core.threads import BackgroundTaskRunner
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QProgressDialog
 
@@ -34,21 +35,11 @@ class EmployeeController:
         self._content = content
         self._service = service or EmployeeService()
 
-    def bind(self) -> None:
-        # Load department tree
-        try:
-            dept_rows = self._service.list_departments_tree_rows()
-            try:
-                title_models = TitleService().list_titles()
-                title_rows = [
-                    (t.id, t.department_id, t.title_name) for t in title_models
-                ]
-            except Exception:
-                title_rows = []
+        self._tree_runner = BackgroundTaskRunner(self._parent_window, name="employee_tree")
+        self._list_runner = BackgroundTaskRunner(self._parent_window, name="employee_list")
 
-            self._content.department_tree.set_departments(dept_rows, titles=title_rows)
-        except Exception:
-            logger.exception("Không thể tải cây phòng ban")
+    def bind(self) -> None:
+        # Wire signals first (fast), then load data in background.
 
         # Restore cached UI/table state (if any) before the first refresh.
         restored = False
@@ -66,8 +57,46 @@ class EmployeeController:
         self._content.delete_clicked.connect(self.on_delete)
         self._content.refresh_clicked.connect(self.on_refresh_clicked)
 
+        # Load tree async so the view can paint first.
+        try:
+            QTimer.singleShot(0, self._load_tree_async)
+        except Exception:
+            self._load_tree_async()
+
         if not restored:
-            self.refresh()
+            # Defer refresh so UI shows immediately.
+            try:
+                QTimer.singleShot(0, self.refresh)
+            except Exception:
+                self.refresh()
+
+    def _load_tree_async(self) -> None:
+        def _fn() -> object:
+            dept_rows = self._service.list_departments_tree_rows()
+            title_rows = []
+            try:
+                title_models = TitleService().list_titles()
+                title_rows = [(t.id, t.department_id, t.title_name) for t in title_models]
+            except Exception:
+                title_rows = []
+            return (list(dept_rows or []), list(title_rows or []))
+
+        def _ok(result: object) -> None:
+            try:
+                dept_rows, title_rows = result if isinstance(result, tuple) else ([], [])
+                d = list(dept_rows or []) if isinstance(dept_rows, list) else []
+                t = list(title_rows or []) if isinstance(title_rows, list) else []
+                self._content.department_tree.set_departments(d, titles=t)
+            except Exception:
+                logger.exception("Không thể tải cây phòng ban")
+
+        def _err(_msg: str) -> None:
+            try:
+                self._content.department_tree.set_departments([], titles=[])
+            except Exception:
+                pass
+
+        self._tree_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_refresh_clicked(self) -> None:
         # User intent: refresh should clear department filtering.
@@ -124,16 +153,49 @@ class EmployeeController:
         return filters
 
     def refresh(self) -> None:
+        # Debounce to keep UI responsive when typing.
+        try:
+            QTimer.singleShot(0, self._refresh_async)
+        except Exception:
+            self._refresh_async()
+
+    def _refresh_async(self) -> None:
         try:
             filters = self._apply_tree_filters(self._content.get_filters())
-            rows = self._service.list_employees(filters)
-            self._content.table.set_rows(rows)
-
-            self._content.set_total(len(rows))
         except Exception:
-            logger.exception("Không thể tải danh sách nhân viên")
-            self._content.table.clear()
-            self._content.set_total(0)
+            filters = {}
+
+        def _fn() -> object:
+            rows = self._service.list_employees(filters)
+            return list(rows or [])
+
+        def _ok(result: object) -> None:
+            try:
+                data = list(result or []) if isinstance(result, list) else []
+                self._content.table.set_rows(data)
+                self._content.set_total(len(data))
+            except Exception:
+                logger.exception("Không thể tải danh sách nhân viên")
+                try:
+                    self._content.table.clear()
+                except Exception:
+                    pass
+                try:
+                    self._content.set_total(0)
+                except Exception:
+                    pass
+
+        def _err(_msg: str) -> None:
+            try:
+                self._content.table.clear()
+            except Exception:
+                pass
+            try:
+                self._content.set_total(0)
+            except Exception:
+                pass
+
+        self._list_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_export(self) -> None:
         default_name = "Danh sách nhân viên.xlsx"

@@ -182,21 +182,34 @@ class ImportShiftAttendanceRepository:
             "%s,%s,%s,%s,%s,%s,%s,%s,"
             "%s,%s,%s,%s"
             ") ON DUPLICATE KEY UPDATE "
-            "device_id = VALUES(device_id), "
-            "device_name = VALUES(device_name), "
-            "employee_id = VALUES(employee_id), "
-            "employee_code = VALUES(employee_code), "
-            "full_name = VALUES(full_name), "
-            "weekday = VALUES(weekday), "
-            "schedule = VALUES(schedule), "
-            "in_1 = VALUES(in_1), out_1 = VALUES(out_1), "
-            "in_2 = VALUES(in_2), out_2 = VALUES(out_2), "
-            "in_3 = VALUES(in_3), out_3 = VALUES(out_3), "
-            "late = VALUES(late), early = VALUES(early), "
-            "hours = VALUES(hours), work = VALUES(work), `leave` = VALUES(`leave`), "
-            "hours_plus = VALUES(hours_plus), work_plus = VALUES(work_plus), leave_plus = VALUES(leave_plus), "
-            "tc1 = VALUES(tc1), tc2 = VALUES(tc2), tc3 = VALUES(tc3), "
-            "import_locked = VALUES(import_locked)"
+            # Protect rows that were imported from Excel (import_locked=1)
+            # from being overwritten/unlocked by other sources (import_locked=0).
+            # Also: do NOT clear existing values when Excel provides NULL/empty.
+            "device_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_id, COALESCE(VALUES(device_id), device_id)), "
+            "device_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_name, COALESCE(NULLIF(VALUES(device_name), ''), device_name)), "
+            "employee_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_id, COALESCE(VALUES(employee_id), employee_id)), "
+            "employee_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_code, COALESCE(NULLIF(VALUES(employee_code), ''), employee_code)), "
+            "full_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, full_name, COALESCE(NULLIF(VALUES(full_name), ''), full_name)), "
+            "weekday = IF(import_locked = 1 AND VALUES(import_locked) = 0, weekday, COALESCE(NULLIF(VALUES(weekday), ''), weekday)), "
+            "schedule = IF(import_locked = 1 AND VALUES(import_locked) = 0, schedule, COALESCE(NULLIF(VALUES(schedule), ''), schedule)), "
+            "in_1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_1, COALESCE(VALUES(in_1), in_1)), "
+            "out_1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, out_1, COALESCE(VALUES(out_1), out_1)), "
+            "in_2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_2, COALESCE(VALUES(in_2), in_2)), "
+            "out_2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, out_2, COALESCE(VALUES(out_2), out_2)), "
+            "in_3 = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_3, COALESCE(VALUES(in_3), in_3)), "
+            "out_3 = IF(import_locked = 1 AND VALUES(import_locked) = 0, out_3, COALESCE(VALUES(out_3), out_3)), "
+            "late = IF(import_locked = 1 AND VALUES(import_locked) = 0, late, COALESCE(NULLIF(VALUES(late), ''), late)), "
+            "early = IF(import_locked = 1 AND VALUES(import_locked) = 0, early, COALESCE(NULLIF(VALUES(early), ''), early)), "
+            "hours = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours, COALESCE(VALUES(hours), hours)), "
+            "work = IF(import_locked = 1 AND VALUES(import_locked) = 0, work, COALESCE(VALUES(work), work)), "
+            "`leave` = IF(import_locked = 1 AND VALUES(import_locked) = 0, `leave`, COALESCE(VALUES(`leave`), `leave`)), "
+            "hours_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours_plus, COALESCE(VALUES(hours_plus), hours_plus)), "
+            "work_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, work_plus, COALESCE(VALUES(work_plus), work_plus)), "
+            "leave_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, leave_plus, COALESCE(VALUES(leave_plus), leave_plus)), "
+            "tc1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc1, COALESCE(NULLIF(VALUES(tc1), ''), tc1)), "
+            "tc2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc2, COALESCE(NULLIF(VALUES(tc2), ''), tc2)), "
+            "tc3 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc3, COALESCE(NULLIF(VALUES(tc3), ''), tc3)), "
+            "import_locked = IF(import_locked = 1, 1, VALUES(import_locked))"
             )
 
         by_year: dict[int, list[tuple[Any, ...]]] = {}
@@ -215,6 +228,7 @@ class ImportShiftAttendanceRepository:
                     r.get("full_name"),
                     r.get("work_date"),
                     r.get("weekday"),
+                    r.get("schedule"),
                     r.get("in_1"),
                     r.get("out_1"),
                     r.get("in_2"),
@@ -232,7 +246,6 @@ class ImportShiftAttendanceRepository:
                     r.get("tc1"),
                     r.get("tc2"),
                     r.get("tc3"),
-                    r.get("schedule"),
                     int(r.get("import_locked") or 0),
                 )
             )

@@ -53,7 +53,12 @@ from core.resource import (
     resource_path,
 )
 
-from core.ui_settings import get_shift_attendance_table_ui, ui_settings_bus
+from core.ui_settings import (
+    get_last_save_dir,
+    get_shift_attendance_table_ui,
+    set_last_save_dir,
+    ui_settings_bus,
+)
 
 
 def _setup_preview_table(
@@ -220,7 +225,7 @@ class ImportShiftAttendanceDialog(QDialog):
             "TC1",
             "TC2",
             "TC3",
-            "Lịch làm việc",
+            "Lịch NV",
         ]
         widths = [
             57,  # 42 + 15
@@ -235,18 +240,18 @@ class ImportShiftAttendanceDialog(QDialog):
             95,  # 80 + 15
             95,  # 80 + 15
             95,  # 80 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            85,  # 70 + 15
-            75,  # 60 + 15
-            75,  # 60 + 15
-            75,  # 60 + 15
-            85,  # 70 + 15
+            70,  # Trễ
+            70,  # Sớm
+            80,  # Giờ
+            80,  # Công
+            80,  # KH
+            80,  # Giờ +
+            80,  # Công +
+            80,  # KH +
+            70,  # TC1
+            70,  # TC2
+            70,  # TC3
+            160,  # Lịch NV
         ]
         _setup_preview_table(self.table, headers, column_widths=widths)
         # Extra safety: ensure no focus rectangle on selection.
@@ -456,6 +461,23 @@ class ImportShiftAttendanceDialog(QDialog):
                 return ""
             return str(v)
 
+        def _fmt_date_ddmmyyyy(v) -> str:
+            if v is None:
+                return ""
+            s = str(v).strip()
+            if not s:
+                return ""
+            # If already dd/MM/yyyy then keep
+            if "/" in s and len(s.split("/")) == 3:
+                return s
+            try:
+                from datetime import date as _date
+
+                d = _date.fromisoformat(s)
+                return d.strftime("%d/%m/%Y")
+            except Exception:
+                return s
+
         for r_idx, r in enumerate(self._preview_rows):
             # checkbox + stt
             it_chk = QTableWidgetItem("❌")
@@ -470,7 +492,7 @@ class ImportShiftAttendanceDialog(QDialog):
             values = [
                 _to_display(r.get("employee_code")),
                 _to_display(r.get("full_name")),
-                _to_display(r.get("work_date")),
+                _fmt_date_ddmmyyyy(r.get("work_date")),
                 _to_display(r.get("weekday")),
                 _to_display(r.get("in_1")),
                 _to_display(r.get("out_1")),
@@ -534,10 +556,16 @@ class ImportShiftAttendanceDialog(QDialog):
                 file_path, _ = QFileDialog.getOpenFileName(
                     self,
                     "Chọn file Excel chấm công",
-                    "",
+                    str(get_last_save_dir() or ""),
                     "Excel (*.xlsx)",
                 )
                 if file_path:
+                    try:
+                        from pathlib import Path
+
+                        set_last_save_dir(str(Path(file_path).parent))
+                    except Exception:
+                        pass
                     self.input_excel_path.setText(file_path)
                 return True
         return super().eventFilter(obj, event)

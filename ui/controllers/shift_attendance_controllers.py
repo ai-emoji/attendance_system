@@ -11,6 +11,7 @@ Hiện tại:
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,7 @@ from export.export_details import export_shift_attendance_details_xlsx
 from export.export_grid_list import CompanyInfo, export_shift_attendance_grid_xlsx
 from services.arrange_schedule_services import ArrangeScheduleService
 from services.company_services import CompanyService
+from services.employee_services import EmployeeService
 from services.export_grid_list_services import (
     ExportGridListService,
     ExportGridListSettings,
@@ -41,6 +43,7 @@ from ui.controllers.shift_attendance_maincontent2_controllers import (
     ShiftAttendanceMainContent2Controller,
 )
 from core.attendance_symbol_bus import attendance_symbol_bus
+from core.threads import BackgroundTaskRunner
 from core.ui_settings import get_last_save_dir, set_last_save_dir
 from ui.dialog.export_grid_list_dialog import ExportGridListDialog, NoteStyle
 from ui.dialog.title_dialog import MessageDialog
@@ -76,6 +79,366 @@ class ShiftAttendanceController:
         self._audit_render_timer: QTimer | None = None
         self._audit_render_state: dict[str, Any] | None = None
         self._audit_render_tick = None
+
+        # Background loader for MainContent1 (employee list) to avoid blocking UI.
+        self._employee_loader_thread: QThread | None = None
+        self._employee_loader_worker: QObject | None = None
+        self._employee_loader_bridge: QObject | None = None
+
+        # Time-sliced render state for MainContent1 table.
+        self._employee_render_timer: QTimer | None = None
+        self._employee_render_state: dict[str, Any] | None = None
+        self._employee_render_tick = None
+
+        # Cache attendance symbols to avoid repeated DB calls during render.
+        self._symbols_by_code_cache: dict[str, dict[str, Any]] | None = None
+
+        # Background runner for export (do not touch Qt widgets in worker thread).
+        self._export_runner = BackgroundTaskRunner(parent=self._parent_window, name="export")
+
+        # Export snapshot state (UI-thread chunking) + loading dialog.
+        self._export_snapshot_timer: QTimer | None = None
+        self._export_snapshot_state: dict[str, Any] | None = None
+        self._export_loading_dialog: LoadingDialog | None = None
+
+    def _cancel_export_snapshot(self) -> None:
+        try:
+            if self._export_snapshot_timer is not None:
+                try:
+                    self._export_snapshot_timer.stop()
+                except Exception:
+                    pass
+                try:
+                    self._export_snapshot_timer.deleteLater()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._export_snapshot_timer = None
+        self._export_snapshot_state = None
+
+        try:
+            if self._export_loading_dialog is not None:
+                try:
+                    self._export_loading_dialog.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._export_loading_dialog = None
+
+    def _export_table_background(
+        self,
+        *,
+        title: str,
+        table,
+        rows_to_export: list[int] | None,
+        do_export: "callable[[object], tuple[bool, str]]",
+    ) -> None:
+        """Show a loading dialog, snapshot table on UI thread in chunks, then export in background.
+
+        Notes:
+        - QTableWidget cannot be accessed from a worker thread.
+        - We snapshot visible text into a lightweight pure-python table-like object.
+        """
+
+        # Cancel any in-flight snapshot/export.
+        try:
+            self._export_runner.cancel_current()
+        except Exception:
+            pass
+        self._cancel_export_snapshot()
+
+        loading = LoadingDialog(
+            self._parent_window,
+            title=str(title),
+            message="Đang chuẩn bị dữ liệu...",
+        )
+        self._export_loading_dialog = loading
+
+        try:
+            loading.set_min_duration_ms(900)
+        except Exception:
+            pass
+
+        # Show non-blocking (do not exec()) so the event loop keeps processing.
+        try:
+            loading.show()
+            loading.raise_()
+            loading.activateWindow()
+        except Exception:
+            pass
+
+        # Build snapshot incrementally on the UI thread.
+        try:
+            col_count = int(table.columnCount())
+        except Exception:
+            col_count = 0
+
+        headers: list[str] = []
+        hidden_cols: set[int] = set()
+        try:
+            for c in range(int(col_count)):
+                try:
+                    hi = table.horizontalHeaderItem(int(c))
+                    headers.append("" if hi is None else str(hi.text() or "").strip())
+                except Exception:
+                    headers.append("")
+                try:
+                    if bool(table.isColumnHidden(int(c))):
+                        hidden_cols.add(int(c))
+                except Exception:
+                    pass
+        except Exception:
+            headers = [""] * int(col_count)
+            hidden_cols = set()
+
+        try:
+            total_rows = int(table.rowCount())
+        except Exception:
+            total_rows = 0
+
+        src_rows = list(range(int(total_rows)))
+        if rows_to_export is not None:
+            src_rows = [int(r) for r in (rows_to_export or []) if 0 <= int(r) < int(total_rows)]
+
+        state: dict[str, Any] = {
+            "i": 0,
+            "src_rows": src_rows,
+            "headers": headers,
+            "hidden_cols": hidden_cols,
+            "rows": [],
+            "col_count": int(col_count),
+        }
+        self._export_snapshot_state = state
+
+        timer = QTimer(loading)
+        timer.setInterval(1)
+        self._export_snapshot_timer = timer
+
+        def _finish_with_message(msg: str) -> None:
+            try:
+                self._cancel_export_snapshot()
+            except Exception:
+                pass
+            MessageDialog.info(self._parent_window, str(title), str(msg))
+
+        def _tick() -> None:
+            st = self._export_snapshot_state
+            if st is None:
+                return
+
+            i = int(st.get("i", 0))
+            src = st.get("src_rows", []) or []
+            n = len(src)
+            if n <= 0:
+                # Empty export: still allow export function to decide.
+                try:
+                    loading.set_indeterminate(True, message="Đang xuất Excel, xin chờ...")
+                except Exception:
+                    pass
+
+                snapshot = _make_snapshot(
+                    headers=st.get("headers", []) or [],
+                    hidden_cols=st.get("hidden_cols", set()) or set(),
+                    rows=[],
+                )
+                self._start_export_worker(title=title, loading=loading, snapshot=snapshot, do_export=do_export)
+                return
+
+            # Process a chunk of rows per tick to keep UI responsive.
+            chunk = 25
+            end = min(n, i + chunk)
+            coln = int(st.get("col_count", 0))
+            out_rows: list[list[str]] = st.get("rows", [])
+
+            for idx in range(i, end):
+                rr = int(src[int(idx)])
+                row_vals: list[str] = []
+                for c in range(coln):
+                    try:
+                        it = table.item(int(rr), int(c))
+                        row_vals.append("" if it is None else str(it.text() or ""))
+                    except Exception:
+                        row_vals.append("")
+                out_rows.append(row_vals)
+
+            st["i"] = int(end)
+            st["rows"] = out_rows
+
+            try:
+                loading.set_count_target(int(end), int(n), message="Đang chuẩn bị dữ liệu...")
+            except Exception:
+                pass
+
+            if int(end) >= int(n):
+                try:
+                    loading.set_indeterminate(True, message="Đang xuất Excel, xin chờ...")
+                except Exception:
+                    pass
+                snapshot = _make_snapshot(
+                    headers=st.get("headers", []) or [],
+                    hidden_cols=st.get("hidden_cols", set()) or set(),
+                    rows=st.get("rows", []) or [],
+                )
+                self._start_export_worker(title=title, loading=loading, snapshot=snapshot, do_export=do_export)
+
+        def _make_snapshot(*, headers: list[str], hidden_cols: set[int], rows: list[list[str]]):
+            class _SnapHeader:
+                def __init__(self, txt: str) -> None:
+                    self._txt = str(txt or "")
+
+                def text(self) -> str:
+                    return str(self._txt)
+
+            class _SnapItem:
+                def __init__(self, txt: str) -> None:
+                    self._txt = str(txt or "")
+
+                def text(self) -> str:
+                    return str(self._txt)
+
+            class _TableSnapshot:
+                def __init__(
+                    self,
+                    *,
+                    headers_in: list[str],
+                    hidden_cols_in: set[int],
+                    rows_in: list[list[str]],
+                ) -> None:
+                    self._headers = [str(x or "") for x in (headers_in or [])]
+                    self._hidden = {int(x) for x in (hidden_cols_in or set())}
+                    self._rows = rows_in or []
+
+                def columnCount(self) -> int:
+                    return int(len(self._headers))
+
+                def rowCount(self) -> int:
+                    return int(len(self._rows))
+
+                def isColumnHidden(self, c: int) -> bool:
+                    return int(c) in self._hidden
+
+                def horizontalHeaderItem(self, c: int):
+                    cc = int(c)
+                    if cc < 0 or cc >= len(self._headers):
+                        return None
+                    t = str(self._headers[cc] or "")
+                    if not t:
+                        return None
+                    return _SnapHeader(t)
+
+                def item(self, r: int, c: int):
+                    rr = int(r)
+                    cc = int(c)
+                    if rr < 0 or rr >= len(self._rows):
+                        return None
+                    row = self._rows[rr]
+                    if cc < 0 or cc >= len(row):
+                        return None
+                    v = "" if row[cc] is None else str(row[cc])
+                    if not v:
+                        return None
+                    return _SnapItem(v)
+
+            return _TableSnapshot(headers_in=headers, hidden_cols_in=hidden_cols, rows_in=rows)
+
+        try:
+            timer.timeout.connect(_tick)
+            timer.start()
+        except Exception as e:
+            _finish_with_message(f"Không thể bắt đầu xuất: {e}")
+
+    def _start_export_worker(
+        self,
+        *,
+        title: str,
+        loading: LoadingDialog,
+        snapshot: object,
+        do_export: "callable[[object], tuple[bool, str]]",
+    ) -> None:
+        # Stop snapshot timer/state now that we have the snapshot.
+        try:
+            if self._export_snapshot_timer is not None:
+                try:
+                    self._export_snapshot_timer.stop()
+                except Exception:
+                    pass
+                try:
+                    self._export_snapshot_timer.deleteLater()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._export_snapshot_timer = None
+        self._export_snapshot_state = None
+
+        def _fn() -> object:
+            return do_export(snapshot)
+
+        def _on_success(result: object) -> None:
+            try:
+                if self._export_loading_dialog is loading:
+                    self._export_loading_dialog = None
+                try:
+                    loading.close()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            try:
+                ok, msg = result  # type: ignore[misc]
+            except Exception:
+                ok, msg = (False, "Xuất Excel thất bại.")
+
+            MessageDialog.info(self._parent_window, str(title), str(msg))
+
+        def _on_error(msg: str) -> None:
+            try:
+                if self._export_loading_dialog is loading:
+                    self._export_loading_dialog = None
+                try:
+                    loading.close()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            MessageDialog.info(self._parent_window, str(title), str(msg))
+
+        self._export_runner.run(fn=_fn, on_success=_on_success, on_error=_on_error, coalesce=True)
+
+    def _get_symbols_by_code_cached(self) -> dict[str, dict[str, Any]]:
+        if self._symbols_by_code_cache is not None:
+            return self._symbols_by_code_cache
+        try:
+            self._symbols_by_code_cache = AttendanceSymbolService().list_rows_by_code() or {}
+        except Exception:
+            self._symbols_by_code_cache = {}
+        return self._symbols_by_code_cache
+
+    def _cancel_employee_render(self) -> None:
+        try:
+            if self._employee_render_timer is not None:
+                try:
+                    if self._employee_render_tick is not None:
+                        self._employee_render_timer.timeout.disconnect(
+                            self._employee_render_tick
+                        )
+                except Exception:
+                    pass
+                try:
+                    self._employee_render_timer.stop()
+                except Exception:
+                    pass
+                try:
+                    self._employee_render_timer.deleteLater()
+                except Exception:
+                    pass
+        finally:
+            self._employee_render_timer = None
+            self._employee_render_state = None
+            self._employee_render_tick = None
 
     def _cancel_audit_render(self) -> None:
         try:
@@ -129,18 +492,40 @@ class ShiftAttendanceController:
         self._load_departments()
         self._load_titles()
         self._reset_fields(clear_table=False)
-        self.refresh()
+        # Defer heavy work to the event loop so the widget can paint first.
+        try:
+            QTimer.singleShot(0, self.refresh)
+        except Exception:
+            self.refresh()
+
         # Default: show ALL audit rows for current date range when opening.
+        # Load in background (no modal dialog) to avoid blocking initial navigation.
         if self._content2 is not None:
             self._audit_mode = "default"
-            self._load_audit_for_current_range(
-                employee_ids=None,
-                attendance_codes=None,
-                department_id=None,
-                title_id=None,
-            )
+            try:
+                QTimer.singleShot(
+                    0,
+                    lambda: self._load_audit_for_current_range_background(
+                        employee_ids=None,
+                        attendance_codes=None,
+                        department_id=None,
+                        title_id=None,
+                    ),
+                )
+            except Exception:
+                self._load_audit_for_current_range_background(
+                    employee_ids=None,
+                    attendance_codes=None,
+                    department_id=None,
+                    title_id=None,
+                )
 
     def _on_attendance_symbols_changed(self) -> None:
+        # Invalidate cached symbols.
+        try:
+            self._symbols_by_code_cache = None
+        except Exception:
+            pass
         # Only reload audit table; do not reset filters or main employee list.
         if self._content2 is None:
             return
@@ -554,56 +939,59 @@ class ShiftAttendanceController:
         if cap_ex:
             force_exclude_headers = set(force_exclude_headers or set()) | cap_ex
 
-        ok, msg = export_shift_attendance_grid_xlsx(
-            file_path=file_path,
-            company=company,
-            from_date_text=from_txt,
-            to_date_text=to_txt,
+        def _do_export(snapshot_table: object) -> tuple[bool, str]:
+            return export_shift_attendance_grid_xlsx(
+                file_path=file_path,
+                company=company,
+                from_date_text=from_txt,
+                to_date_text=to_txt,
+                table=snapshot_table,
+                row_indexes=None,
+                force_exclude_headers=force_exclude_headers,
+                company_name_style={
+                    "font_size": int(cn_style.font_size),
+                    "bold": bool(cn_style.bold),
+                    "italic": bool(cn_style.italic),
+                    "underline": bool(cn_style.underline),
+                    "align": str(cn_style.align or "left"),
+                },
+                company_address_style={
+                    "font_size": int(ca_style.font_size),
+                    "bold": bool(ca_style.bold),
+                    "italic": bool(ca_style.italic),
+                    "underline": bool(ca_style.underline),
+                    "align": str(ca_style.align or "left"),
+                },
+                company_phone_style={
+                    "font_size": int(cp_style.font_size),
+                    "bold": bool(cp_style.bold),
+                    "italic": bool(cp_style.italic),
+                    "underline": bool(cp_style.underline),
+                    "align": str(cp_style.align or "left"),
+                },
+                creator=str(vals.get("creator", "") or "").strip(),
+                creator_style={
+                    "font_size": int(creator_style.font_size),
+                    "bold": bool(creator_style.bold),
+                    "italic": bool(creator_style.italic),
+                    "underline": bool(creator_style.underline),
+                    "align": str(creator_style.align or "left"),
+                },
+                note_text=str(vals.get("note_text", "") or ""),
+                note_style={
+                    "font_size": int(note_style.font_size),
+                    "bold": bool(note_style.bold),
+                    "italic": bool(note_style.italic),
+                    "underline": bool(note_style.underline),
+                    "align": str(note_style.align or "left"),
+                },
+            )
+
+        self._export_table_background(
+            title=title,
             table=self._content2.table,
-            row_indexes=(checked_rows if checked_rows else None),
-            force_exclude_headers=force_exclude_headers,
-            company_name_style={
-                "font_size": int(cn_style.font_size),
-                "bold": bool(cn_style.bold),
-                "italic": bool(cn_style.italic),
-                "underline": bool(cn_style.underline),
-                "align": str(cn_style.align or "left"),
-            },
-            company_address_style={
-                "font_size": int(ca_style.font_size),
-                "bold": bool(ca_style.bold),
-                "italic": bool(ca_style.italic),
-                "underline": bool(ca_style.underline),
-                "align": str(ca_style.align or "left"),
-            },
-            company_phone_style={
-                "font_size": int(cp_style.font_size),
-                "bold": bool(cp_style.bold),
-                "italic": bool(cp_style.italic),
-                "underline": bool(cp_style.underline),
-                "align": str(cp_style.align or "left"),
-            },
-            creator=str(vals.get("creator", "") or "").strip(),
-            creator_style={
-                "font_size": int(creator_style.font_size),
-                "bold": bool(creator_style.bold),
-                "italic": bool(creator_style.italic),
-                "underline": bool(creator_style.underline),
-                "align": str(creator_style.align or "left"),
-            },
-            note_text=str(vals.get("note_text", "") or ""),
-            note_style={
-                "font_size": int(note_style.font_size),
-                "bold": bool(note_style.bold),
-                "italic": bool(note_style.italic),
-                "underline": bool(note_style.underline),
-                "align": str(note_style.align or "left"),
-            },
-        )
-        MessageDialog.info(
-            self._parent_window,
-            title,
-            msg,
+            rows_to_export=(checked_rows if checked_rows else None),
+            do_export=_do_export,
         )
 
     def on_export_detail_clicked(self) -> None:
@@ -995,58 +1383,114 @@ class ShiftAttendanceController:
         if cap_ex:
             force_exclude_headers = set(force_exclude_headers or set()) | cap_ex
 
-        ok, msg = export_shift_attendance_details_xlsx(
-            file_path=file_path,
-            company=company,
-            from_date_text=from_txt,
-            to_date_text=to_txt,
-            table=self._content2.table,
-            row_indexes=(checked_rows if checked_rows else None),
-            force_exclude_headers=force_exclude_headers,
-            in_out_mode_by_employee_code=in_out_mode_by_employee_code,
-            company_name_style={
-                "font_size": int(cn_style.font_size),
-                "bold": bool(cn_style.bold),
-                "italic": bool(cn_style.italic),
-                "underline": bool(cn_style.underline),
-                "align": str(cn_style.align or "left"),
-            },
-            company_address_style={
-                "font_size": int(ca_style.font_size),
-                "bold": bool(ca_style.bold),
-                "italic": bool(ca_style.italic),
-                "underline": bool(ca_style.underline),
-                "align": str(ca_style.align or "left"),
-            },
-            company_phone_style={
-                "font_size": int(cp_style.font_size),
-                "bold": bool(cp_style.bold),
-                "italic": bool(cp_style.italic),
-                "underline": bool(cp_style.underline),
-                "align": str(cp_style.align or "left"),
-            },
-            creator=str(vals.get("creator", "") or "").strip(),
-            creator_style={
-                "font_size": int(creator_style.font_size),
-                "bold": bool(creator_style.bold),
-                "italic": bool(creator_style.italic),
-                "underline": bool(creator_style.underline),
-                "align": str(creator_style.align or "left"),
-            },
-            note_text=str(vals.get("note_text", "") or ""),
-            note_style={
-                "font_size": int(note_style.font_size),
-                "bold": bool(note_style.bold),
-                "italic": bool(note_style.italic),
-                "underline": bool(note_style.underline),
-                "align": str(note_style.align or "left"),
-            },
-        )
+        def _do_export(snapshot_table: object) -> tuple[bool, str]:
+            dept_txt = ""
+            title_txt = ""
 
-        MessageDialog.info(
-            self._parent_window,
-            title,
-            msg,
+            # Fallback: if the audit table doesn't contain department/title columns,
+            # fetch distinct values from DB by exported employee codes.
+            try:
+                # Find employee code column in the snapshot table.
+                code_col = None
+                try:
+                    col_count = int(getattr(snapshot_table, "columnCount")())
+                except Exception:
+                    col_count = 0
+
+                for c in range(int(col_count)):
+                    try:
+                        hi = getattr(snapshot_table, "horizontalHeaderItem")(int(c))
+                        ht = "" if hi is None else str(getattr(hi, "text")() or "")
+                        ht = ht.strip().lower()
+                    except Exception:
+                        ht = ""
+                    if ht in {"mã nv", "mã nhân viên", "ma nv", "ma nhan vien"}:
+                        code_col = int(c)
+                        break
+
+                codes: list[str] = []
+                if code_col is not None:
+                    try:
+                        rc = int(getattr(snapshot_table, "rowCount")())
+                    except Exception:
+                        rc = 0
+
+                    seen_codes: set[str] = set()
+                    for r in range(int(rc)):
+                        try:
+                            it = getattr(snapshot_table, "item")(int(r), int(code_col))
+                            code = "" if it is None else str(getattr(it, "text")() or "")
+                            code = code.strip()
+                        except Exception:
+                            code = ""
+                        if not code:
+                            continue
+                        if code in seen_codes:
+                            continue
+                        seen_codes.add(code)
+                        codes.append(code)
+
+                if codes:
+                    dept_txt, title_txt = EmployeeService().get_department_title_text_by_employee_codes(codes)
+            except Exception:
+                dept_txt = ""
+                title_txt = ""
+
+            return export_shift_attendance_details_xlsx(
+                file_path=file_path,
+                company=company,
+                from_date_text=from_txt,
+                to_date_text=to_txt,
+                table=snapshot_table,
+                row_indexes=None,
+                force_exclude_headers=force_exclude_headers,
+                in_out_mode_by_employee_code=in_out_mode_by_employee_code,
+                department_text=dept_txt,
+                title_text=title_txt,
+                company_name_style={
+                    "font_size": int(cn_style.font_size),
+                    "bold": bool(cn_style.bold),
+                    "italic": bool(cn_style.italic),
+                    "underline": bool(cn_style.underline),
+                    "align": str(cn_style.align or "left"),
+                },
+                company_address_style={
+                    "font_size": int(ca_style.font_size),
+                    "bold": bool(ca_style.bold),
+                    "italic": bool(ca_style.italic),
+                    "underline": bool(ca_style.underline),
+                    "align": str(ca_style.align or "left"),
+                },
+                company_phone_style={
+                    "font_size": int(cp_style.font_size),
+                    "bold": bool(cp_style.bold),
+                    "italic": bool(cp_style.italic),
+                    "underline": bool(cp_style.underline),
+                    "align": str(cp_style.align or "left"),
+                },
+                creator=str(vals.get("creator", "") or "").strip(),
+                creator_style={
+                    "font_size": int(creator_style.font_size),
+                    "bold": bool(creator_style.bold),
+                    "italic": bool(creator_style.italic),
+                    "underline": bool(creator_style.underline),
+                    "align": str(creator_style.align or "left"),
+                },
+                note_text=str(vals.get("note_text", "") or ""),
+                note_style={
+                    "font_size": int(note_style.font_size),
+                    "bold": bool(note_style.bold),
+                    "italic": bool(note_style.italic),
+                    "underline": bool(note_style.underline),
+                    "align": str(note_style.align or "left"),
+                },
+            )
+
+        self._export_table_background(
+            title=title,
+            table=self._content2.table,
+            rows_to_export=(checked_rows if checked_rows else None),
+            do_export=_do_export,
         )
 
     def _current_date_range(self) -> tuple[str | None, str | None]:
@@ -1089,6 +1533,140 @@ class ShiftAttendanceController:
             except Exception:
                 pass
 
+    def _load_audit_for_current_range_background(
+        self,
+        *,
+        employee_ids: list[int] | None,
+        attendance_codes: list[str] | None,
+        department_id: int | None,
+        title_id: int | None,
+    ) -> None:
+        """Load audit rows in background without blocking initial UI.
+
+        Notes:
+        - No modal LoadingDialog (only used for explicit 'Xem công').
+        - Render is time-sliced so the table becomes visible progressively.
+        """
+
+        if self._content2 is None:
+            return
+
+        from_date, to_date = self._current_date_range()
+
+        # Cancel any in-flight table rendering.
+        self._cancel_audit_render()
+
+        # Cancel any in-flight loader.
+        try:
+            if self._audit_loader_worker is not None:
+                try:
+                    getattr(self._audit_loader_worker, "cancel")()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if self._audit_loader_thread is not None:
+                try:
+                    self._audit_loader_thread.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Clear table quickly; keep table visible.
+        try:
+            self._content2.table.setRowCount(0)
+        except Exception:
+            pass
+        try:
+            if (
+                hasattr(self._content2, "table_frame")
+                and self._content2.table_frame is not None
+            ):
+                self._content2.table_frame.setVisible(True)
+        except Exception:
+            pass
+
+        thread = QThread(self._parent_window)
+        worker = self._AuditLoadWorker(
+            self._mc2_controller,
+            from_date=from_date,
+            to_date=to_date,
+            employee_ids=employee_ids,
+            attendance_codes=attendance_codes,
+            department_id=department_id,
+            title_id=title_id,
+            enable_progress=False,
+        )
+        worker.moveToThread(thread)
+
+        class _UiBridge(QObject):
+            def __init__(self) -> None:
+                super().__init__()
+
+            @Slot(list)
+            def on_finished(self, rows: list) -> None:
+                try:
+                    self_parent._render_audit_table_chunked(rows, None)
+                except Exception:
+                    logger.exception("Không thể render attendance_audit")
+
+            @Slot(str)
+            def on_failed(self, msg: str) -> None:
+                try:
+                    self_parent._content2.table.setRowCount(0)  # type: ignore[name-defined]
+                except Exception:
+                    pass
+                try:
+                    logger.error("Không thể tải dữ liệu chấm công: %s", msg)
+                except Exception:
+                    pass
+
+        self_parent = self
+        bridge = _UiBridge()
+
+        # Hold strong refs until thread finishes.
+        self._audit_loader_thread = thread
+        self._audit_loader_worker = worker
+        self._audit_loader_bridge = bridge
+
+        worker.finished.connect(bridge.on_finished)
+        worker.failed.connect(bridge.on_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+
+        def _cleanup() -> None:
+            try:
+                thread.quit()
+            except Exception:
+                pass
+            try:
+                worker.deleteLater()
+            except Exception:
+                pass
+            try:
+                bridge.deleteLater()
+            except Exception:
+                pass
+            try:
+                thread.deleteLater()
+            except Exception:
+                pass
+            try:
+                if self_parent._audit_loader_thread is thread:
+                    self_parent._audit_loader_thread = None
+                if self_parent._audit_loader_worker is worker:
+                    self_parent._audit_loader_worker = None
+                if self_parent._audit_loader_bridge is bridge:
+                    self_parent._audit_loader_bridge = None
+            except Exception:
+                pass
+
+        thread.finished.connect(_cleanup)
+        thread.started.connect(worker.run)
+        thread.start()
+
     class _AuditLoadWorker(QObject):
         progress = Signal(int, str)  # percent, message
         progress_items = Signal(int, int, str)  # done, total, message
@@ -1105,6 +1683,7 @@ class ShiftAttendanceController:
             attendance_codes: list[str] | None,
             department_id: int | None,
             title_id: int | None,
+            enable_progress: bool = True,
         ) -> None:
             super().__init__()
             self._controller = controller
@@ -1114,6 +1693,7 @@ class ShiftAttendanceController:
             self._attendance_codes = attendance_codes
             self._department_id = department_id
             self._title_id = title_id
+            self._enable_progress = bool(enable_progress)
             self._cancelled = False
 
         def cancel(self) -> None:
@@ -1124,18 +1704,25 @@ class ShiftAttendanceController:
 
         def run(self) -> None:
             try:
+                t0 = time.perf_counter()
+                progress_cb = None
+                progress_items_cb = None
+                if self._enable_progress:
 
-                def _on_progress(pct: int, msg: str) -> None:
-                    try:
-                        self.progress.emit(int(pct), str(msg))
-                    except Exception:
-                        pass
+                    def _on_progress(pct: int, msg: str) -> None:
+                        try:
+                            self.progress.emit(int(pct), str(msg))
+                        except Exception:
+                            pass
 
-                def _on_progress_items(done: int, total: int, msg: str) -> None:
-                    try:
-                        self.progress_items.emit(int(done), int(total), str(msg))
-                    except Exception:
-                        pass
+                    def _on_progress_items(done: int, total: int, msg: str) -> None:
+                        try:
+                            self.progress_items.emit(int(done), int(total), str(msg))
+                        except Exception:
+                            pass
+
+                    progress_cb = _on_progress
+                    progress_items_cb = _on_progress_items
 
                 rows = self._controller.list_attendance_audit_arranged(
                     from_date=self._from_date,
@@ -1144,11 +1731,23 @@ class ShiftAttendanceController:
                     attendance_codes=self._attendance_codes,
                     department_id=self._department_id,
                     title_id=self._title_id,
-                    progress_cb=_on_progress,
-                    progress_items_cb=_on_progress_items,
+                    progress_cb=progress_cb,
+                    progress_items_cb=progress_items_cb,
                     cancel_cb=self._is_cancelled,
                 )
-                self.finished.emit(list(rows or []))
+                try:
+                    dt_ms = int((time.perf_counter() - t0) * 1000)
+                    logger.info(
+                        "Xem công: service rows=%s in %sms",
+                        (len(rows) if isinstance(rows, list) else "?"),
+                        dt_ms,
+                    )
+                except Exception:
+                    pass
+                if isinstance(rows, list):
+                    self.finished.emit(rows)
+                else:
+                    self.finished.emit(list(rows or []))
             except Exception as e:
                 self.failed.emit(str(e))
 
@@ -1164,13 +1763,6 @@ class ShiftAttendanceController:
             return
 
         from_date, to_date = self._current_date_range()
-
-        # UI yêu cầu: trong lúc đang tải/tính toán, không hiển thị bảng audit.
-        try:
-            if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
-                self._content2.table_frame.setVisible(False)
-        except Exception:
-            pass
 
         # Cancel any in-flight table rendering to keep UI responsive.
         self._cancel_audit_render()
@@ -1243,6 +1835,7 @@ class ShiftAttendanceController:
             attendance_codes=attendance_codes,
             department_id=department_id,
             title_id=title_id,
+            enable_progress=False,
         )
         worker.moveToThread(thread)
 
@@ -1516,33 +2109,343 @@ class ShiftAttendanceController:
             )
 
     def refresh(self) -> None:
+        """Refresh employee list without freezing UI.
+
+        This method is called on filter changes (textChanged, combobox, etc.).
+        DB + QTableWidget rendering can be expensive; we move DB work to a QThread
+        and render rows in time slices using QTimer.
+        """
+
+        # Defer actual work so the UI can process paint/events first.
         try:
-            rows = self._service.list_employees(self._build_filters())
-            from_date, _to_date = self._current_date_range()
-            schedule_map: dict[int, str] = {}
-            if from_date:
+            QTimer.singleShot(0, self._refresh_async)
+        except Exception:
+            self._refresh_async()
+
+    class _EmployeeLoadWorker(QObject):
+        # PySide6/Shiboken không hỗ trợ copy-convert dict trong typed Signal.
+        finished = Signal(object, object)  # rows, schedule_map
+        failed = Signal(str)
+
+        def __init__(
+            self,
+            service: ShiftAttendanceService,
+            *,
+            filters: dict[str, Any],
+            on_date: str | None,
+        ) -> None:
+            super().__init__()
+            self._service = service
+            self._filters = dict(filters or {})
+            self._on_date = on_date
+            self._cancelled = False
+
+        def cancel(self) -> None:
+            self._cancelled = True
+
+        def _is_cancelled(self) -> bool:
+            return bool(self._cancelled)
+
+        def run(self) -> None:
+            try:
+                if self._is_cancelled():
+                    self.finished.emit([], {})
+                    return
+
+                rows = self._service.list_employees(self._filters)
+
+                schedule_map: dict[int, str] = {}
+                if self._on_date and rows:
+                    try:
+                        emp_ids = [int(r.get("id")) for r in rows if r.get("id")]
+                        if emp_ids and (not self._is_cancelled()):
+                            schedule_map = self._service.get_employee_schedule_name_map(
+                                employee_ids=emp_ids,
+                                on_date=str(self._on_date),
+                            )
+                    except Exception:
+                        logger.exception("Không thể tải lịch làm việc của nhân viên")
+                        schedule_map = {}
+
+                if self._is_cancelled():
+                    self.finished.emit([], {})
+                    return
+
+                self.finished.emit(list(rows or []), dict(schedule_map or {}))
+            except Exception as e:
+                self.failed.emit(str(e))
+
+    def _refresh_async(self) -> None:
+        # Cancel any in-flight render.
+        self._cancel_employee_render()
+
+        # Cancel any in-flight loader.
+        try:
+            if self._employee_loader_worker is not None:
                 try:
-                    emp_ids = [int(r.get("id")) for r in rows if r.get("id")]
-                    schedule_map = self._service.get_employee_schedule_name_map(
-                        employee_ids=emp_ids,
-                        on_date=str(from_date),
+                    getattr(self._employee_loader_worker, "cancel")()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if self._employee_loader_thread is not None:
+                try:
+                    self._employee_loader_thread.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        from_date, _to_date = self._current_date_range()
+        filters = self._build_filters()
+
+        thread = QThread(self._parent_window)
+        worker = self._EmployeeLoadWorker(
+            self._service,
+            filters=filters,
+            on_date=from_date,
+        )
+        worker.moveToThread(thread)
+
+        class _UiBridge(QObject):
+            def __init__(self) -> None:
+                super().__init__()
+
+            @Slot(object, object)
+            def on_finished(self, rows: object, schedule_map: object) -> None:
+                try:
+                    self_parent._render_main_table_chunked(
+                        list(rows or []) if isinstance(rows, list) else [],
+                        schedule_map=(
+                            dict(schedule_map or {}) if isinstance(schedule_map, dict) else {}
+                        ),
                     )
                 except Exception:
-                    logger.exception("Không thể tải lịch làm việc của nhân viên")
-                    schedule_map = {}
+                    logger.exception("Không thể render danh sách nhân viên")
+                    try:
+                        self_parent._content1.table.setRowCount(0)
+                    except Exception:
+                        pass
+                    try:
+                        self_parent._content1.set_total(0)
+                    except Exception:
+                        pass
 
-            self._render_main_table(rows, schedule_map=schedule_map)
-            self._content1.set_total(len(rows))
-        except Exception:
-            logger.exception("Không thể tải danh sách nhân viên")
+            @Slot(str)
+            def on_failed(self, msg: str) -> None:
+                try:
+                    logger.error("Không thể tải danh sách nhân viên: %s", msg)
+                except Exception:
+                    pass
+                try:
+                    self_parent._content1.table.setRowCount(0)
+                except Exception:
+                    pass
+                try:
+                    self_parent._content1.set_total(0)
+                except Exception:
+                    pass
+
+        self_parent = self
+        bridge = _UiBridge()
+
+        # Hold strong refs.
+        self._employee_loader_thread = thread
+        self._employee_loader_worker = worker
+        self._employee_loader_bridge = bridge
+
+        worker.finished.connect(bridge.on_finished)
+        worker.failed.connect(bridge.on_failed)
+        worker.finished.connect(thread.quit)
+        worker.failed.connect(thread.quit)
+
+        def _cleanup() -> None:
             try:
-                self._content1.table.setRowCount(0)
+                thread.quit()
             except Exception:
                 pass
+            try:
+                worker.deleteLater()
+            except Exception:
+                pass
+            try:
+                bridge.deleteLater()
+            except Exception:
+                pass
+            try:
+                thread.deleteLater()
+            except Exception:
+                pass
+            try:
+                if self_parent._employee_loader_thread is thread:
+                    self_parent._employee_loader_thread = None
+                if self_parent._employee_loader_worker is worker:
+                    self_parent._employee_loader_worker = None
+                if self_parent._employee_loader_bridge is bridge:
+                    self_parent._employee_loader_bridge = None
+            except Exception:
+                pass
+
+        thread.finished.connect(_cleanup)
+        thread.started.connect(worker.run)
+        thread.start()
+
+    def _render_main_table_chunked(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        schedule_map: dict[int, str] | None = None,
+    ) -> None:
+        """Render MainContent1 table in time slices to keep UI responsive."""
+
+        table = self._content1.table
+
+        # Reset quickly.
+        try:
+            table.setRowCount(0)
+        except Exception:
+            pass
+
+        if not rows:
             try:
                 self._content1.set_total(0)
             except Exception:
                 pass
+            return
+
+        schedule_map = schedule_map or {}
+
+        try:
+            table.setRowCount(len(rows))
+        except Exception:
+            pass
+
+        # Disable sorting to avoid expensive re-layout during item insertion.
+        try:
+            table.setSortingEnabled(False)
+        except Exception:
+            pass
+
+        self._employee_render_state = {
+            "rows": rows,
+            "schedule_map": schedule_map,
+            "idx": 0,
+            "table": table,
+        }
+
+        if self._employee_render_timer is None:
+            self._employee_render_timer = QTimer(self._parent_window)
+            self._employee_render_timer.setSingleShot(True)
+
+        def _tick() -> None:
+            st = self._employee_render_state
+            if not st:
+                return
+
+            _rows: list[dict[str, Any]] = st["rows"]
+            _table = st["table"]
+            _schedule_map: dict[int, str] = st.get("schedule_map") or {}
+            try:
+                idx = int(st.get("idx") or 0)
+            except Exception:
+                idx = 0
+
+            budget = QElapsedTimer()
+            budget.start()
+
+            # Batch: avoid repaint per-cell; repaint once per slice.
+            try:
+                _table.setUpdatesEnabled(False)
+            except Exception:
+                pass
+
+            while idx < len(_rows) and int(budget.elapsed()) < 12:
+                r = _rows[idx]
+
+                emp_id = r.get("id")
+                dept_id = r.get("department_id")
+                title_id = r.get("title_id")
+
+                mcc_code = r.get("mcc_code")
+                attendance_code = (
+                    str(mcc_code or "").strip()
+                    or str(r.get("employee_code") or "").strip()
+                )
+
+                chk = QTableWidgetItem("❌")
+                chk.setFlags(chk.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                chk.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                chk.setData(Qt.ItemDataRole.UserRole, emp_id)
+                chk.setData(Qt.ItemDataRole.UserRole + 1, attendance_code)
+                chk.setData(Qt.ItemDataRole.UserRole + 2, dept_id)
+                chk.setData(Qt.ItemDataRole.UserRole + 3, title_id)
+                _table.setItem(idx, 0, chk)
+
+                stt_val = r.get("stt")
+                if stt_val is None or str(stt_val).strip() == "":
+                    stt_val = idx + 1
+                stt_item = QTableWidgetItem(str(stt_val))
+                stt_item.setFlags(stt_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                stt_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                _table.setItem(idx, 1, stt_item)
+
+                values = [
+                    r.get("employee_code"),
+                    r.get("full_name"),
+                    r.get("mcc_code"),
+                    _schedule_map.get(int(emp_id), "") if emp_id is not None else "",
+                    r.get("title_name"),
+                    r.get("department_name"),
+                    r.get("start_date"),
+                ]
+
+                for c_idx, v in enumerate(values, start=2):
+                    item = QTableWidgetItem(str(v or ""))
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    if c_idx == 2:
+                        item.setData(Qt.ItemDataRole.UserRole, emp_id)
+                        item.setData(Qt.ItemDataRole.UserRole + 1, dept_id)
+                        item.setData(Qt.ItemDataRole.UserRole + 2, title_id)
+                    _table.setItem(idx, c_idx, item)
+
+                idx += 1
+
+            st["idx"] = idx
+
+            try:
+                _table.setUpdatesEnabled(True)
+                _table.viewport().update()
+            except Exception:
+                pass
+
+            if idx >= len(_rows):
+                try:
+                    self._content1.apply_ui_settings()
+                except Exception:
+                    pass
+                try:
+                    self._content1.set_total(len(_rows))
+                except Exception:
+                    pass
+                self._cancel_employee_render()
+                return
+
+            try:
+                self._employee_render_timer.start(0)
+            except Exception:
+                QTimer.singleShot(0, _tick)
+
+        try:
+            if self._employee_render_tick is not None:
+                self._employee_render_timer.timeout.disconnect(
+                    self._employee_render_tick
+                )
+        except Exception:
+            pass
+        self._employee_render_tick = _tick
+        self._employee_render_timer.timeout.connect(_tick)
+        self._employee_render_timer.start(0)
 
     def _render_main_table(
         self,
@@ -2041,7 +2944,7 @@ class ShiftAttendanceController:
             pass
 
     def _render_audit_table_chunked(
-        self, rows: list[dict[str, Any]], dlg: QDialog
+        self, rows: list[dict[str, Any]], dlg: QDialog | None
     ) -> None:
         """Render audit table without freezing the UI.
 
@@ -2050,13 +2953,14 @@ class ShiftAttendanceController:
         """
 
         if self._content2 is None:
-            try:
-                dlg.finish_and_close()  # type: ignore[attr-defined]
-            except Exception:
+            if dlg is not None:
                 try:
-                    dlg.close()
+                    dlg.finish_and_close()  # type: ignore[attr-defined]
                 except Exception:
-                    pass
+                    try:
+                        dlg.close()
+                    except Exception:
+                        pass
             return
 
         table = self._content2.table
@@ -2066,19 +2970,27 @@ class ShiftAttendanceController:
             table.setRowCount(0)
         except Exception:
             pass
+
+        # Show table once we start rendering (compute already finished).
+        try:
+            if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
+                self._content2.table_frame.setVisible(True)
+        except Exception:
+            pass
         if not rows:
             try:
                 if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
                     self._content2.table_frame.setVisible(True)
             except Exception:
                 pass
-            try:
-                dlg.finish_and_close()  # type: ignore[attr-defined]
-            except Exception:
+            if dlg is not None:
                 try:
-                    dlg.close()
+                    dlg.finish_and_close()  # type: ignore[attr-defined]
                 except Exception:
-                    pass
+                    try:
+                        dlg.close()
+                    except Exception:
+                        pass
             return
 
         cols = [k for (k, _label) in getattr(self._content2, "_COLUMNS", [])]
@@ -2088,16 +3000,17 @@ class ShiftAttendanceController:
                     self._content2.table_frame.setVisible(True)
             except Exception:
                 pass
-            try:
-                dlg.finish_and_close()  # type: ignore[attr-defined]
-            except Exception:
+            if dlg is not None:
                 try:
-                    dlg.close()
+                    dlg.finish_and_close()  # type: ignore[attr-defined]
                 except Exception:
-                    pass
+                    try:
+                        dlg.close()
+                    except Exception:
+                        pass
             return
 
-        # Load symbols (same logic as _render_audit_table).
+        # Load symbols (cached; avoid extra DB query on every view).
         overtime_symbol = "+"  # C04
         work_symbol = "X"  # C03
         late_symbol = "Tr"  # C01
@@ -2108,7 +3021,7 @@ class ShiftAttendanceController:
         missing_out_symbol = "KR"  # C05
         missing_in_symbol = "KV"  # C06
         try:
-            sym = AttendanceSymbolService().list_rows_by_code()
+            sym = self._get_symbols_by_code_cached()
 
             def _sym(code: str, default: str) -> str:
                 row_data = sym.get(code)
@@ -2144,13 +3057,14 @@ class ShiftAttendanceController:
             missing_out_symbol = "KR"
             missing_in_symbol = "KV"
 
-        # Prepare table for bulk set.
+        # Prepare table for incremental append (avoid setRowCount(len) spike on large result).
         try:
-            table.setRowCount(len(rows))
+            table.setRowCount(0)
         except Exception:
             pass
+        # Keep table visible and repaint once per tick (avoid "tính xong mới hiện").
         try:
-            table.setUpdatesEnabled(False)
+            table.setUpdatesEnabled(True)
         except Exception:
             pass
         try:
@@ -2163,6 +3077,7 @@ class ShiftAttendanceController:
             "rows": rows,
             "cols": cols,
             "idx": 0,
+            "t0": time.perf_counter(),
             "dlg": dlg,
             "table": table,
             "overtime_symbol": overtime_symbol,
@@ -2207,8 +3122,20 @@ class ShiftAttendanceController:
             def _norm(s: object | None) -> str:
                 return str("" if s is None else s).strip()
 
+            try:
+                _table.blockSignals(True)
+            except Exception:
+                pass
+
             while idx < len(_rows) and int(budget.elapsed()) < 12:
                 r = _rows[idx]
+
+                # Ensure row exists before setItem.
+                try:
+                    if _table.rowCount() < (idx + 1):
+                        _table.setRowCount(idx + 1)
+                except Exception:
+                    pass
 
                 # Fill KR/KV per in/out pair (only the missing one).
                 try:
@@ -2518,34 +3445,39 @@ class ShiftAttendanceController:
 
                 idx += 1
 
+            try:
+                _table.blockSignals(False)
+            except Exception:
+                pass
+
             st["idx"] = idx
 
+            # Repaint after each slice so user sees rows appear progressively.
+            try:
+                _table.viewport().update()
+            except Exception:
+                pass
+
             if idx >= len(_rows):
-                try:
-                    _table.setUpdatesEnabled(True)
-                except Exception:
-                    pass
                 try:
                     self._content2.apply_ui_settings()
                 except Exception:
                     pass
                 try:
-                    _dlg.finish_and_close()  # type: ignore[attr-defined]
-                except Exception:
-                    try:
-                        _dlg.close()
-                    except Exception:
-                        pass
-                # Show audit table only after render is complete.
-                try:
-                    if (
-                        self._content2 is not None
-                        and hasattr(self._content2, "table_frame")
-                        and self._content2.table_frame is not None
-                    ):
-                        self._content2.table_frame.setVisible(True)
+                    t0 = float(st.get("t0") or 0)
+                    dt_ms = int((time.perf_counter() - t0) * 1000) if t0 else 0
+                    logger.info("Xem công: render rows=%s in %sms", len(_rows), dt_ms)
                 except Exception:
                     pass
+                if _dlg is not None:
+                    try:
+                        _dlg.finish_and_close()  # type: ignore[attr-defined]
+                    except Exception:
+                        try:
+                            _dlg.close()
+                        except Exception:
+                            pass
+                # Keep table visible; do not wait until end to show.
                 self._cancel_audit_render()
                 return
 

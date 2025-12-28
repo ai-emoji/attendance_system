@@ -16,6 +16,8 @@ import logging
 
 from PySide6.QtCore import QDate, QTimer
 
+from core.threads import BackgroundTaskRunner
+
 from services.schedule_work_services import ScheduleWorkService
 from ui.dialog.title_dialog import MessageDialog
 from ui.dialog.schedule_work_settings import ScheduleWorkSettingsDialog
@@ -44,6 +46,7 @@ class ScheduleWorkController:
         # Watch date change (midnight) to refresh default schedule column
         self._day_watch_timer: QTimer | None = None
         self._last_day_iso: str | None = None
+        self._search_runner = BackgroundTaskRunner(self._parent_window, name="schedule_work_search")
 
     def bind(self) -> None:
         try:
@@ -78,14 +81,15 @@ class ScheduleWorkController:
         except Exception:
             pass
 
-        # Load tree on first show
-        self.refresh_tree()
-        self.refresh_schedules()
-        self.refresh_temp_table()
-
-        # Load initial employee list from DB (same columns shown in the right table).
-        # This mirrors the Employee screen behavior: show data immediately, user can refine via Search.
-        self.on_search()
+        # Defer heavy initial loads so UI can paint first.
+        try:
+            QTimer.singleShot(0, self.refresh_tree)
+            QTimer.singleShot(0, self.refresh_schedules)
+            QTimer.singleShot(0, self.on_search)
+        except Exception:
+            self.refresh_tree()
+            self.refresh_schedules()
+            self.on_search()
 
         # Auto-refresh schedule names when day changes (00:00).
         # Requirement: when passing 23:59 -> 00:00 of next day, expired ranges should no longer show.
@@ -184,7 +188,10 @@ class ScheduleWorkController:
                         filtered.append(r)
                 rows = filtered
 
-            self._view.content.temp.set_rows(rows)
+            try:
+                self._view.content.temp.set_rows_chunked(rows)
+            except Exception:
+                self._view.content.temp.set_rows(rows)
         except Exception:
             logger.exception("Không thể tải danh sách lịch trình tạm")
             try:
@@ -731,42 +738,119 @@ class ScheduleWorkController:
         return filters
 
     def on_search(self) -> None:
+        # Defer + async: avoid UI freeze when DB or tables are large.
+        try:
+            QTimer.singleShot(0, self._on_search_async)
+        except Exception:
+            self._on_search_async()
+
+    def _on_search_async(self) -> None:
         try:
             filters = self._get_selected_filters()
-            rows = self._service.search_employees(filters)
-            self._employees_cache = list(rows)
-            self._view.title2.set_total(len(self._employees_cache))
-            self._view.content.right.set_employees(self._employees_cache)
-
-            # Load lịch làm việc đã gán từ DB để không bị mất khi mở lại.
-            try:
-                emp_ids = []
-                for x in self._employees_cache:
-                    try:
-                        if isinstance(x, dict):
-                            emp_ids.append(int(x.get("id") or 0))
-                        else:
-                            emp_ids.append(int(getattr(x, "id", None) or 0))
-                    except Exception:
-                        continue
-                emp_ids = [i for i in emp_ids if i > 0]
-                schedule_map = self._service.get_employee_schedule_name_map(emp_ids)
-                self._view.content.right.apply_schedule_name_map(schedule_map)
-            except Exception:
-                logger.exception("Không thể tải lịch làm việc đã gán")
-
-            # Keep temp schedule table in sync after searching
-            try:
-                self.refresh_temp_table(filters)
-            except Exception:
-                pass
         except Exception:
+            filters = {}
+
+        def _fn() -> object:
+            def _norm(x) -> str:
+                return str(x or "").strip().casefold()
+
+            employees = list(self._service.search_employees(filters) or [])
+
+            emp_ids: list[int] = []
+            for x in employees:
+                try:
+                    if isinstance(x, dict):
+                        emp_ids.append(int(x.get("id") or 0))
+                    else:
+                        emp_ids.append(int(getattr(x, "id", None) or 0))
+                except Exception:
+                    continue
+            emp_ids = [i for i in emp_ids if i > 0]
+
+            schedule_map: dict[int, str] = {}
+            try:
+                if emp_ids:
+                    schedule_map = dict(self._service.get_employee_schedule_name_map(emp_ids) or {})
+            except Exception:
+                schedule_map = {}
+
+            temp_rows = list(self._service.list_temp_schedule_assignments() or [])
+            try:
+                search_text = _norm((filters or {}).get("search_text"))
+                search_by = _norm((filters or {}).get("search_by"))
+            except Exception:
+                search_text = ""
+                search_by = ""
+
+            if search_text:
+                filtered: list[dict] = []
+                for r in temp_rows:
+                    code = _norm((r or {}).get("employee_code"))
+                    name = _norm((r or {}).get("full_name"))
+                    if search_by == "employee_code":
+                        ok = search_text in code
+                    elif search_by == "employee_name":
+                        ok = search_text in name
+                    else:
+                        ok = (search_text in code) or (search_text in name)
+                    if ok:
+                        filtered.append(r)
+                temp_rows = filtered
+
+            return {
+                "employees": employees,
+                "schedule_map": schedule_map,
+                "temp_rows": temp_rows,
+            }
+
+        def _ok(payload: object) -> None:
+            try:
+                data = payload if isinstance(payload, dict) else {}
+                employees = list(data.get("employees") or [])
+                schedule_map = data.get("schedule_map") or {}
+                temp_rows = list(data.get("temp_rows") or [])
+
+                self._employees_cache = employees
+                self._view.title2.set_total(len(employees))
+
+                try:
+                    self._view.content.right.set_employees_chunked(
+                        employees,
+                        schedule_by_employee_id=schedule_map,
+                    )
+                except Exception:
+                    self._view.content.right.set_employees(employees)
+                    try:
+                        self._view.content.right.apply_schedule_name_map(schedule_map)
+                    except Exception:
+                        pass
+
+                try:
+                    self._view.content.temp.set_rows_chunked(temp_rows)
+                except Exception:
+                    self._view.content.temp.set_rows(temp_rows)
+            except Exception:
+                logger.exception("Không thể tìm nhân viên")
+                try:
+                    self._view.title2.set_total(0)
+                    self._view.content.right.clear_employees()
+                except Exception:
+                    pass
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tìm nhân viên")
             try:
+                self._employees_cache = []
                 self._view.title2.set_total(0)
                 self._view.content.right.clear_employees()
             except Exception:
                 pass
+            try:
+                self._view.content.temp.clear_rows()
+            except Exception:
+                pass
+
+        self._search_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_apply(self) -> None:
         try:

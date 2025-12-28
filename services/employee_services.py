@@ -141,6 +141,35 @@ class EmployeeService:
         self._title_service = title_service or TitleService()
         self._schedule_work_repo = schedule_work_repo or ScheduleWorkRepository()
 
+    def get_department_title_text_by_employee_codes(
+        self, employee_codes: list[str]
+    ) -> tuple[str, str]:
+        """Return (department_text, title_text) for the given employee codes."""
+
+        codes = [str(x or "").strip() for x in (employee_codes or [])]
+        codes = [c for c in codes if c]
+        if not codes:
+            return ("", "")
+
+        try:
+            rows = self._repo.list_distinct_department_title_by_employee_codes(codes)
+        except Exception:
+            return ("", "")
+
+        dept_set: set[str] = set()
+        title_set: set[str] = set()
+        for r in rows or []:
+            dn = str(r.get("department_name") or "").strip()
+            tn = str(r.get("title_name") or "").strip()
+            if dn:
+                dept_set.add(dn)
+            if tn:
+                title_set.add(tn)
+
+        dept_list = sorted(dept_set)
+        title_list = sorted(title_set)
+        return (", ".join(dept_list), ", ".join(title_list))
+
     def list_departments_tree_rows(self) -> list[tuple[int, int | None, str, str]]:
         models = self._department_service.list_departments()
         return [
@@ -507,6 +536,15 @@ class EmployeeService:
 
         path.parent.mkdir(parents=True, exist_ok=True)
         wb.save(str(path))
+
+        # Auto-open exported template (best-effort)
+        try:
+            import os
+
+            if os.name == "nt":
+                os.startfile(str(path))  # type: ignore[attr-defined]
+        except Exception:
+            pass
         return True, f"Đã tạo file mẫu: {path}"
 
     def read_employees_from_xlsx(

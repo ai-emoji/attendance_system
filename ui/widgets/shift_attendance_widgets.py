@@ -97,6 +97,9 @@ _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
 # the latest UI state without forcing an apparent refresh.
 _SHIFT_ATTENDANCE_STATE: dict[str, object] = {}
 
+# Tránh lag khi main window recreate widget: không lưu/restore bảng quá lớn.
+_STATE_TABLE_MAX_ROWS = 200
+
 
 def _fmt_date_ddmmyyyy(value: object | None) -> str:
     """Format a date-like value to dd/MM/yyyy for UI display."""
@@ -807,6 +810,13 @@ class MainContent1(QWidget):
         except Exception:
             return None
 
+        # Nếu bảng quá lớn, không cache cell-by-cell (rất chậm khi restore).
+        try:
+            if rows > int(_STATE_TABLE_MAX_ROWS):
+                return None
+        except Exception:
+            return None
+
         data: list[list[dict[str, object]]] = []
         for r in range(rows):
             row_items: list[dict[str, object]] = []
@@ -1352,6 +1362,13 @@ class MainContent2(QWidget):
         try:
             rows = int(self.table.rowCount())
             cols = int(self.table.columnCount())
+        except Exception:
+            return None
+
+        # Nếu bảng quá lớn, không cache cell-by-cell (rất chậm khi restore).
+        try:
+            if rows > int(_STATE_TABLE_MAX_ROWS):
+                return None
         except Exception:
             return None
 
