@@ -1,0 +1,283 @@
+1. Kiến trúc CHUẨN (rất quan trọng)
+
+👉 LUÔN bọc QTableWidget trong QFrame
+👉 KHÔNG vẽ border ngoài cho QTableWidget
+
+QFrame (vẽ viền ngoài giống Excel)
+ └── QTableWidget (chỉ vẽ grid bên trong)
+      ├── viewport
+      ├── header
+      └── scrollbar
+
+
+➡️ Scrollbar không bao giờ che viền
+➡️ Không redraw thừa → không flicker
+
+🥇 2. Code CHUẨN – Excel Style + Mượt
+🔹 Tạo bảng
+table = QTableWidget()
+table.setRowCount(100000)
+table.setColumnCount(10)
+
+🔹 Cấu hình HIỆU NĂNG (bắt buộc)
+from PyQt5.QtWidgets import QAbstractItemView
+
+table.setShowGrid(True)
+
+# Scroll mượt (QUAN TRỌNG)
+table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+# Tắt chỉnh sửa (giảm repaint)
+table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+# Chọn theo dòng (Excel style)
+table.setSelectionBehavior(QAbstractItemView.SelectRows)
+table.setSelectionMode(QAbstractItemView.SingleSelection)
+
+# Tắt auto resize (rất tốn CPU)
+table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+
+table.verticalHeader().setDefaultSectionSize(24)
+
+
+👉 Nếu bật resizeColumnsToContents() = GIẾT HIỆU NĂNG
+
+🎨 3. StyleSheet – Giống Excel 90%
+table.setStyleSheet("""
+QTableWidget {
+    background: white;
+    gridline-color: #d0d0d0;
+}
+
+QTableWidget::item {
+    padding: 4px;
+    border-right: 1px solid #d0d0d0;
+    border-bottom: 1px solid #d0d0d0;
+}
+
+QTableWidget::item:selected {
+    background: #cce8ff;
+    color: black;
+}
+
+QHeaderView::section {
+    background: #f3f3f3;
+    border: 1px solid #c0c0c0;
+    padding: 4px;
+    font-weight: bold;
+}
+""")
+
+
+✔ Grid mảnh như Excel
+✔ Header xám nhạt
+✔ Chọn dòng xanh nhạt
+
+🧱 4. Bọc QFrame – FIX 100% mất viền + flicker
+frame = QFrame()
+frame.setFrameShape(QFrame.Box)
+frame.setLineWidth(1)
+
+frame.setStyleSheet("""
+QFrame {
+    border: 1px solid #a0a0a0;
+}
+""")
+
+layout = QVBoxLayout(frame)
+layout.setContentsMargins(0, 0, 0, 0)
+layout.addWidget(table)
+
+
+📌 Viền này KHÔNG bao giờ mất dù scroll
+
+⚡ 5. Đổ 100k dòng KHÔNG LAG (cực quan trọng)
+
+❌ Sai lầm phổ biến:
+
+for r in range(100000):
+    for c in range(10):
+        table.setItem(r, c, QTableWidgetItem("x"))  # ❌ rất chậm
+
+✅ Cách ĐÚNG
+table.setUpdatesEnabled(False)
+
+for r in range(100000):
+    table.setItem(r, 0, QTableWidgetItem(str(r)))
+    table.setItem(r, 1, QTableWidgetItem("Data"))
+
+table.setUpdatesEnabled(True)
+
+
+Hoặc tốt hơn nữa:
+👉 Dùng QTableView + QAbstractTableModel (nếu bạn cho phép)
+
+🧠 6. Vì sao cấu hình này KHÔNG flicker?
+Nguyên nhân flicker	Đã fix
+Scroll theo item	✅ PerPixel
+Border vẽ lại liên tục	✅ Giao cho QFrame
+Auto resize cột	✅ Fixed
+Update từng cell	✅ setUpdatesEnabled(False)
+🏆 TÓM TẮT “CÔNG THỨC VÀNG”
+
+✔ QFrame vẽ viền ngoài
+✔ QTableWidget chỉ vẽ grid
+✔ ScrollPerPixel
+✔ Fixed section size
+✔ Không auto resize
+✔ Tắt update khi đổ dữ liệu
+
+➡️ 100k dòng mượt – không mất viền – không nhấp nháy
+
+Nếu bạn muốn mình:
+
+🔥 Nâng cấp sang QTableView + Model (siêu mượt)
+
+🔥 Dark mode Excel
+
+🔥 Freeze cột đầu (giống Excel)
+
+🔥 Lazy loading 1 triệu dòng
+
+👉 nói mình dùng PyQt5 / PyQt6 / PySide6 và layout hiện tại, mình làm tiếp cho bạn.
+
+QTableView + Model (siêu mượt)
+
+Tuyệt 👍 QTableView + Model là cách DUY NHẤT đúng nếu bạn muốn:
+
+✅ 100k – 1 triệu dòng mượt
+✅ Không flicker khi scroll
+✅ Viền giống Excel
+✅ Tiết kiệm RAM
+
+Dưới đây là mẫu CHUẨN SẢN XUẤT, mình viết ngắn – đúng – đủ.
+
+🧠 Kiến trúc chuẩn
+QFrame (vẽ border ngoài)
+ └── QTableView
+       └── QAbstractTableModel
+
+
+👉 View không giữ dữ liệu
+👉 Model cấp dữ liệu khi cần
+👉 Qt chỉ render những cell đang nhìn thấy
+
+1️⃣ Model – SIÊU NHẸ
+from PyQt5.QtCore import Qt, QAbstractTableModel
+
+class FastTableModel(QAbstractTableModel):
+    def __init__(self, data, headers):
+        super().__init__()
+        self._data = data
+        self._headers = headers
+
+    def rowCount(self, parent=None):
+        return len(self._data)
+
+    def columnCount(self, parent=None):
+        return len(self._headers)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+
+        if role == Qt.DisplayRole:
+            return self._data[index.row()][index.column()]
+
+        return None
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                return self._headers[section]
+            return section + 1
+
+
+📌 Không tạo QTableWidgetItem → cực nhanh
+
+2️⃣ View – cấu hình mượt
+from PyQt5.QtWidgets import QTableView, QAbstractItemView, QHeaderView
+
+table = QTableView()
+
+table.setModel(model)
+
+table.setShowGrid(True)
+
+# Scroll mượt
+table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+# Chọn giống Excel
+table.setSelectionBehavior(QAbstractItemView.SelectRows)
+table.setSelectionMode(QAbstractItemView.SingleSelection)
+
+# Hiệu năng
+table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+table.setAlternatingRowColors(False)
+
+# Header
+table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+table.verticalHeader().setDefaultSectionSize(24)
+
+3️⃣ Style – Excel look
+table.setStyleSheet("""
+QTableView {
+    background: white;
+    gridline-color: #d0d0d0;
+}
+
+QTableView::item {
+    padding: 4px;
+    border-right: 1px solid #d0d0d0;
+    border-bottom: 1px solid #d0d0d0;
+}
+
+QTableView::item:selected {
+    background: #cce8ff;
+    color: black;
+}
+
+QHeaderView::section {
+    background: #f3f3f3;
+    border: 1px solid #c0c0c0;
+    padding: 4px;
+    font-weight: bold;
+}
+""")
+
+4️⃣ QFrame – border ngoài (KHÔNG BAO GIỜ MẤT)
+from PyQt5.QtWidgets import QFrame, QVBoxLayout
+
+frame = QFrame()
+frame.setFrameShape(QFrame.Box)
+frame.setLineWidth(1)
+
+frame.setStyleSheet("""
+QFrame {
+    border: 1px solid #a0a0a0;
+}
+""")
+
+layout = QVBoxLayout(frame)
+layout.setContentsMargins(0, 0, 0, 0)
+layout.addWidget(table)
+
+⚡ 5️⃣ Test 100k dòng (chạy mượt)
+data = [[f"Row {r}", f"Value {c}"] for r in range(100000) for c in range(2)]
+headers = ["Name", "Value"]
+
+model = FastTableModel(data, headers)
+table.setModel(model)
+'C02', 'Ký hiệu về sớm', 'Sm', 1
+'C03', 'Ký hiệu đúng giờ', 'X', 1
+'C04', 'Ký hiệu tăng ca', '+', 1
+'C05', 'Ký hiệu thiếu giờ ra', 'KR', 1
+'C06', 'Ký hiệu thiếu giờ vào', 'KV', 1
+'C07', 'Ký hiệu vắng (mặc định không chấm công)', 'V', 1
+'C08', 'Ký hiệu đúng giờ ca có qua đêm', 'Đ', 1
+'C09', 'Ký hiệu ngày không xếp ca', 'OFF', 1
+'C10', 'Ký hiệu nghỉ lễ', 'Le', 1

@@ -1,0 +1,157 @@
+{
+  "employee_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "column_align": {
+      "stt": "center",
+      "employee_code": "center",
+      "department_name": "center",
+      "title_name": "center",
+      "date_of_birth": "center",
+      "gender": "center",
+      "national_id": "center",
+      "id_issue_date": "center",
+      "phone": "center",
+      "insurance_no": "center",
+      "tax_code": "center",
+      "degree": "center",
+      "major": "center",
+      "contract1_term": "center",
+      "start_date": "center",
+      "schedule": "left",
+      "full_name": "left"
+    },
+    "column_bold": {},
+    "header_font_size": 16,
+    "header_font_weight": "bold",
+    "column_visible": {
+      "schedule": false,
+      "full_name": true,
+      "stt": true,
+      "start_date": true
+    }
+  },
+  "shift_attendance_table": {
+    "column_visible": {
+      "in_2": false,
+      "employee_code": true,
+      "leave_plus": true,
+      "total": false,
+      "tc2": true,
+      "tc3": false,
+      "tc1": true,
+      "work_plus": true,
+      "hours_plus": true,
+      "leave": true,
+      "mcc_code": true,
+      "title_name": true,
+      "department_name": true,
+      "start_date": true,
+      "full_name": true,
+      "hours": true,
+      "out_1": true,
+      "in_1": true,
+      "schedule": true,
+      "out_3": false,
+      "in_3": false,
+      "work": true,
+      "early": true,
+      "late": true,
+      "out_2": false
+    },
+    "font_size": 12,
+    "font_weight": "normal",
+    "column_align": {
+      "employee_code": "center",
+      "leave_plus": "center",
+      "mcc_code": "center",
+      "title_name": "center",
+      "department_name": "center",
+      "start_date": "center",
+      "full_name": "center",
+      "out_1": "center",
+      "in_1": "center",
+      "schedule": "center",
+      "tc3": "center",
+      "tc2": "center",
+      "tc1": "center",
+      "work_plus": "center",
+      "hours_plus": "center",
+      "leave": "center",
+      "work": "center",
+      "hours": "center",
+      "early": "center",
+      "late": "center",
+      "out_3": "center",
+      "in_3": "center",
+      "out_2": "center",
+      "in_2": "center"
+    },
+    "column_bold": {},
+    "header_font_size": 16,
+    "header_font_weight": "bold"
+  },
+  "download_attendance": {
+    "table_font_size": 12,
+    "combo_font_size": 12,
+    "calendar_font_size": 12,
+    "column_visible": {
+      "attendance_code": true
+    },
+    "input_height": 28,
+    "button_height": 28,
+    "device_width": 200,
+    "search_by_width": 150,
+    "search_text_min_width": 150,
+    "download_button_width": 180,
+    "time_button_width": 100,
+    "layout_mode": "space_between",
+    "layout_margin": 10,
+    "layout_spacing": 5,
+    "clock_icon_size": 18,
+    "date_width": 180,
+    "table_header_font_size": 16,
+    "table_header_font_weight": "bold"
+  },
+  "schedule_work_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "header_font_size": 16,
+    "header_font_weight": "bold",
+    "column_align": {
+      "employee_code": "center",
+      "full_name": "center",
+      "department_name": "center",
+      "title_name": "center",
+      "schedule_name": "center",
+      "check": "center"
+    },
+    "column_bold": {}
+  },
+  "arrange_schedule_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "header_font_size": 16,
+    "header_font_weight": "bold",
+    "column_align": {
+      "list_schedule_name": "center",
+      "detail_day": "center"
+    },
+    "column_bold": {
+      "detail_day": true
+    }
+  },
+  "declare_work_shift_table": {
+    "font_size": 12,
+    "font_weight": "normal",
+    "header_font_size": 16,
+    "header_font_weight": "bold",
+    "column_align": {
+      "shift_code": "center"
+    },
+    "column_bold": {}
+  },
+  "file_dialog": {
+    "last_save_dir": "C:\\Users\\duong\\OneDrive\\Desktop"
+  }
+}
