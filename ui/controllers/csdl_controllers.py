@@ -9,6 +9,7 @@ import logging
 
 from PySide6.QtCore import QRect
 
+from core.db_connection_bus import db_connection_bus
 from repository.csdl_repository import CSDLConfig
 from services.csdl_services import CSDLService
 from ui.dialog.csdl_dialog import CSDLDialog
@@ -46,6 +47,11 @@ class CSDLController:
 
         ok, msg = self._service.apply_and_save(cfg)
         dialog.set_status(msg, ok=ok)
+        if ok:
+            try:
+                db_connection_bus.emit_changed()
+            except Exception:
+                pass
 
     def _center_dialog(self, dialog: CSDLDialog) -> None:
         parent = self._parent_window

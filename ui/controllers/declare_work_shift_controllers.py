@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 
+from core.threads import BackgroundTaskRunner
+
 from services.declare_work_shift_services import DeclareWorkShiftService
 from ui.dialog.title_dialog import MessageDialog
 
@@ -36,6 +38,9 @@ class DeclareWorkShiftController:
         self._service = service or DeclareWorkShiftService()
 
         self._selected_shift_id: int | None = None
+        self._runner = BackgroundTaskRunner(
+            self._parent_window, name="work_shift_refresh"
+        )
 
     def bind(self) -> None:
         # Restore cached state BEFORE wiring signals to avoid triggering handlers.
@@ -78,20 +83,55 @@ class DeclareWorkShiftController:
             self.refresh()
 
     def refresh(self) -> None:
-        try:
+        def _fn() -> object:
             models = self._service.list_work_shifts()
-            rows = [(m.id, m.shift_code, m.time_in, m.time_out) for m in models]
+            return [(m.id, m.shift_code, m.time_in, m.time_out) for m in models]
+
+        def _ok(result: object) -> None:
+            rows = list(result or []) if isinstance(result, list) else []
             self._content.set_work_shifts(rows)
             self._title_bar2.set_total(len(rows))
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách ca làm việc")
-            self._content.set_work_shifts([])
-            self._title_bar2.set_total(0)
+            try:
+                self._content.set_work_shifts([])
+            except Exception:
+                pass
+            try:
+                self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_refresh(self) -> None:
         self._selected_shift_id = None
-        self._content.table.clearSelection()
+        # Reset UI immediately: clear table data and selection before async reload.
+        try:
+            if hasattr(self._content, "reset_table"):
+                self._content.reset_table()
+            else:
+                self._content.set_work_shifts([])
+                self._content.table.clearSelection()
+                try:
+                    sm = self._content.table.selectionModel()
+                    if sm is not None:
+                        from PySide6.QtCore import QItemSelectionModel, QModelIndex
+
+                        sm.setCurrentIndex(QModelIndex(), QItemSelectionModel.NoUpdate)
+                except Exception:
+                    pass
+        except Exception:
+            try:
+                self._content.table.clearSelection()
+            except Exception:
+                pass
         self._content.clear_form()
+        try:
+            self._title_bar2.set_total(0)
+        except Exception:
+            pass
         self.refresh()
 
     def _on_table_selection(self) -> None:

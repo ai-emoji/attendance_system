@@ -253,15 +253,24 @@ class ImportShiftAttendanceService:
             "tc1": "tc1",
             "tc2": "tc2",
             "tc3": "tc3",
+            "in_1_symbol": "in_1_symbol",
+            "symbol": "in_1_symbol",
             # Vietnamese (MainContent2)
             "Mã nv": "employee_code",
             "Mã NV": "employee_code",
             "Tên nhân viên": "full_name",
             "Họ và tên": "full_name",
             "Ngày": "work_date",
+            "Ngay": "work_date",
+            "Ngày công": "work_date",
+            "Ngay cong": "work_date",
             "Thứ": "weekday",
+            "Ký hiệu": "in_1_symbol",
+            "Ky hieu": "in_1_symbol",
+            "Kí hiệu": "in_1_symbol",
             "Ca": "shift_code",
             "Lịch NV": "schedule",
+            "Lịch làm việc": "schedule",
             "Vào 1": "in_1",
             "Ra 1": "out_1",
             "Vào 2": "in_2",
@@ -333,6 +342,35 @@ class ImportShiftAttendanceService:
                 return None
             return None
 
+        def extract_symbol_token(v: Any) -> str:
+            """Extract a short symbol code from a cell value.
+
+            Some files place attendance symbols in time columns (e.g. 'V', 'KR').
+            We treat these as in_1_symbol so the import doesn't drop them.
+            """
+
+            if v is None:
+                return ""
+            if isinstance(v, (time, datetime)):
+                return ""
+            s = str(v or "").strip()
+            if not s:
+                return ""
+            s2 = s.replace(" ", "")
+            # If it looks like a time, it's not a symbol.
+            if ":" in s2 or "." in s2:
+                return ""
+            # Reject obvious numbers.
+            if s2.isdigit():
+                return ""
+            # Keep short alpha-numeric codes like V, KR, OFF, KV...
+            if len(s2) > 12:
+                return ""
+            # Must contain at least one letter.
+            if not any(ch.isalpha() for ch in s2):
+                return ""
+            return s2
+
         def parse_decimal(v: Any) -> Decimal | None:
             if v is None:
                 return None
@@ -354,6 +392,24 @@ class ImportShiftAttendanceService:
                 return Decimal(s)
             except Exception:
                 return None
+
+        def parse_decimal_or_symbol(v: Any) -> Decimal | str | None:
+            """Parse a cell that may contain either a number or a symbol.
+
+            Some templates/users put symbols like 'V' into KH / KH+ columns.
+            The Shift Attendance UI logic also treats leave/leave_plus as a symbol
+            in some cases.
+            """
+
+            if v is None:
+                return None
+            # First try numeric
+            dv = parse_decimal(v)
+            if dv is not None:
+                return dv
+            # Then try symbol token
+            sym = extract_symbol_token(v)
+            return sym or None
 
         wb = load_workbook(str(path), data_only=True)
         ws = wb.active
@@ -404,16 +460,32 @@ class ImportShiftAttendanceService:
                 if key == "work_date":
                     item[key] = parse_date(raw)
                 elif key in {"in_1", "out_1", "in_2", "out_2", "in_3", "out_3"}:
-                    item[key] = parse_time(raw)
+                    tv = parse_time(raw)
+                    if tv is not None:
+                        item[key] = tv
+                    else:
+                        # If user/device put a symbol code in a time column, keep it.
+                        sym = extract_symbol_token(raw)
+                        if sym:
+                            cur_sym = str(item.get("in_1_symbol") or "").strip()
+                            if not cur_sym:
+                                item["in_1_symbol"] = sym
+                            else:
+                                # Avoid duplicates; keep stable order.
+                                parts = [p for p in cur_sym.split("|") if p]
+                                if sym not in parts:
+                                    item["in_1_symbol"] = "|".join(parts + [sym])
+                        item[key] = None
                 elif key in {
                     "hours",
                     "work",
-                    "leave",
                     "hours_plus",
                     "work_plus",
-                    "leave_plus",
+                    # leave/leave_plus handled separately (can be symbol)
                 }:
                     item[key] = parse_decimal(raw)
+                elif key in {"leave", "leave_plus"}:
+                    item[key] = parse_decimal_or_symbol(raw)
                 else:
                     s = str(raw or "").strip()
                     item[key] = s if s else None
@@ -485,29 +557,294 @@ class ImportShiftAttendanceService:
         except Exception:
             pass
 
-        # Build keys for existing lookup
-        pairs: list[tuple[str, str]] = []
+        # Build keys + employee lookup first (needed to map mcc_code -> attendance_code).
+        pairs_emp: list[tuple[str, str]] = []
         emp_codes: list[str] = []
+        work_dates: list[str] = []
         for r in rows:
             emp_code = str(r.get("employee_code") or "").strip()
             wd = str(r.get("work_date") or "").strip()
             if emp_code and wd:
-                pairs.append((emp_code, wd))
+                pairs_emp.append((emp_code, wd))
                 emp_codes.append(emp_code)
+            work_dates.append(wd)
 
-        existing_map = {}
-        try:
-            existing_map = self._repo.get_existing_by_employee_code_date(pairs)
-        except Exception:
-            # if DB lookup fails, we still allow insert best-effort
-            existing_map = {}
-
-        # Employee lookup (for attendance_code + employee_id)
         emp_lookup: dict[str, dict[str, Any]] = {}
         try:
             emp_lookup = self._repo.get_employees_by_codes(emp_codes)
         except Exception:
             emp_lookup = {}
+
+        # Existing lookup:
+        # - primary: by (employee_code, work_date)
+        # - fallback: by (attendance_code=mcc_code, work_date) for legacy downloaded rows
+        existing_map_by_emp: dict[tuple[str, str], dict[str, Any]] = {}
+        try:
+            existing_map_by_emp = self._repo.get_existing_by_employee_code_date(
+                pairs_emp
+            )
+        except Exception:
+            existing_map_by_emp = {}
+
+        pairs_att: list[tuple[str, str]] = []
+        try:
+            for emp_code, wd in pairs_emp:
+                emp = emp_lookup.get(str(emp_code).lower())
+                mcc = str((emp or {}).get("mcc_code") or "").strip()
+                if mcc:
+                    pairs_att.append((mcc, wd))
+        except Exception:
+            pairs_att = []
+
+        existing_map_by_att: dict[tuple[str, str], dict[str, Any]] = {}
+        try:
+            if pairs_att:
+                existing_map_by_att = self._repo.get_existing_by_attendance_code_date(
+                    pairs_att
+                )
+        except Exception:
+            existing_map_by_att = {}
+
+        def _get_existing_row(emp_code: str, wd: str) -> dict[str, Any] | None:
+            k = (str(emp_code or "").strip(), str(wd or "").strip())
+            if k[0] and k[1]:
+                r0 = existing_map_by_emp.get(k)
+                if r0:
+                    return r0
+            emp = emp_lookup.get(str(emp_code or "").lower())
+            mcc = str((emp or {}).get("mcc_code") or "").strip()
+            if mcc and k[1]:
+                return existing_map_by_att.get((mcc, k[1]))
+            return None
+
+        def _iter_dates_inclusive(from_iso: str, to_iso: str) -> list[str]:
+            try:
+                d0 = date.fromisoformat(str(from_iso))
+                d1 = date.fromisoformat(str(to_iso))
+            except Exception:
+                return []
+            if d1 < d0:
+                d0, d1 = d1, d0
+            days = (d1 - d0).days
+            # Guardrail: importing an extremely wide range can create too many rows.
+            if days > 180:
+                return []
+            out: list[str] = []
+            cur = d0
+            while cur <= d1:
+                out.append(cur.isoformat())
+                cur = cur.fromordinal(cur.toordinal() + 1)
+            return out
+
+        def _get_existing_pairs(pairs0: list[tuple[str, str]]) -> set[tuple[str, str]]:
+            existing: set[tuple[str, str]] = set()
+            if not pairs0:
+                return existing
+
+            # Reverse map: mcc_code(attendance_code) -> employee_code for the imported population.
+            mcc_to_emp: dict[str, str] = {}
+            try:
+                for ec0 in emp_codes:
+                    emp0 = emp_lookup.get(str(ec0 or "").lower())
+                    mcc0 = str((emp0 or {}).get("mcc_code") or "").strip()
+                    if mcc0:
+                        mcc_to_emp[mcc0] = str(ec0)
+            except Exception:
+                mcc_to_emp = {}
+
+            # Chunk to avoid overly long IN lists.
+            step = 800
+            for i0 in range(0, len(pairs0), step):
+                part = pairs0[i0 : i0 + step]
+                # 1) employee_code based
+                try:
+                    m1 = self._repo.get_existing_by_employee_code_date(part)
+                except Exception:
+                    m1 = {}
+                for k in (m1 or {}).keys():
+                    try:
+                        ec, wd = k
+                        if ec and wd:
+                            existing.add((str(ec).strip(), str(wd).strip()))
+                    except Exception:
+                        continue
+
+                # 2) attendance_code based (mcc_code) to catch legacy downloaded rows
+                try:
+                    part2: list[tuple[str, str]] = []
+                    for ec, wd in part:
+                        emp = emp_lookup.get(str(ec or "").lower())
+                        mcc = str((emp or {}).get("mcc_code") or "").strip()
+                        if mcc and wd:
+                            part2.append((mcc, wd))
+                    if part2:
+                        m2 = self._repo.get_existing_by_attendance_code_date(part2)
+                    else:
+                        m2 = {}
+                except Exception:
+                    m2 = {}
+                if m2:
+                    # Map back to (employee_code, work_date) so callers can skip placeholders
+                    for (att_code, wd), row in (m2 or {}).items():
+                        try:
+                            ec2 = str((row or {}).get("employee_code") or "").strip()
+                            if not ec2:
+                                ec2 = str(
+                                    mcc_to_emp.get(str(att_code or "").strip()) or ""
+                                ).strip()
+                            if ec2 and wd:
+                                existing.add((ec2, str(wd).strip()))
+                        except Exception:
+                            continue
+            return existing
+
+        def _build_missing_day_payloads(
+            *,
+            from_date_iso: str,
+            to_date_iso: str,
+        ) -> tuple[list[dict[str, Any]], set[tuple[str, str]]]:
+            """Create placeholder rows for days without any attendance_audit row.
+
+            Returns (payloads, affected_pairs).
+            """
+
+            date_list = _iter_dates_inclusive(from_date_iso, to_date_iso)
+            if not date_list:
+                return ([], set())
+
+            # Only generate placeholders for employees that can be mapped to employee_id.
+            emp_id_by_code: dict[str, int] = {}
+            for code in emp_codes:
+                c = str(code or "").strip()
+                if not c:
+                    continue
+                emp = emp_lookup.get(c.lower())
+                if not emp or emp.get("id") is None:
+                    continue
+                try:
+                    eid = int(emp.get("id"))
+                except Exception:
+                    continue
+                if eid > 0:
+                    emp_id_by_code[c] = eid
+
+            if not emp_id_by_code:
+                return ([], set())
+
+            # Strongest existence check: any row for (employee_id, work_date) should block placeholder.
+            existing_empid_pairs: set[tuple[int, str]] = set()
+            try:
+                all_pairs_empid: list[tuple[int, str]] = []
+                for _ec, _eid in emp_id_by_code.items():
+                    for d_iso in date_list:
+                        all_pairs_empid.append((int(_eid), str(d_iso)))
+                # Chunk to avoid huge IN lists.
+                step2 = 800
+                for j0 in range(0, len(all_pairs_empid), step2):
+                    part_ids = all_pairs_empid[j0 : j0 + step2]
+                    try:
+                        existing_empid_pairs |= (
+                            self._repo.get_existing_employee_id_date_pairs(part_ids)
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                existing_empid_pairs = set()
+
+            # Preload schedule names for each date for all employee_ids (batch per date).
+            schedule_by_emp_date2: dict[tuple[int, str], str] = {}
+            try:
+                sched_repo2 = ScheduleWorkRepository()
+                ids_all = list(dict.fromkeys(list(emp_id_by_code.values())))
+                for d_iso in date_list:
+                    try:
+                        m2 = sched_repo2.get_employee_schedule_name_map(
+                            employee_ids=ids_all,
+                            on_date=str(d_iso),
+                        )
+                    except Exception:
+                        m2 = {}
+                    for eid2, name2 in (m2 or {}).items():
+                        sname2 = str(name2 or "").strip()
+                        if sname2:
+                            schedule_by_emp_date2[(int(eid2), str(d_iso))] = sname2
+            except Exception:
+                schedule_by_emp_date2 = {}
+
+            # Determine which (employee_code, date) pairs already exist in DB.
+            all_pairs: list[tuple[str, str]] = []
+            for ec, _eid in emp_id_by_code.items():
+                for d_iso in date_list:
+                    all_pairs.append((str(ec), str(d_iso)))
+            existing_pairs = _get_existing_pairs(all_pairs)
+
+            payloads: list[dict[str, Any]] = []
+            affected: set[tuple[str, str]] = set()
+            for ec, eid in emp_id_by_code.items():
+                emp = emp_lookup.get(ec.lower())
+                name = str(
+                    (emp or {}).get("full_name") or (emp or {}).get("name_on_mcc") or ""
+                ).strip()
+                mcc = str((emp or {}).get("mcc_code") or "").strip()
+
+                for d_iso in date_list:
+                    k = (str(ec).strip(), str(d_iso).strip())
+                    # If ANY row already exists for this employee_id+date (any device/attendance_code), skip placeholder.
+                    try:
+                        if (int(eid), str(d_iso).strip()) in existing_empid_pairs:
+                            continue
+                    except Exception:
+                        pass
+                    if k in existing_pairs:
+                        continue
+
+                    schedule_name = str(
+                        schedule_by_emp_date2.get((int(eid), str(d_iso))) or ""
+                    ).strip()
+                    weekday = ""
+                    try:
+                        weekday = self._weekday_label(date.fromisoformat(str(d_iso)))
+                    except Exception:
+                        weekday = ""
+
+                    payloads.append(
+                        {
+                            "attendance_code": mcc or str(ec),
+                            "device_no": 1,
+                            "device_id": None,
+                            "device_name": "",
+                            "employee_id": int(eid),
+                            "employee_code": str(ec),
+                            "full_name": name or None,
+                            "work_date": str(d_iso),
+                            "weekday": weekday or None,
+                            "schedule": schedule_name or None,
+                            "shift_code": None,
+                            "in_1_symbol": None,
+                            "in_1": None,
+                            "out_1": None,
+                            "in_2": None,
+                            "out_2": None,
+                            "in_3": None,
+                            "out_3": None,
+                            "late": None,
+                            "early": None,
+                            "hours": None,
+                            "work": None,
+                            "leave": None,
+                            "hours_plus": None,
+                            "work_plus": None,
+                            "leave_plus": None,
+                            "tc1": None,
+                            "tc2": None,
+                            "tc3": None,
+                            # IMPORTANT: allow future downloads to overwrite placeholders.
+                            "import_locked": 0,
+                        }
+                    )
+                    affected.add(k)
+
+            return (payloads, affected)
 
         # Schedule snapshot for each (employee_id, work_date).
         # If Excel doesn't provide schedule, we resolve current assignment on that date
@@ -573,6 +910,7 @@ class ImportShiftAttendanceService:
             "work_date",
             "weekday",
             "schedule",
+            "in_1_symbol",
             "in_1",
             "out_1",
             "in_2",
@@ -640,6 +978,7 @@ class ImportShiftAttendanceService:
         updated = 0
         skipped = 0
         failed = 0
+        inserted_missing = 0
 
         total = len(rows)
         for i, raw in enumerate(rows, start=1):
@@ -659,7 +998,7 @@ class ImportShiftAttendanceService:
                     progress_cb(i, False, emp_code or "(không mã)", "Thiếu dữ liệu")
                 continue
 
-            existing = existing_map.get((emp_code, wd))
+            existing = _get_existing_row(emp_code, wd)
             import_locked = int(existing.get("import_locked") or 0) if existing else 0
 
             # If not found in DB, we allow INSERT (create new row) from Excel import.
@@ -763,6 +1102,33 @@ class ImportShiftAttendanceService:
                     schedule = ""
             payload["schedule"] = schedule or None
 
+            # Optional symbol column (e.g. 'Ký hiệu')
+            sym = str(raw.get("in_1_symbol") or "").strip()
+            payload["in_1_symbol"] = sym or None
+
+            # KH/KH+ columns may carry a symbol in some user templates (e.g., 'V').
+            # DB columns are numeric on many installs; never push string into them.
+            def _merge_symbol_into_payload(val: Any) -> None:
+                try:
+                    s0 = str(val or "").strip()
+                except Exception:
+                    s0 = ""
+                if not s0:
+                    return
+                cur = str(payload.get("in_1_symbol") or "").strip()
+                if not cur:
+                    payload["in_1_symbol"] = s0
+                    return
+                parts = [p.strip() for p in cur.split("|") if p.strip()]
+                if s0 not in parts:
+                    payload["in_1_symbol"] = "|".join(parts + [s0])
+
+            for k_sym in ("leave", "leave_plus"):
+                v_sym = raw.get(k_sym)
+                if isinstance(v_sym, str) and str(v_sym).strip():
+                    _merge_symbol_into_payload(v_sym)
+                    payload[k_sym] = None
+
             # shift_code (Ca) is optional; upload only when provided.
             shift_code = str(raw.get("shift_code") or "").strip()
             payload["shift_code"] = shift_code or None
@@ -772,7 +1138,9 @@ class ImportShiftAttendanceService:
 
             # Decide action label
             if existing:
-                action = "OVERWRITE_DOWNLOAD" if import_locked == 0 else "UPDATE_CHANGED"
+                action = (
+                    "OVERWRITE_DOWNLOAD" if import_locked == 0 else "UPDATE_CHANGED"
+                )
                 updated += 1
             else:
                 action = "INSERT"
@@ -788,6 +1156,32 @@ class ImportShiftAttendanceService:
             )
             if progress_cb:
                 progress_cb(i, True, emp_code, action)
+
+        # Fill missing days in DB so Shift Attendance can show V/KV/OFF/Lễ correctly.
+        missing_payloads: list[dict[str, Any]] = []
+        missing_pairs: set[tuple[str, str]] = set()
+        try:
+            dates2 = [d for d in work_dates if d]
+            from_date2 = min(dates2) if dates2 else None
+            to_date2 = max(dates2) if dates2 else None
+            if from_date2 and to_date2:
+                missing_payloads, missing_pairs = _build_missing_day_payloads(
+                    from_date_iso=str(from_date2),
+                    to_date_iso=str(to_date2),
+                )
+        except Exception:
+            missing_payloads, missing_pairs = ([], set())
+
+        if missing_payloads:
+            try:
+                self._repo.upsert_import_rows(missing_payloads)
+                inserted_missing = int(len(missing_payloads))
+            except Exception:
+                # Non-fatal: importing actual rows still succeeded.
+                logger.exception(
+                    "Không thể tạo dòng placeholder cho ngày thiếu dữ liệu"
+                )
+                inserted_missing = 0
 
         # Execute upserts in one batch
         try:
@@ -805,28 +1199,49 @@ class ImportShiftAttendanceService:
             )
 
         # After import: recompute derived/computed columns and persist back to DB.
-        # This ensures columns like late/early/hours/work/tc/shift_code are consistent
-        # with current schedule/shift rules whenever import changes punch times.
+        # IMPORTANT: When user re-uploads, they expect recalculation even if the import
+        # decides to SKIP because values look unchanged. Therefore, recompute must be
+        # based on the uploaded Excel rows, not only on rows that were upserted.
         try:
-            if upsert_payloads:
-                affected_pairs: set[tuple[str, str]] = set()
-                provided_shift_code_by_pair: dict[tuple[str, str], str] = {}
+            if rows:
+                # Match affected rows by BOTH employee_code and attendance_code.
+                # Some DBs store/compare keys differently (e.g. '00004' vs '4').
+                affected_keys: set[tuple[str, str]] = set()  # (code, work_date)
+                provided_shift_code_by_key: dict[tuple[str, str], str] = {}
                 att_codes: list[str] = []
                 emp_ids: list[int] = []
                 dates: list[str] = []
 
-                for p in upsert_payloads:
-                    ec = str(p.get("employee_code") or "").strip()
+                def _add_key(code0: Any, wd0: Any) -> None:
+                    c0 = str(code0 or "").strip()
+                    d0 = str(wd0 or "").strip()
+                    if c0 and d0:
+                        affected_keys.add((c0, d0))
+
+                for p in rows:
                     wd = str(p.get("work_date") or "").strip()
-                    if ec and wd:
-                        affected_pairs.add((ec, wd))
+                    if wd:
                         dates.append(wd)
-                        sc = str(p.get("shift_code") or "").strip()
-                        if sc:
-                            provided_shift_code_by_pair[(ec, wd)] = sc
+
+                    ec = str(p.get("employee_code") or "").strip()
                     ac2 = str(p.get("attendance_code") or "").strip()
+                    _add_key(ec, wd)
+                    _add_key(ac2, wd)
+
+                    sc = str(p.get("shift_code") or "").strip()
+                    if sc:
+                        if ec and wd:
+                            provided_shift_code_by_key[(ec, wd)] = sc
+                        if ac2 and wd:
+                            provided_shift_code_by_key[(ac2, wd)] = sc
+
                     if ac2:
                         att_codes.append(ac2)
+                    # Also include employee_code in attendance_codes filter so the repo
+                    # can match either a.attendance_code OR a.employee_code.
+                    if ec:
+                        att_codes.append(ec)
+
                     try:
                         eid = p.get("employee_id")
                         if eid is not None:
@@ -840,7 +1255,15 @@ class ImportShiftAttendanceService:
                 from_date = min(dates) if dates else None
                 to_date = max(dates) if dates else None
 
-                if from_date and to_date and affected_pairs:
+                # Include missing-day placeholders in recompute persistence.
+                try:
+                    if missing_pairs:
+                        for (ec2, wd2) in missing_pairs:
+                            _add_key(ec2, wd2)
+                except Exception:
+                    pass
+
+                if from_date and to_date and affected_keys:
                     calc_service = ShiftAttendanceMainContent2Service()
                     rows_calc = calc_service.list_attendance_audit_arranged(
                         from_date=from_date,
@@ -851,7 +1274,7 @@ class ImportShiftAttendanceService:
                         overwrite_import_locked_computed=True,
                     )
 
-                    # Persist only exact imported (employee_code, work_date) pairs.
+                    # Persist only exact affected rows from this upload.
                     pending_updates: list[dict[str, Any]] = []
 
                     def _to_num(v: Any) -> Any:
@@ -873,10 +1296,17 @@ class ImportShiftAttendanceService:
                     for r in rows_calc or []:
                         try:
                             ec = str(r.get("employee_code") or "").strip()
+                            ac = str(r.get("attendance_code") or "").strip()
                             wd = str(r.get("date") or r.get("work_date") or "").strip()
-                            if not ec or not wd:
+                            if not wd:
                                 continue
-                            if (ec, wd) not in affected_pairs:
+
+                            # Accept match by either code.
+                            if (ec and (ec, wd) in affected_keys) or (
+                                ac and (ac, wd) in affected_keys
+                            ):
+                                pass
+                            else:
                                 continue
 
                             work_v = _to_num(r.get("work"))
@@ -903,7 +1333,16 @@ class ImportShiftAttendanceService:
                                     "tc3": r.get("tc3"),
                                     "total": total_v,
                                     "schedule": r.get("schedule"),
-                                    "shift_code": provided_shift_code_by_pair.get((ec, wd))
+                                    "shift_code": (
+                                        provided_shift_code_by_key.get((ec, wd))
+                                        if ec
+                                        else None
+                                    )
+                                    or (
+                                        provided_shift_code_by_key.get((ac, wd))
+                                        if ac
+                                        else None
+                                    )
                                     or r.get("shift_code"),
                                 }
                             )
@@ -911,15 +1350,59 @@ class ImportShiftAttendanceService:
                             continue
 
                     if pending_updates:
-                        ShiftAttendanceMainContent2Repository().update_computed_fields_by_id(
-                            pending_updates,
-                            allow_import_locked=True,
-                        )
+                        repo2 = ShiftAttendanceMainContent2Repository()
+
+                        # Temporarily unlock imported rows so computed-field updates follow
+                        # the same rules as normal rows, then lock again after done.
+                        unlocked_ok = False
+                        try:
+                            n_unlock = repo2.update_import_locked_by_id(
+                                pending_updates,
+                                import_locked=0,
+                            )
+                            unlocked_ok = int(n_unlock or 0) > 0
+                        except Exception:
+                            # Best-effort: continue; we still can update with allow_import_locked.
+                            repo2 = ShiftAttendanceMainContent2Repository()
+
+                        n_updated = 0
+                        try:
+                            n_updated = repo2.update_computed_fields_by_id(
+                                pending_updates,
+                                allow_import_locked=False,
+                            )
+
+                            # If unlock failed silently or WHERE(import_locked=0) matches nothing,
+                            # update 0 rows without raising. In that case, force-update.
+                            if (not bool(unlocked_ok)) or int(n_updated or 0) <= 0:
+                                repo2.update_computed_fields_by_id(
+                                    pending_updates,
+                                    allow_import_locked=True,
+                                )
+                        except Exception:
+                            # Fallback: allow updating even if rows stayed locked.
+                            repo2.update_computed_fields_by_id(
+                                pending_updates,
+                                allow_import_locked=True,
+                            )
+
+                        try:
+                            repo2.update_import_locked_by_id(
+                                pending_updates,
+                                import_locked=1,
+                            )
+                        except Exception:
+                            pass
         except Exception:
             # Do not fail the whole import if recompute fails; import itself succeeded.
             logger.exception("Không thể tính lại/cập nhật các cột tính toán sau import")
 
-        msg = f"Hoàn tất import: Thêm {inserted}, Cập nhập {updated}, Bỏ qua {skipped}, Lỗi {failed}."
+        extra = (
+            f" | Bổ sung ngày thiếu: {inserted_missing}"
+            if int(inserted_missing) > 0
+            else ""
+        )
+        msg = f"Hoàn tất import: Thêm {inserted}, Cập nhập {updated}, Bỏ qua {skipped}, Lỗi {failed}.{extra}"
         return ImportShiftAttendanceResult(
             True,
             msg,

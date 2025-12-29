@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+from core.threads import BackgroundTaskRunner
+
 from services.device_services import DeviceService
 from ui.dialog.title_dialog import MessageDialog
 
@@ -30,6 +32,7 @@ class DeviceController:
         self._service = service or DeviceService()
 
         self._selected_device_id: int | None = None
+        self._runner = BackgroundTaskRunner(self._parent_window, name="device_refresh")
 
     def bind(self) -> None:
         self._title_bar2.refresh_clicked.connect(self.on_refresh)
@@ -46,15 +49,27 @@ class DeviceController:
             self._content.set_connection_status("Chưa kết nối")
 
     def refresh(self) -> None:
-        try:
+        def _fn() -> object:
             models = self._service.list_devices()
-            rows = [(m.id, m.device_name, m.ip_address) for m in models]
+            return [(m.id, m.device_name, m.ip_address) for m in models]
+
+        def _ok(result: object) -> None:
+            rows = list(result or []) if isinstance(result, list) else []
             self._content.set_devices(rows)
             self._title_bar2.set_total(len(rows))
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách thiết bị")
-            self._content.set_devices([])
-            self._title_bar2.set_total(0)
+            try:
+                self._content.set_devices([])
+            except Exception:
+                pass
+            try:
+                self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_refresh(self) -> None:
         self._selected_device_id = None

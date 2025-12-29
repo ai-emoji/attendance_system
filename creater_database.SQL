@@ -192,10 +192,7 @@
     -- Tải dữ liệu chấm công (tạm) + lưu thô
     -- =========================
 
-    -- attendance_raw: BẢNG TEMPLATE (không lưu lâu dài).
-    -- Dữ liệu thô thực tế sẽ được lưu theo năm:
-    --   attendance_raw_YYYY (VD: attendance_raw_2025)
-    -- Ứng dụng sẽ tự tạo bảng theo năm khi cần (nếu user có quyền CREATE).
+    -- attendance_raw: lưu dữ liệu chấm công thô (lưu lâu dài)
     -- Quy ước:
     -- - attendance_code: mã chấm công (user_id trên máy)
     -- - work_date: ngày chấm công
@@ -276,12 +273,7 @@
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-    -- attendance_audit: BẢNG TEMPLATE (không lưu lâu dài).
-    -- Dữ liệu tổng hợp thực tế sẽ được lưu theo năm:
-    --   attendance_audit_YYYY (VD: attendance_audit_2025)
-    -- Ứng dụng sẽ tự tạo bảng theo năm khi cần (nếu user có quyền CREATE).
-    --
-    -- Dùng cho màn "Chấm công Theo ca" - MainContent2
+    -- attendance_audit: dữ liệu chấm công theo ca đã tổng hợp (dùng cho màn "Chấm công Theo ca" - MainContent2)
     -- Ghi chú:
     -- - Đây là bảng lưu kết quả/tổng hợp để UI gọi lại từ DB
     -- - Nếu chưa có dữ liệu, UI sẽ hiển thị rỗng
@@ -297,6 +289,7 @@
         full_name VARCHAR(255) NULL COMMENT 'Họ và tên nhân viên',
         work_date DATE NOT NULL COMMENT 'Ngày chấm công',
         weekday VARCHAR(20) NULL COMMENT 'Thứ trong tuần (chuỗi hiển thị)',
+        in_1_symbol VARCHAR(50) NULL COMMENT 'Ký hiệu import/override (VD: OFF, V, Lễ...)',
         in_1 TIME NULL COMMENT 'Giờ vào lần 1',
         out_1 TIME NULL COMMENT 'Giờ ra lần 1',
         in_2 TIME NULL COMMENT 'Giờ vào lần 2',
@@ -307,17 +300,27 @@
         early VARCHAR(20) NULL COMMENT 'Về sớm (chuỗi/tổng hợp theo rule)',
         hours DECIMAL(10,2) NULL COMMENT 'Tổng giờ làm (giờ)',
         work DECIMAL(10,2) NULL COMMENT 'Số công (ví dụ 1.0, 0.5)',
-        `leave` DECIMAL(10,2) NULL COMMENT 'ký hiệu công (nếu có)',
-        hours_plus DECIMAL(10,2) NULL COMMENT 'tổng giờ công nghỉ bổ sung (nếu có)',
-        work_plus DECIMAL(10,2) NULL COMMENT 'Số công nghỉ bổ sung (nếu có)',
-        leave_plus DECIMAL(10,2) NULL COMMENT 'ký hiệu nghỉ bổ sung (nếu có)',
-        tc1 VARCHAR(50) NULL COMMENT 'Ký hiệu tăng ca (TC1)',
-        tc2 VARCHAR(50) NULL COMMENT 'Ký hiệu tăng ca 2 (TC2)',
-        tc3 VARCHAR(50) NULL COMMENT 'Ký hiệu tăng ca 3 (TC3)',
-        total DECIMAL(10,2) NULL COMMENT 'Tổng (thường = Công + Công +)',
+        `leave` DECIMAL(10,2) NULL COMMENT 'Số giờ/công nghỉ phép',
+        hours_plus VARCHAR(10) NULL COMMENT 'Ký hiệu cộng thêm cho giờ (ví dụ "+", áp dụng theo điều kiện từ in_1..out_3)',
+        work_plus  VARCHAR(10) NULL COMMENT 'Ký hiệu cộng thêm cho công (ví dụ "+", áp dụng theo điều kiện từ in_1..out_3)',
+        leave_plus VARCHAR(10) NULL COMMENT 'Ký hiệu cộng thêm cho phép (ví dụ "+", áp dụng theo điều kiện từ in_1..out_3)',
+        tc1 DECIMAL(10,2) NULL COMMENT 'Giờ tăng ca 1 (giờ)',
+        tc2 DECIMAL(10,2) NULL COMMENT 'Giờ tăng ca 2 (giờ)',
+        tc3 DECIMAL(10,2) NULL COMMENT 'Giờ tăng ca 3 (giờ)',
+        total DECIMAL(10,2) NULL COMMENT 'Tổng công (work + work_plus) - cache cho UI',
         schedule VARCHAR(255) NULL COMMENT 'Tên lịch/ca áp dụng (chuỗi hiển thị)',
+        shift_code VARCHAR(255) NULL COMMENT 'Mã ca (chuỗi hiển thị) - dùng khi import/khóa công',
+        CONSTRAINT fk_attendance_audit_device
+            FOREIGN KEY (device_id)
+            REFERENCES hr_attendance.devices (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE,
 
-        shift_code VARCHAR(255) NULL COMMENT 'Mã ca đã xác định theo lịch/ca (có thể ghép: HC+CH)',
+        CONSTRAINT fk_attendance_audit_employee
+            FOREIGN KEY (employee_id)
+            REFERENCES hr_attendance.employees (id)
+            ON DELETE SET NULL
+            ON UPDATE CASCADE,
 
         -- Nếu = 1: dữ liệu đã được chỉnh bằng "Import dữ liệu chấm công" -> không tự động ghi đè khi sync
         import_locked TINYINT(1) NOT NULL DEFAULT 0,
@@ -331,119 +334,6 @@
         KEY idx_attendance_audit_employee_date (employee_id, work_date),
         KEY idx_attendance_audit_employee_code_date (employee_code, work_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-    -- =========================
-    -- Tạo bảng chấm công theo năm
-    -- =========================
-    -- Tạo 2 bảng theo năm dựa trên TEMPLATE:
-    -- - attendance_raw_YYYY
-    -- - attendance_audit_YYYY
-    -- Lưu ý: cần quyền CREATE TABLE.
-
-    DROP PROCEDURE IF EXISTS hr_attendance.sp_create_attendance_year_tables;
-    DELIMITER $$
-    CREATE PROCEDURE hr_attendance.sp_create_attendance_year_tables(IN p_year INT)
-    BEGIN
-        DECLARE v_has_work_date_idx INT DEFAULT 0;
-        DECLARE v_has_employee_date_idx INT DEFAULT 0;
-        SET @y := IFNULL(p_year, YEAR(CURDATE()));
-        SET @tbl_raw := CONCAT('hr_attendance.attendance_raw_', @y);
-        SET @tbl_audit := CONCAT('hr_attendance.attendance_audit_', @y);
-        SET @tbl_audit_name := CONCAT('attendance_audit_', @y);
-
-        SET @sql_raw := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_raw, ' LIKE hr_attendance.attendance_raw');
-        PREPARE stmt_raw FROM @sql_raw; EXECUTE stmt_raw; DEALLOCATE PREPARE stmt_raw;
-
-        SET @sql_audit := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_audit, ' LIKE hr_attendance.attendance_audit');
-        PREPARE stmt_audit FROM @sql_audit; EXECUTE stmt_audit; DEALLOCATE PREPARE stmt_audit;
-
-        -- Ensure mandatory indexes for large datasets (80K -> 1M records)
-        -- Requirement (by columns):
-        --  - (work_date)
-        --  - (employee_id, work_date)
-        -- Note: Table created via LIKE already copies indexes, but this block
-        --       protects older DBs where yearly tables were created without indexes.
-
-        -- Any index starting with work_date
-        SELECT COUNT(*) INTO v_has_work_date_idx
-        FROM (
-            SELECT s.index_name,
-                   SUM(s.seq_in_index = 1 AND s.column_name = 'work_date') AS ok
-            FROM information_schema.statistics s
-            WHERE s.table_schema = 'hr_attendance'
-              AND s.table_name = @tbl_audit_name
-              AND s.index_name <> 'PRIMARY'
-            GROUP BY s.index_name
-        ) t
-        WHERE t.ok = 1;
-
-        IF v_has_work_date_idx = 0 THEN
-            SET @sql_add_idx_work_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_work_date (work_date)');
-            PREPARE stmt_idx1 FROM @sql_add_idx_work_date; EXECUTE stmt_idx1; DEALLOCATE PREPARE stmt_idx1;
-        END IF;
-
-        -- Any index starting with (employee_id, work_date)
-        SELECT COUNT(*) INTO v_has_employee_date_idx
-        FROM (
-            SELECT s.index_name,
-                   SUM(s.seq_in_index = 1 AND s.column_name = 'employee_id') AS ok1,
-                   SUM(s.seq_in_index = 2 AND s.column_name = 'work_date') AS ok2
-            FROM information_schema.statistics s
-            WHERE s.table_schema = 'hr_attendance'
-              AND s.table_name = @tbl_audit_name
-              AND s.index_name <> 'PRIMARY'
-            GROUP BY s.index_name
-        ) t
-        WHERE t.ok1 = 1 AND t.ok2 = 1;
-
-        IF v_has_employee_date_idx = 0 THEN
-            SET @sql_add_idx_employee_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_employee_date (employee_id, work_date)');
-            PREPARE stmt_idx2 FROM @sql_add_idx_employee_date; EXECUTE stmt_idx2; DEALLOCATE PREPARE stmt_idx2;
-        END IF;
-    END$$
-    DELIMITER ;
-
-    -- KHÔNG tạo bảng theo năm trước.
-    -- Ứng dụng sẽ tự tạo attendance_raw_YYYY / attendance_audit_YYYY khi phát sinh dữ liệu năm đó.
-    -- Nếu cần tạo thủ công, chạy:
-    --   CALL hr_attendance.sp_create_attendance_year_tables(2026);
-
-
-    -- Add column total if missing (migrate for existing DB)
-    SET @col_audit_total := (
-        SELECT COUNT(*)
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = 'hr_attendance'
-          AND TABLE_NAME = 'attendance_audit'
-          AND COLUMN_NAME = 'total'
-    );
-    SET @sql_add_audit_total := IF(
-        @col_audit_total = 0,
-        'ALTER TABLE hr_attendance.attendance_audit ADD COLUMN total DECIMAL(10,2) NULL AFTER tc3',
-        'SELECT \'attendance_audit.total already exists\''
-    );
-    PREPARE stmt_add_audit_total FROM @sql_add_audit_total;
-    EXECUTE stmt_add_audit_total;
-    DEALLOCATE PREPARE stmt_add_audit_total;
-
-
-    -- Add column shift_code if missing (migrate for existing DB)
-    SET @col_audit_shift_code := (
-        SELECT COUNT(*)
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = 'hr_attendance'
-          AND TABLE_NAME = 'attendance_audit'
-          AND COLUMN_NAME = 'shift_code'
-    );
-    SET @sql_add_audit_shift_code := IF(
-        @col_audit_shift_code = 0,
-        'ALTER TABLE hr_attendance.attendance_audit ADD COLUMN shift_code VARCHAR(255) NULL AFTER schedule',
-        'SELECT \'attendance_audit.shift_code already exists\''
-    );
-    PREPARE stmt_add_audit_shift_code FROM @sql_add_audit_shift_code;
-    EXECUTE stmt_add_audit_shift_code;
-    DEALLOCATE PREPARE stmt_add_audit_shift_code;
 
 
     -- Khai báo Ca làm việc

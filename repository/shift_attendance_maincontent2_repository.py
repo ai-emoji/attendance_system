@@ -25,6 +25,96 @@ logger = logging.getLogger(__name__)
 class ShiftAttendanceMainContent2Repository:
     TABLE = "attendance_audit"
 
+    def update_import_locked_by_id(
+        self,
+        items: list[dict[str, Any]],
+        *,
+        import_locked: int,
+    ) -> int:
+        """Batch update import_locked by attendance_audit.id.
+
+        Expected keys per item:
+        - id (required)
+        - work_date or date (required for routing to attendance_audit_YYYY)
+        """
+
+        lock_val = 1 if int(import_locked) == 1 else 0
+
+        cleaned: list[dict[str, Any]] = []
+        for it in items or []:
+            if not isinstance(it, dict):
+                continue
+            audit_id = it.get("id")
+            if audit_id is None:
+                continue
+            try:
+                aid = int(audit_id)
+            except Exception:
+                continue
+
+            wd = it.get("work_date")
+            if wd is None:
+                wd = it.get("date")
+            if wd is None:
+                continue
+            # Normalize date to ISO string
+            try:
+                if hasattr(wd, "isoformat"):
+                    wd_s = wd.isoformat()  # type: ignore[assignment]
+                else:
+                    wd_s = str(wd).strip()
+            except Exception:
+                wd_s = str(wd).strip()
+            if not wd_s:
+                continue
+
+            cleaned.append({"id": aid, "work_date": wd_s})
+
+        if not cleaned:
+            return 0
+
+        by_year: dict[int, list[tuple[Any, ...]]] = {}
+        legacy: list[tuple[Any, ...]] = []
+        for r in cleaned:
+            y = Database._year_from_work_date(r.get("work_date"))
+            tup = (int(lock_val), int(r["id"]))
+            if y is None:
+                legacy.append(tup)
+            else:
+                by_year.setdefault(int(y), []).append(tup)
+
+        sql_tpl = "UPDATE {table} SET import_locked=%s WHERE id=%s"
+
+        cursor = None
+        try:
+            with Database.connect() as conn:
+                cursor = Database.get_cursor(conn, dictionary=False)
+                total_updated = 0
+
+                if legacy:
+                    cursor.executemany(sql_tpl.format(table=self.TABLE), legacy)
+                    total_updated += int(cursor.rowcount or 0)
+
+                for year in sorted(by_year.keys()):
+                    table = Database.ensure_year_table(conn, self.TABLE, int(year))
+                    payload = by_year.get(year, [])
+                    if not payload:
+                        continue
+                    cursor.executemany(sql_tpl.format(table=table), payload)
+                    total_updated += int(cursor.rowcount or 0)
+
+                try:
+                    conn.commit()
+                except Exception:
+                    pass
+                return int(total_updated)
+        except Exception:
+            logger.exception("Lỗi update_import_locked_by_id")
+            raise
+        finally:
+            if cursor is not None:
+                cursor.close()
+
     def update_computed_fields_by_id(
         self,
         items: list[dict[str, Any]],
@@ -86,11 +176,13 @@ class ShiftAttendanceMainContent2Repository:
         if not cleaned:
             return 0
 
-        def _norm_str(v: Any) -> str | None:
+        def _norm_str(v: Any, *, keep_empty: bool = False) -> str | None:
             if v is None:
                 return None
             s = str(v).strip()
-            return s if s else None
+            if s:
+                return s
+            return "" if bool(keep_empty) else None
 
         def _norm_num(v: Any) -> Any:
             if v is None:
@@ -114,8 +206,8 @@ class ShiftAttendanceMainContent2Repository:
         for r in cleaned:
             y = Database._year_from_work_date(r.get("work_date"))
             tup = (
-                _norm_str(r.get("late")),
-                _norm_str(r.get("early")),
+                _norm_str(r.get("late"), keep_empty=True),
+                _norm_str(r.get("early"), keep_empty=True),
                 _norm_num(r.get("hours")),
                 _norm_num(r.get("work")),
                 _norm_num(r.get("hours_plus")),
@@ -134,7 +226,9 @@ class ShiftAttendanceMainContent2Repository:
                 by_year.setdefault(int(y), []).append(tup)
 
         # Prefer full schema update (total + shift_code). Fall back if missing.
-        where_locked_sql = "" if bool(allow_import_locked) else " AND COALESCE(import_locked, 0) = 0"
+        where_locked_sql = (
+            "" if bool(allow_import_locked) else " AND COALESCE(import_locked, 0) = 0"
+        )
 
         update_full_tpl = (
             "UPDATE {table} SET "
@@ -305,9 +399,7 @@ class ShiftAttendanceMainContent2Repository:
 
                 for year in sorted(by_year.keys()):
                     table = Database.ensure_year_table(conn, self.TABLE, int(year))
-                    total_updated += _exec_many(
-                        cursor, table, by_year.get(year, [])
-                    )
+                    total_updated += _exec_many(cursor, table, by_year.get(year, []))
                 try:
                     conn.commit()
                 except Exception:
@@ -353,7 +445,9 @@ class ShiftAttendanceMainContent2Repository:
                 continue
 
             c = str(code or "").strip()
-            cleaned.append((aid, c if c else None, str(work_date) if work_date else None))
+            cleaned.append(
+                (aid, c if c else None, str(work_date) if work_date else None)
+            )
 
         if not cleaned:
             return 0
@@ -385,7 +479,9 @@ class ShiftAttendanceMainContent2Repository:
                     except Exception as exc:
                         msg = str(exc)
                         if "import_locked" in msg and "Unknown column" in msg:
-                            query0 = f"UPDATE {self.TABLE} SET shift_code = %s WHERE id = %s"
+                            query0 = (
+                                f"UPDATE {self.TABLE} SET shift_code = %s WHERE id = %s"
+                            )
                             cursor.executemany(query0, legacy)
                         else:
                             raise
@@ -732,16 +828,29 @@ class ShiftAttendanceMainContent2Repository:
                 parts.append("a.employee_id IN (" + ",".join(["%s"] * len(ids)) + ")")
                 params.extend(ids)
             if codes:
+                # Backward-compat: some data sources store the key in employee_code
+                # instead of attendance_code. Match both.
                 parts.append(
-                    "a.attendance_code IN (" + ",".join(["%s"] * len(codes)) + ")"
+                    "(a.attendance_code IN ("
+                    + ",".join(["%s"] * len(codes))
+                    + ") OR a.employee_code IN ("
+                    + ",".join(["%s"] * len(codes))
+                    + "))"
                 )
+                params.extend(codes)
                 params.extend(codes)
             if parts:
                 where.append("(" + " OR ".join(parts) + ")")
 
         join_sql = (
             " LEFT JOIN hr_attendance.employees e "
-            "   ON (e.id = a.employee_id OR e.mcc_code = a.attendance_code OR e.employee_code = a.attendance_code) "
+            "   ON ("
+            "        e.id = a.employee_id "
+            "     OR e.mcc_code = a.attendance_code "
+            "     OR e.mcc_code = a.employee_code "
+            "     OR e.employee_code = a.attendance_code "
+            "     OR e.employee_code = a.employee_code"
+            "   ) "
         )
         if department_id is not None:
             where.append("e.department_id = %s")
@@ -775,6 +884,7 @@ class ShiftAttendanceMainContent2Repository:
             "a.id, "
             "a.attendance_code, a.employee_code, a.full_name, a.work_date AS date, a.weekday, "
             "a.import_locked, "
+            "a.in_1_symbol, "
             "a.in_1, a.out_1, a.in_2, a.out_2, a.in_3, a.out_3, "
             "a.late, a.early, a.hours, a.work, a.`leave`, a.`leave` AS kh, a.hours_plus, a.work_plus, a.leave_plus, "
             "CASE "
@@ -802,11 +912,47 @@ class ShiftAttendanceMainContent2Repository:
             "ORDER BY a.work_date ASC, a.employee_code ASC, a.id ASC"
         )
 
+        # Backward-compat: some installs/tables don't have shift_code yet.
+        # Keep in_1_symbol so imported symbols (OFF/V/Lễ) can still display.
+        query_no_shift_tpl = (
+            "SELECT "
+            "a.id, "
+            "a.attendance_code, a.employee_code, a.full_name, a.work_date AS date, a.weekday, "
+            "a.import_locked, "
+            "a.in_1_symbol, "
+            "a.in_1, a.out_1, a.in_2, a.out_2, a.in_3, a.out_3, "
+            "a.late, a.early, a.hours, a.work, a.`leave`, a.`leave` AS kh, a.hours_plus, a.work_plus, a.leave_plus, "
+            "CASE "
+            "  WHEN a.work IS NULL AND a.work_plus IS NULL THEN NULL "
+            "  ELSE (COALESCE(a.work, 0) + COALESCE(a.work_plus, 0)) "
+            "END AS total, "
+            "a.tc1, a.tc2, a.tc3, "
+            "NULL AS shift_code_db, "
+            "CASE "
+            "  WHEN COALESCE(a.import_locked, 0) = 1 THEN a.schedule "
+            "  ELSE COALESCE(("
+            "    SELECT s.schedule_name "
+            "    FROM hr_attendance.employee_schedule_assignments esa "
+            "    JOIN hr_attendance.arrange_schedules s ON s.id = esa.schedule_id "
+            "    WHERE esa.employee_id = e.id "
+            "      AND esa.effective_from <= a.work_date "
+            "      AND (esa.effective_to IS NULL OR esa.effective_to >= a.work_date) "
+            "    ORDER BY esa.effective_from DESC, esa.id DESC "
+            "    LIMIT 1"
+            "  ), a.schedule) "
+            "END AS schedule "
+            "FROM {FROM_SQL}"
+            f"{join_sql}"
+            f"{where_sql} "
+            "ORDER BY a.work_date ASC, a.employee_code ASC, a.id ASC"
+        )
+
         query_legacy_tpl = (
             "SELECT "
             "a.id, "
             "a.attendance_code, a.employee_code, a.full_name, a.work_date AS date, a.weekday, "
             "a.import_locked, "
+            "NULL AS in_1_symbol, "
             "a.in_1, a.out_1, a.in_2, a.out_2, a.in_3, a.out_3, "
             "a.late, a.early, a.hours, a.work, a.`leave`, a.`leave` AS kh, a.hours_plus, a.work_plus, a.leave_plus, "
             "CASE "
@@ -839,13 +985,24 @@ class ShiftAttendanceMainContent2Repository:
                 cursor = Database.get_cursor(conn, dictionary=True)
                 from_sql = _from_sql_for_years(conn)
                 query = query_tpl.replace("{FROM_SQL}", from_sql)
+                query_no_shift = query_no_shift_tpl.replace("{FROM_SQL}", from_sql)
                 query_legacy = query_legacy_tpl.replace("{FROM_SQL}", from_sql)
                 try:
                     cursor.execute(query, tuple(params))
                 except Exception as exc:
                     msg = str(exc)
-                    if "shift_code" in msg and "Unknown column" in msg:
-                        cursor.execute(query_legacy, tuple(params))
+                    if "Unknown column" in msg:
+                        # If shift_code is missing, retry a query that preserves in_1_symbol.
+                        if "shift_code" in msg:
+                            try:
+                                cursor.execute(query_no_shift, tuple(params))
+                            except Exception:
+                                # Fall back to legacy (drops in_1_symbol) only if needed.
+                                cursor.execute(query_legacy, tuple(params))
+                        elif "in_1_symbol" in msg:
+                            cursor.execute(query_legacy, tuple(params))
+                        else:
+                            raise
                     else:
                         raise
 
@@ -853,6 +1010,7 @@ class ShiftAttendanceMainContent2Repository:
                 for r in rows:
                     r.setdefault("shift_code_db", None)
                     r.setdefault("import_locked", 0)
+                    r.setdefault("in_1_symbol", None)
                 return rows
         except Exception:
             logger.exception("Lỗi list_rows (shift_attendance_maincontent2)")

@@ -52,6 +52,9 @@ DEFAULT_UI_SETTINGS: dict[str, Any] = {
         "column_visible": {},
     },
     "shift_attendance_table": {
+        # UI controls (Shift Attendance screen)
+        # Show/hide the "Import dữ liệu chấm công" button.
+        "show_import_button": True,
         # Font settings apply to table body.
         "font_size": 11,
         # "normal" | "bold"
@@ -71,6 +74,21 @@ DEFAULT_UI_SETTINGS: dict[str, Any] = {
         # Per-column visible: true/false (defaults to true when missing)
         "column_visible": {},
     },
+    "shift_attendance_state": {
+        # Persist basic view state for Shift Attendance (filters + UI toggles).
+        # Kept small and JSON-serializable (dates stored as yyyy-MM-dd strings).
+        "content1": {
+            "department_id": None,
+            "title_id": None,
+            "search_by_data": "auto",
+            "search_text": "",
+            "date_from": "",
+            "date_to": "",
+        },
+        "content2": {
+            "show_seconds": True,
+        },
+    },
     "schedule_work_table": {
         # Font settings apply to table body.
         "font_size": 11,
@@ -88,10 +106,10 @@ DEFAULT_UI_SETTINGS: dict[str, Any] = {
             "mcc_code": "center",
             "from_date": "center",
             "to_date": "center",
-            "full_name": "left",
-            "department_name": "left",
-            "title_name": "left",
-            "schedule_name": "left",
+            "full_name": "center",
+            "department_name": "center",
+            "title_name": "center",
+            "schedule_name": "center",
         },
         # Per-column: true/false (overrides table font_weight)
         "column_bold": {},
@@ -267,6 +285,7 @@ class EmployeeTableUI:
 
 @dataclass
 class ShiftAttendanceTableUI:
+    show_import_button: bool
     font_size: int
     font_weight: str
     header_font_size: int
@@ -499,6 +518,14 @@ def get_shift_attendance_table_ui() -> ShiftAttendanceTableUI:
     if not isinstance(t, dict):
         t = {}
 
+    show_import_button = bool(
+        t.get("show_import_button")
+        if "show_import_button" in t
+        else DEFAULT_UI_SETTINGS["shift_attendance_table"].get(
+            "show_import_button", True
+        )
+    )
+
     font_size = int(
         t.get("font_size") or DEFAULT_UI_SETTINGS["shift_attendance_table"]["font_size"]
     )
@@ -574,6 +601,7 @@ def get_shift_attendance_table_ui() -> ShiftAttendanceTableUI:
             column_align[k] = v
 
     return ShiftAttendanceTableUI(
+        show_import_button=show_import_button,
         font_size=font_size,
         font_weight=font_weight,
         header_font_size=header_font_size,
@@ -582,6 +610,87 @@ def get_shift_attendance_table_ui() -> ShiftAttendanceTableUI:
         column_bold=column_bold,
         column_visible=column_visible,
     )
+
+
+def get_shift_attendance_state() -> dict[str, Any]:
+    """Read persisted Shift Attendance view state.
+
+    Returns a dict with keys: content1, content2.
+    Values are JSON-serializable primitives (dates are yyyy-MM-dd strings).
+    """
+
+    data = load_ui_settings()
+    st = data.get("shift_attendance_state") if isinstance(data, dict) else None
+    if not isinstance(st, dict):
+        st = {}
+
+    defaults = DEFAULT_UI_SETTINGS.get("shift_attendance_state")
+    if not isinstance(defaults, dict):
+        defaults = {}
+
+    # Merge with defaults defensively.
+    c1 = st.get("content1")
+    if not isinstance(c1, dict):
+        c1 = {}
+    d1 = defaults.get("content1") if isinstance(defaults.get("content1"), dict) else {}
+    merged_c1: dict[str, Any] = dict(d1)
+    merged_c1.update(
+        {
+            k: v
+            for k, v in c1.items()
+            if k in d1
+            or k
+            in {
+                "department_id",
+                "title_id",
+                "search_by_data",
+                "search_text",
+                "date_from",
+                "date_to",
+            }
+        }
+    )
+
+    c2 = st.get("content2")
+    if not isinstance(c2, dict):
+        c2 = {}
+    d2 = defaults.get("content2") if isinstance(defaults.get("content2"), dict) else {}
+    merged_c2: dict[str, Any] = dict(d2)
+    merged_c2.update({k: v for k, v in c2.items() if k in d2 or k in {"show_seconds"}})
+
+    return {"content1": merged_c1, "content2": merged_c2}
+
+
+def update_shift_attendance_state(
+    *,
+    content1: dict[str, Any] | None = None,
+    content2: dict[str, Any] | None = None,
+) -> None:
+    """Persist Shift Attendance view state into ui_settings.json."""
+
+    data = load_ui_settings()
+    st = data.get("shift_attendance_state")
+    if not isinstance(st, dict):
+        st = {}
+
+    if content1 is not None:
+        c1 = st.get("content1")
+        if not isinstance(c1, dict):
+            c1 = {}
+        for k, v in dict(content1).items():
+            c1[str(k)] = v
+        st["content1"] = c1
+
+    if content2 is not None:
+        c2 = st.get("content2")
+        if not isinstance(c2, dict):
+            c2 = {}
+        for k, v in dict(content2).items():
+            c2[str(k)] = v
+        st["content2"] = c2
+
+    data["shift_attendance_state"] = st
+    save_ui_settings(data)
 
 
 def get_schedule_work_table_ui() -> ScheduleWorkTableUI:
@@ -1353,6 +1462,7 @@ def update_download_attendance_ui(
 
 def update_shift_attendance_table_ui(
     *,
+    show_import_button: bool | None = None,
     font_size: int | None = None,
     font_weight: str | None = None,
     header_font_size: int | None = None,
@@ -1368,6 +1478,9 @@ def update_shift_attendance_table_ui(
     t = data.get("shift_attendance_table")
     if not isinstance(t, dict):
         t = {}
+
+    if show_import_button is not None:
+        t["show_import_button"] = bool(show_import_button)
 
     if font_size is not None:
         try:

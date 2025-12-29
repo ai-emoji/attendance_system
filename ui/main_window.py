@@ -9,9 +9,12 @@ Theo .copilot_instructions:
 - Tài nguyên (icon/ảnh/stylesheet) phải load qua resource_path()
 """
 
-import logging
+from __future__ import annotations
 
-from PySide6.QtCore import Qt
+import logging
+from typing import TYPE_CHECKING
+
+from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -29,55 +32,28 @@ from core.resource import (
     MIN_MAINWINDOW_WIDTH,
     set_window_icon,
 )
-from ui.controllers.company_controllers import CompanyController
-from ui.controllers.declare_work_shift_controllers import DeclareWorkShiftController
-from ui.controllers.device_controllers import DeviceController
-from ui.controllers.department_controllers import DepartmentController
-from ui.controllers.employee_controllers import EmployeeController
-from ui.controllers.holiday_controllers import HolidayController
-from ui.controllers.csdl_controllers import CSDLController
-from ui.controllers.backup_controllers import BackupController
-from ui.controllers.absence_restore_controllers import AbsenceRestoreController
-from ui.controllers.title_controllers import TitleController
-from ui.controllers.download_attendance_controllers import DownloadAttendanceController
-from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
-from ui.controllers.arrange_schedule_controllers import ArrangeScheduleController
-from ui.controllers.schedule_work_controllers import ScheduleWorkController
+from core.ui_settings import update_shift_attendance_state
 from ui.common.footer import Footer as CommonFooter
 from ui.common.header import Header as CommonHeader
-from ui.widgets.department_widgets import MainContent as DepartmentContent
-from ui.widgets.department_widgets import TitleBar1 as DepartmentTitleBar1
-from ui.widgets.department_widgets import TitleBar2 as DepartmentTitleBar2
-from ui.widgets.holiday_widgets import MainContent as HolidayContent
-from ui.widgets.holiday_widgets import TitleBar1 as HolidayTitleBar1
-from ui.widgets.holiday_widgets import TitleBar2 as HolidayTitleBar2
-from ui.widgets.title_widgets import MainContent, TitleBar1, TitleBar2
-from ui.widgets.employee_widgets import MainContent as EmployeeContent
-from ui.widgets.employee_widgets import TitleBar1 as EmployeeTitleBar1
-from ui.widgets.device_widgets import (
-    MainContent as DeviceContent,
-    TitleBar1 as DeviceTitleBar1,
-    TitleBar2 as DeviceTitleBar2,
-)
-from ui.widgets.declare_work_shift_widgets import (
-    MainContent as DeclareWorkShiftContent,
-    TitleBar1 as DeclareWorkShiftTitleBar1,
-    TitleBar2 as DeclareWorkShiftTitleBar2,
-)
-from ui.widgets.download_attendance_widgets import (
-    MainContent as DownloadAttendanceContent,
-    TitleBar1 as DownloadAttendanceTitleBar1,
-    TitleBar2 as DownloadAttendanceTitleBar2,
-)
-from ui.widgets.shift_attendance_widgets import (
-    TitleBar1 as ShiftAttendanceTitleBar1,
-    MainContent1 as ShiftAttendanceContent1,
-    MainContent2 as ShiftAttendanceContent2,
-)
-from ui.widgets.arrange_schedule_widgets import ArrangeScheduleView
-from ui.widgets.schedule_work_widgets import ScheduleWorkView
-from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
-from ui.dialog.settings_dialog import SettingsDialog
+
+
+if TYPE_CHECKING:
+    from ui.controllers.absence_restore_controllers import AbsenceRestoreController
+    from ui.controllers.arrange_schedule_controllers import ArrangeScheduleController
+    from ui.controllers.backup_controllers import BackupController
+    from ui.controllers.company_controllers import CompanyController
+    from ui.controllers.csdl_controllers import CSDLController
+    from ui.controllers.declare_work_shift_controllers import DeclareWorkShiftController
+    from ui.controllers.department_controllers import DepartmentController
+    from ui.controllers.device_controllers import DeviceController
+    from ui.controllers.download_attendance_controllers import (
+        DownloadAttendanceController,
+    )
+    from ui.controllers.employee_controllers import EmployeeController
+    from ui.controllers.holiday_controllers import HolidayController
+    from ui.controllers.schedule_work_controllers import ScheduleWorkController
+    from ui.controllers.shift_attendance_controllers import ShiftAttendanceController
+    from ui.controllers.title_controllers import TitleController
 
 
 class Header(CommonHeader):
@@ -133,19 +109,38 @@ class Container(QWidget):
         if widgets:
             self._layout.setStretchFactor(widgets[-1], 1)
 
+    @staticmethod
+    def _defer_bind(controller: object) -> None:
+        """Defer controller.bind() to next event-loop tick so UI can render first."""
+
+        bind = getattr(controller, "bind", None)
+        if callable(bind):
+            QTimer.singleShot(0, bind)
+
     def show_job_title_view(self) -> None:
         """Hiển thị màn hình Khai báo Chức danh."""
+        from ui.controllers.title_controllers import TitleController
+        from ui.widgets.title_widgets import MainContent, TitleBar1, TitleBar2
+
         title1 = TitleBar1("Khai báo Chức danh", "assets/images/job_title.svg", self)
         title2 = TitleBar2("Tổng: 0", self)
         content = MainContent(self)
         self.set_container_widgets([title1, title2, content])
 
         # Controller CRUD
-        self._title_controller = TitleController(self.window(), title2, content)
-        self._title_controller.bind()
+        ctrl = TitleController(self.window(), title2, content)
+        self._title_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_department_view(self) -> None:
         """Hiển thị màn hình Khai báo Phòng ban."""
+        from ui.controllers.department_controllers import DepartmentController
+        from ui.widgets.department_widgets import (
+            MainContent as DepartmentContent,
+            TitleBar1 as DepartmentTitleBar1,
+            TitleBar2 as DepartmentTitleBar2,
+        )
+
         title1 = DepartmentTitleBar1(
             "Khai báo Phòng ban", "assets/images/department.svg", self
         )
@@ -153,33 +148,56 @@ class Container(QWidget):
         content = DepartmentContent(self)
         self.set_container_widgets([title1, title2, content])
 
-        self._department_controller = DepartmentController(
-            self.window(), title2, content
-        )
-        self._department_controller.bind()
+        ctrl = DepartmentController(self.window(), title2, content)
+        self._department_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_holiday_view(self) -> None:
         """Hiển thị màn hình Khai báo Ngày lễ."""
+        from ui.controllers.holiday_controllers import HolidayController
+        from ui.widgets.holiday_widgets import (
+            MainContent as HolidayContent,
+            TitleBar1 as HolidayTitleBar1,
+            TitleBar2 as HolidayTitleBar2,
+        )
+
         title1 = HolidayTitleBar1("Khai báo Ngày lễ", "assets/images/holiday.svg", self)
         title2 = HolidayTitleBar2("Tổng: 0", self)
         content = HolidayContent(self)
         self.set_container_widgets([title1, title2, content])
 
-        self._holiday_controller = HolidayController(self.window(), title2, content)
-        self._holiday_controller.bind()
+        ctrl = HolidayController(self.window(), title2, content)
+        self._holiday_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_device_view(self) -> None:
         """Hiển thị màn hình Thêm Máy chấm công."""
+        from ui.controllers.device_controllers import DeviceController
+        from ui.widgets.device_widgets import (
+            MainContent as DeviceContent,
+            TitleBar1 as DeviceTitleBar1,
+            TitleBar2 as DeviceTitleBar2,
+        )
+
         title1 = DeviceTitleBar1("Thêm Máy chấm công", "assets/images/device.svg", self)
         title2 = DeviceTitleBar2("Tổng: 0", self)
         content = DeviceContent(self)
         self.set_container_widgets([title1, title2, content])
 
-        self._device_controller = DeviceController(self.window(), title2, content)
-        self._device_controller.bind()
+        ctrl = DeviceController(self.window(), title2, content)
+        self._device_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_declare_work_shift_view(self) -> None:
         """Hiển thị màn hình Khai báo Ca làm việc."""
+        from ui.controllers.declare_work_shift_controllers import (
+            DeclareWorkShiftController,
+        )
+        from ui.widgets.declare_work_shift_widgets import (
+            MainContent as DeclareWorkShiftContent,
+            TitleBar1 as DeclareWorkShiftTitleBar1,
+            TitleBar2 as DeclareWorkShiftTitleBar2,
+        )
 
         title1 = DeclareWorkShiftTitleBar1(
             "Khai báo Ca làm việc", "assets/images/declare_work_shift.svg", self
@@ -188,24 +206,36 @@ class Container(QWidget):
         content = DeclareWorkShiftContent(self)
         self.set_container_widgets([title1, title2, content])
 
-        self._declare_work_shift_controller = DeclareWorkShiftController(
-            self.window(), title2, content
-        )
-        self._declare_work_shift_controller.bind()
+        ctrl = DeclareWorkShiftController(self.window(), title2, content)
+        self._declare_work_shift_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_employee_view(self) -> None:
         """Hiển thị màn hình Thông tin Nhân viên."""
+        from ui.controllers.employee_controllers import EmployeeController
+        from ui.widgets.employee_widgets import MainContent as EmployeeContent
+        from ui.widgets.employee_widgets import TitleBar1 as EmployeeTitleBar1
+
         title1 = EmployeeTitleBar1(
             "Thông tin Nhân viên", "assets/images/employee.svg", self
         )
         content = EmployeeContent(self)
         self.set_container_widgets([title1, content])
 
-        self._employee_controller = EmployeeController(self.window(), content)
-        self._employee_controller.bind()
+        ctrl = EmployeeController(self.window(), content)
+        self._employee_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_download_attendance_view(self) -> None:
         """Hiển thị màn hình Tải dữ liệu Máy chấm công."""
+        from ui.controllers.download_attendance_controllers import (
+            DownloadAttendanceController,
+        )
+        from ui.widgets.download_attendance_widgets import (
+            MainContent as DownloadAttendanceContent,
+            TitleBar1 as DownloadAttendanceTitleBar1,
+            TitleBar2 as DownloadAttendanceTitleBar2,
+        )
 
         title1 = DownloadAttendanceTitleBar1(
             "Tải dữ liệu Máy chấm công", "assets/images/download_attendance.svg", self
@@ -214,13 +244,20 @@ class Container(QWidget):
         content = DownloadAttendanceContent(self)
         self.set_container_widgets([title1, title2, content])
 
-        self._download_attendance_controller = DownloadAttendanceController(
-            self.window(), title2, content
-        )
-        self._download_attendance_controller.bind()
+        ctrl = DownloadAttendanceController(self.window(), title2, content)
+        self._download_attendance_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_shift_attendance_view(self) -> None:
         """Hiển thị màn hình Chấm công Theo ca."""
+        from ui.controllers.shift_attendance_controllers import (
+            ShiftAttendanceController,
+        )
+        from ui.widgets.shift_attendance_widgets import (
+            TitleBar1 as ShiftAttendanceTitleBar1,
+            MainContent1 as ShiftAttendanceContent1,
+            MainContent2 as ShiftAttendanceContent2,
+        )
 
         title1 = ShiftAttendanceTitleBar1(
             "Chấm công Theo ca", "assets/images/shift_attendance.svg", self
@@ -247,41 +284,65 @@ class Container(QWidget):
         splitter.setStretchFactor(1, 1)
 
         # Tỉ lệ mặc định: phần danh sách NV nhỏ hơn phần lưới chấm công.
+        # Tránh setSizes([1,1]) (pixel) vì có thể làm pane bị co/"ẩn" khi layout cập nhật.
+        def _init_splitter_sizes() -> None:
+            try:
+                h = int(splitter.size().height())
+            except Exception:
+                h = 0
+            try:
+                if h > 0:
+                    top = max(220, int(h * 0.35))
+                    bottom = max(220, h - top)
+                    splitter.setSizes([top, bottom])
+                else:
+                    splitter.setSizes([280, 520])
+            except Exception:
+                pass
+
         try:
-            splitter.setSizes([1, 1])
+            QTimer.singleShot(0, _init_splitter_sizes)
         except Exception:
-            pass
+            try:
+                _init_splitter_sizes()
+            except Exception:
+                pass
 
         content_layout.addWidget(splitter, 1)
 
         self.set_container_widgets([title1, content_root])
 
         # Controller: load phòng ban + danh sách nhân viên cho MainContent1
-        self._shift_attendance_controller = ShiftAttendanceController(
-            self.window(), content1, content2
-        )
-        self._shift_attendance_controller.bind()
+        ctrl = ShiftAttendanceController(self.window(), content1, content2)
+        self._shift_attendance_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_arrange_schedule_view(self) -> None:
         """Hiển thị màn hình Sắp xếp lịch Làm việc."""
+        from ui.controllers.arrange_schedule_controllers import (
+            ArrangeScheduleController,
+        )
+        from ui.widgets.arrange_schedule_widgets import ArrangeScheduleView
 
         view = ArrangeScheduleView(self)
         self.set_container_widgets([view])
 
         # Controller (hiện tại stub/no-op theo yêu cầu)
-        self._arrange_schedule_controller = ArrangeScheduleController(
-            self.window(), view.left, view.right
-        )
-        self._arrange_schedule_controller.bind()
+        ctrl = ArrangeScheduleController(self.window(), view.left, view.right)
+        self._arrange_schedule_controller = ctrl
+        self._defer_bind(ctrl)
 
     def show_schedule_work_view(self) -> None:
         """Hiển thị màn hình Sắp xếp lịch Làm việc."""
+        from ui.controllers.schedule_work_controllers import ScheduleWorkController
+        from ui.widgets.schedule_work_widgets import ScheduleWorkView
 
         view = ScheduleWorkView(self)
         self.set_container_widgets([view])
 
-        self._schedule_work_controller = ScheduleWorkController(self.window(), view)
-        self._schedule_work_controller.bind()
+        ctrl = ScheduleWorkController(self.window(), view)
+        self._schedule_work_controller = ctrl
+        self._defer_bind(ctrl)
 
 
 class Footer(CommonFooter):
@@ -339,11 +400,21 @@ class MainWindow(QMainWindow):
         self.container = Container(central_widget)
         self.footer = Footer(central_widget)
 
+        # Reset filter Shift Attendance khi thoát app (kể cả trường hợp bấm "Thoát\nỨng dụng"
+        # gọi QApplication.quit() và không đi qua closeEvent như kỳ vọng).
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                app.aboutToQuit.connect(self._on_about_to_quit)
+        except Exception:
+            pass
+
         # Controller cho dialog công ty
-        self._company_controller = CompanyController(self)
-        self._csdl_controller = CSDLController(self)
-        self._backup_controller = BackupController(self)
-        self._absence_restore_controller = AbsenceRestoreController(self)
+        # Lazy-init controllers on demand to keep startup fast.
+        self._company_controller = None
+        self._csdl_controller = None
+        self._backup_controller = None
+        self._absence_restore_controller = None
         self.header.action_triggered.connect(self._on_header_action_triggered)
 
         main_layout.addWidget(self.header)
@@ -353,11 +424,44 @@ class MainWindow(QMainWindow):
         # Căn giữa cửa sổ trên màn hình
         self._center_window()
 
+    def _reset_shift_attendance_filters_on_exit(self) -> None:
+        try:
+            update_shift_attendance_state(
+                content1={
+                    "department_id": None,
+                    "title_id": None,
+                    "search_by_data": "auto",
+                    "search_text": "",
+                    "date_from": "",
+                    "date_to": "",
+                }
+            )
+        except Exception:
+            # Best-effort
+            pass
+
+    def _on_about_to_quit(self) -> None:
+        # Đảm bảo reset filter là thao tác cuối trước khi app thoát.
+        self._reset_shift_attendance_filters_on_exit()
+
     def _on_header_action_triggered(self, action_text: str) -> None:
         """Điều phối sự kiện click phím chức năng trên Header."""
         action_text = str(action_text or "").strip()
         logging.getLogger(__name__).info("Header action clicked: %s", action_text)
+
+        # Note: UX requirement changed - even without DB connection/config,
+        # the app should still allow opening screens and show UI quickly.
+        # Controllers handle DB errors and will show empty UI when offline.
+
         if action_text == "Thông tin\nCông ty" and self._company_controller is not None:
+            self._company_controller.show_dialog()
+            return
+
+        if action_text == "Thông tin\nCông ty":
+            if self._company_controller is None:
+                from ui.controllers.company_controllers import CompanyController
+
+                self._company_controller = CompanyController(self)
             self._company_controller.show_dialog()
             return
 
@@ -382,6 +486,8 @@ class MainWindow(QMainWindow):
             return
 
         if action_text == "Ký hiệu\nChấm công":
+            from ui.dialog.attendance_symbol_dialog import AttendanceSymbolDialog
+
             dlg = AttendanceSymbolDialog(self)
             dlg.exec()
             return
@@ -418,7 +524,23 @@ class MainWindow(QMainWindow):
             self._csdl_controller.show_dialog()
             return
 
+        if action_text == "Kết nối\nCSDL SQL":
+            if self._csdl_controller is None:
+                from ui.controllers.csdl_controllers import CSDLController
+
+                self._csdl_controller = CSDLController(self)
+            self._csdl_controller.show_dialog()
+            return
+
         if action_text == "Sao lưu\nDữ liệu" and self._backup_controller is not None:
+            self._backup_controller.show_dialog()
+            return
+
+        if action_text == "Sao lưu\nDữ liệu":
+            if self._backup_controller is None:
+                from ui.controllers.backup_controllers import BackupController
+
+                self._backup_controller = BackupController(self)
             self._backup_controller.show_dialog()
             return
 
@@ -429,7 +551,19 @@ class MainWindow(QMainWindow):
             self._absence_restore_controller.show_dialog()
             return
 
+        if action_text == "Khôi phục\nDữ liệu":
+            if self._absence_restore_controller is None:
+                from ui.controllers.absence_restore_controllers import (
+                    AbsenceRestoreController,
+                )
+
+                self._absence_restore_controller = AbsenceRestoreController(self)
+            self._absence_restore_controller.show_dialog()
+            return
+
         if action_text == "Cài đặt":
+            from ui.dialog.settings_dialog import SettingsDialog
+
             dlg = SettingsDialog(self)
             dlg.exec()
             return
@@ -443,7 +577,11 @@ class MainWindow(QMainWindow):
         self.move(window_geometry.topLeft())
 
     def closeEvent(self, event) -> None:
-        """Khi đóng phần mềm: tự động xóa dữ liệu tải tạm trong download_attendance."""
+        """Khi đóng phần mềm.
+
+        - Tự động xóa dữ liệu tải tạm trong download_attendance.
+        - Reset filter tìm kiếm của màn Chấm công Theo ca cho lần mở sau.
+        """
 
         try:
             from services.download_attendance_services import DownloadAttendanceService
@@ -453,4 +591,9 @@ class MainWindow(QMainWindow):
             # Best-effort: không chặn app đóng nếu xóa thất bại
             pass
 
-        super().closeEvent(event)
+        # Để tránh trường hợp các widget con (ShiftAttendance) persist state trong hideEvent
+        # khi app đang đóng, reset state sau khi window đã close.
+        try:
+            super().closeEvent(event)
+        finally:
+            self._reset_shift_attendance_filters_on_exit()

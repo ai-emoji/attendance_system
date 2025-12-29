@@ -39,10 +39,15 @@ class ImportShiftAttendanceController:
         self._parent = parent
         self._service = service or ImportShiftAttendanceService()
 
-    def open(self) -> None:
+    def open(self) -> bool:
         dlg = ImportShiftAttendanceDialog(self._parent)
         self._wire(dlg)
-        dlg.exec()
+        try:
+            # QDialog.exec() returns 1 for Accepted, 0 for Rejected.
+            return bool(dlg.exec())
+        except Exception:
+            dlg.exec()
+            return False
 
     def _wire(self, dlg: ImportShiftAttendanceDialog) -> None:
         dlg.btn_view_template.clicked.connect(lambda: self._on_view_template(dlg))
@@ -217,7 +222,11 @@ class ImportShiftAttendanceController:
                 detail_msg_parts.append(f"Chi tiết đầy đủ đã lưu: {report_path}")
 
             MessageDialog.info_scroll(
-                dlg, "Import dữ liệu chấm công", "\n".join(detail_msg_parts), width=600, height=500
+                dlg,
+                "Import dữ liệu chấm công",
+                "\n".join(detail_msg_parts),
+                width=600,
+                height=500,
             )
         except Exception:
             try:

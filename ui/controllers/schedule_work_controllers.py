@@ -21,6 +21,7 @@ from core.threads import BackgroundTaskRunner
 from services.schedule_work_services import ScheduleWorkService
 from ui.dialog.title_dialog import MessageDialog
 from ui.dialog.schedule_work_settings import ScheduleWorkSettingsDialog
+from ui.dialog.loading_dialog import LoadingDialog
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,75 @@ class ScheduleWorkController:
         # Watch date change (midnight) to refresh default schedule column
         self._day_watch_timer: QTimer | None = None
         self._last_day_iso: str | None = None
-        self._search_runner = BackgroundTaskRunner(self._parent_window, name="schedule_work_search")
+        self._search_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_search"
+        )
+        self._tree_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_tree"
+        )
+        self._schedules_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_schedules"
+        )
+        self._temp_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_temp"
+        )
+
+        # Long-running mutations (DB writes): run in background with progress.
+        self._apply_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_apply"
+        )
+        self._delete_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_delete"
+        )
+        self._temp_mutate_runner = BackgroundTaskRunner(
+            self._parent_window, name="schedule_work_temp_mutate"
+        )
+
+        self._busy_dialog: LoadingDialog | None = None
+
+    def _close_busy(self) -> None:
+        dlg = getattr(self, "_busy_dialog", None)
+        self._busy_dialog = None
+        if dlg is None:
+            return
+        try:
+            dlg.finish_and_close(delay_ms=120)
+        except Exception:
+            try:
+                dlg.close()
+            except Exception:
+                pass
+
+    def _show_busy(
+        self,
+        *,
+        title: str,
+        message: str,
+        total: int | None = None,
+    ) -> LoadingDialog:
+        # Close any existing dialog (avoid stacking modals).
+        try:
+            self._close_busy()
+        except Exception:
+            pass
+
+        dlg = LoadingDialog(self._parent_window, title=title, message=message)
+        try:
+            if total is not None and int(total) > 0:
+                # Make animation duration scale with item count (keeps it smooth).
+                dlg.set_min_duration_ms(int(min(6000, max(900, int(total) * 12))))
+                dlg.set_count_target(0, int(total), message)
+            else:
+                dlg.set_indeterminate(True, message=message)
+        except Exception:
+            pass
+
+        try:
+            dlg.show()  # non-blocking
+        except Exception:
+            pass
+        self._busy_dialog = dlg
+        return dlg
 
     def bind(self) -> None:
         try:
@@ -82,14 +151,26 @@ class ScheduleWorkController:
             pass
 
         # Defer heavy initial loads so UI can paint first.
+        restored_any_table = False
+        try:
+            if hasattr(self._view, "restore_cached_state_if_any"):
+                flags = self._view.restore_cached_state_if_any()
+                if isinstance(flags, dict):
+                    restored_any_table = bool(flags.get("restored_any"))
+        except Exception:
+            restored_any_table = False
+
         try:
             QTimer.singleShot(0, self.refresh_tree)
             QTimer.singleShot(0, self.refresh_schedules)
-            QTimer.singleShot(0, self.on_search)
+            # If tables were restored from cache, avoid overwriting them on bind.
+            if not restored_any_table:
+                QTimer.singleShot(0, self.on_search)
         except Exception:
             self.refresh_tree()
             self.refresh_schedules()
-            self.on_search()
+            if not restored_any_table:
+                self.on_search()
 
         # Auto-refresh schedule names when day changes (00:00).
         # Requirement: when passing 23:59 -> 00:00 of next day, expired ranges should no longer show.
@@ -161,7 +242,7 @@ class ScheduleWorkController:
         def _norm(x) -> str:
             return str(x or "").strip().casefold()
 
-        try:
+        def _fn() -> object:
             rows = list(self._service.list_temp_schedule_assignments() or [])
 
             try:
@@ -188,16 +269,26 @@ class ScheduleWorkController:
                         filtered.append(r)
                 rows = filtered
 
+            return rows
+
+        def _ok(result: object) -> None:
+            rows = list(result or []) if isinstance(result, list) else []
             try:
                 self._view.content.temp.set_rows_chunked(rows)
             except Exception:
-                self._view.content.temp.set_rows(rows)
-        except Exception:
+                try:
+                    self._view.content.temp.set_rows(rows)
+                except Exception:
+                    pass
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách lịch trình tạm")
             try:
                 self._view.content.temp.clear_rows()
             except Exception:
                 pass
+
+        self._temp_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _qdate_from_iso(self, iso: str | None) -> QDate | None:
         s = str(iso or "").strip()
@@ -485,33 +576,72 @@ class ScheduleWorkController:
         effective_from = from_q.toString("yyyy-MM-dd")
         effective_to = to_q.toString("yyyy-MM-dd")
 
-        failed_ids: list[int] = []
-        last_msg = None
-        for emp_id in target_employee_ids:
-            ok, msg, _ = self._service.upsert_employee_schedule_assignment_with_range(
-                employee_id=int(emp_id),
-                schedule_id=int(schedule_id),
-                effective_from=str(effective_from),
-                effective_to=str(effective_to),
-                note=None,
-            )
-            if not ok:
-                failed_ids.append(int(emp_id))
-                last_msg = msg
+        total = len(target_employee_ids)
+        self._show_busy(
+            title="Thêm mới",
+            message="Đang lưu lịch trình tạm...",
+            total=total,
+        )
 
-        if failed_ids:
-            MessageDialog.info(
-                self._parent_window,
-                "Thông báo",
-                f"Có {len(failed_ids)} nhân viên không thể lưu lịch trình tạm. {str(last_msg or '')}".strip(),
-            )
-            # Continue to refresh tables for any successful rows.
+        def _fn(progress_items_cb=None) -> object:
+            failed_ids: list[int] = []
+            last_msg = None
+            done = 0
+            for emp_id in target_employee_ids:
+                ok, msg, _ = (
+                    self._service.upsert_employee_schedule_assignment_with_range(
+                        employee_id=int(emp_id),
+                        schedule_id=int(schedule_id),
+                        effective_from=str(effective_from),
+                        effective_to=str(effective_to),
+                        note=None,
+                    )
+                )
+                if not ok:
+                    failed_ids.append(int(emp_id))
+                    last_msg = msg
+                done += 1
+                if progress_items_cb is not None:
+                    try:
+                        progress_items_cb(done, total, "Đang lưu lịch trình tạm")
+                    except Exception:
+                        pass
+            return {
+                "failed_ids": failed_ids,
+                "last_msg": last_msg,
+            }
 
-        # Refresh global temp table (do not filter to one employee)
-        try:
-            self.refresh_temp_table(self._get_selected_filters())
-        except Exception:
-            self.refresh_temp_table()
+        def _on_progress_items(done: int, total2: int, msg: str) -> None:
+            dlg = getattr(self, "_busy_dialog", None)
+            if dlg is None:
+                return
+            try:
+                dlg.set_count_target(int(done), int(total2), msg)
+            except Exception:
+                pass
+
+        def _ok(payload: object) -> None:
+            try:
+                data = payload if isinstance(payload, dict) else {}
+                failed_ids = list(data.get("failed_ids") or [])
+                last_msg = data.get("last_msg")
+            except Exception:
+                failed_ids, last_msg = ([], None)
+
+            self._close_busy()
+
+            if failed_ids:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Thông báo",
+                    f"Có {len(failed_ids)} nhân viên không thể lưu lịch trình tạm. {str(last_msg or '')}".strip(),
+                )
+
+            # Refresh global temp table (do not filter to one employee)
+            try:
+                self.refresh_temp_table(self._get_selected_filters())
+            except Exception:
+                self.refresh_temp_table()
 
         # Update default schedule table immediately (no manual Refresh required).
         # 1) If the range covers today, update UI immediately.
@@ -540,17 +670,33 @@ class ScheduleWorkController:
         except Exception:
             pass
 
-        # 2) Refresh schedule map from DB for affected employees (fallback: whole table)
-        try:
-            self.refresh_default_schedule_column(target_employee_ids)
-        except Exception:
-            self.refresh_default_schedule_column()
+            # 2) Refresh schedule map from DB for affected employees (fallback: whole table)
+            try:
+                self.refresh_default_schedule_column(target_employee_ids)
+            except Exception:
+                self.refresh_default_schedule_column()
 
-        # Keep the selected schedule visible
-        try:
-            self._select_combo_by_data(temp.cbo_schedule, int(schedule_id))
-        except Exception:
-            pass
+            # Keep the selected schedule visible
+            try:
+                self._select_combo_by_data(temp.cbo_schedule, int(schedule_id))
+            except Exception:
+                pass
+
+        def _err(_msg: str) -> None:
+            self._close_busy()
+            MessageDialog.info(
+                self._parent_window,
+                "Thông báo",
+                "Không thể lưu lịch trình tạm. Vui lòng thử lại.",
+            )
+
+        self._temp_mutate_runner.run(
+            fn=_fn,
+            on_success=_ok,
+            on_error=_err,
+            on_progress_items=_on_progress_items,
+            coalesce=True,
+        )
 
         # Optional: keep label updated in UI table (for active range)
         try:
@@ -568,28 +714,15 @@ class ScheduleWorkController:
         except Exception:
             checked_ids = []
 
+        # Decide delete set
         if checked_ids:
-            affected_emp_ids = self._get_employee_ids_by_temp_assignment_ids(
-                checked_ids
-            )
-            any_failed = False
-            for aid in checked_ids:
-                ok, _msg, _ = self._service.delete_assignment_by_id(int(aid))
-                if not ok:
-                    any_failed = True
-            if any_failed:
-                MessageDialog.info(
-                    self._parent_window,
-                    "Thông báo",
-                    "Có dòng không thể xóa. Vui lòng thử lại.",
-                )
+            delete_ids = list(checked_ids)
         else:
             assignment_id = None
             try:
                 assignment_id = temp.get_selected_assignment_id()
             except Exception:
                 assignment_id = None
-
             if not assignment_id:
                 MessageDialog.info(
                     self._parent_window,
@@ -597,52 +730,124 @@ class ScheduleWorkController:
                     "Vui lòng tick ✅ hoặc chọn dòng trong bảng Lịch trình tạm để Xóa bỏ.",
                 )
                 return
+            delete_ids = [int(assignment_id)]
 
-            affected_emp_ids = self._get_employee_ids_by_temp_assignment_ids(
-                [int(assignment_id)]
+        affected_emp_ids = self._get_employee_ids_by_temp_assignment_ids(delete_ids)
+
+        total = len(delete_ids)
+        self._show_busy(
+            title="Xóa",
+            message="Đang xóa lịch trình tạm...",
+            total=total,
+        )
+
+        def _fn(progress_items_cb=None) -> object:
+            any_failed = False
+            done = 0
+            last_msg = None
+            for aid in delete_ids:
+                ok, msg, _ = self._service.delete_assignment_by_id(int(aid))
+                if not ok:
+                    any_failed = True
+                    last_msg = msg
+                done += 1
+                if progress_items_cb is not None:
+                    try:
+                        progress_items_cb(done, total, "Đang xóa lịch trình tạm")
+                    except Exception:
+                        pass
+            return {"any_failed": any_failed, "last_msg": last_msg}
+
+        def _on_progress_items(done: int, total2: int, msg: str) -> None:
+            dlg = getattr(self, "_busy_dialog", None)
+            if dlg is None:
+                return
+            try:
+                dlg.set_count_target(int(done), int(total2), msg)
+            except Exception:
+                pass
+
+        def _ok(payload: object) -> None:
+            self._close_busy()
+            try:
+                data = payload if isinstance(payload, dict) else {}
+                any_failed = bool(data.get("any_failed"))
+                last_msg = data.get("last_msg")
+            except Exception:
+                any_failed, last_msg = (False, None)
+
+            if any_failed:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Thông báo",
+                    f"Có dòng không thể xóa. {str(last_msg or '')}".strip(),
+                )
+
+            # Refresh global temp table (do not filter to one employee)
+            try:
+                self.refresh_temp_table(self._get_selected_filters())
+            except Exception:
+                self.refresh_temp_table()
+
+            # Refresh default schedule column for impacted employees (or whole table if unknown)
+            try:
+                if affected_emp_ids:
+                    self.refresh_default_schedule_column(affected_emp_ids)
+                else:
+                    self.refresh_default_schedule_column()
+            except Exception:
+                pass
+
+        def _err(_msg: str) -> None:
+            self._close_busy()
+            MessageDialog.info(
+                self._parent_window,
+                "Thông báo",
+                "Không thể xóa lịch trình tạm. Vui lòng thử lại.",
             )
 
-            ok, msg, _ = self._service.delete_assignment_by_id(int(assignment_id))
-            if not ok:
-                MessageDialog.info(self._parent_window, "Thông báo", str(msg))
-                return
-
-        # Refresh global temp table (do not filter to one employee)
-        try:
-            self.refresh_temp_table(self._get_selected_filters())
-        except Exception:
-            self.refresh_temp_table()
-
-        # Refresh default schedule column for impacted employees (or whole table if unknown)
-        try:
-            if affected_emp_ids:
-                self.refresh_default_schedule_column(affected_emp_ids)
-            else:
-                self.refresh_default_schedule_column()
-        except Exception:
-            pass
+        self._temp_mutate_runner.run(
+            fn=_fn,
+            on_success=_ok,
+            on_error=_err,
+            on_progress_items=_on_progress_items,
+            coalesce=True,
+        )
 
     def refresh_tree(self) -> None:
-        try:
+        def _fn() -> object:
             dept_rows = self._service.list_departments_tree_rows()
             title_rows = self._service.list_titles_tree_rows()
-            self._view.content.left.set_departments(dept_rows, titles=title_rows)
-        except Exception:
+            return (list(dept_rows or []), list(title_rows or []))
+
+        def _ok(result: object) -> None:
+            dept_rows, title_rows = result if isinstance(result, tuple) else ([], [])
+            d = list(dept_rows or []) if isinstance(dept_rows, list) else []
+            t = list(title_rows or []) if isinstance(title_rows, list) else []
+            self._view.content.left.set_departments(d, titles=t)
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải cây phòng ban/chức danh")
             try:
                 self._view.content.left.set_departments([], titles=[])
             except Exception:
                 pass
 
+        self._tree_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
+
     def refresh_schedules(self) -> None:
-        try:
-            items = self._service.list_schedules()
+        def _fn() -> object:
+            return list(self._service.list_schedules() or [])
+
+        def _ok(result: object) -> None:
+            items = list(result or []) if isinstance(result, list) else []
             self._view.content.right.set_schedules(items)
             try:
                 self._view.content.temp.set_schedules(items)
             except Exception:
                 pass
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách lịch làm việc")
             try:
                 self._view.content.right.set_schedules([])
@@ -652,6 +857,8 @@ class ScheduleWorkController:
                     pass
             except Exception:
                 pass
+
+        self._schedules_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_refresh(self) -> None:
         # Spec: Làm mới phải hiển thị lại đầy đủ nhân viên (không để bảng rỗng).
@@ -770,7 +977,9 @@ class ScheduleWorkController:
             schedule_map: dict[int, str] = {}
             try:
                 if emp_ids:
-                    schedule_map = dict(self._service.get_employee_schedule_name_map(emp_ids) or {})
+                    schedule_map = dict(
+                        self._service.get_employee_schedule_name_map(emp_ids) or {}
+                    )
             except Exception:
                 schedule_map = {}
 
@@ -879,52 +1088,106 @@ class ScheduleWorkController:
                 )
                 return
 
-            # Option "Chưa sắp xếp ca" (data=0): clear assignments
-            try:
+            emp_ids = [int(x) for x in (checked_ids or []) if int(x) > 0]
+            emp_ids = list(dict.fromkeys(emp_ids))
+            total = len(emp_ids)
+
+            self._show_busy(
+                title="Áp dụng",
+                message="Đang cập nhật lịch làm việc...",
+                total=total,
+            )
+
+            def _fn(_pct_cb=None, progress_items_cb=None) -> object:
+                done = 0
+                failed = 0
+
+                # Option "Chưa sắp xếp ca" (data=0): clear assignments
                 if int(schedule_id or 0) == 0:
-                    for emp_id in checked_ids:
+                    for emp_id in emp_ids:
                         try:
                             self._service.delete_employee_schedule(int(emp_id))
                         except Exception:
-                            pass
-                    self._view.content.right.apply_schedule_to_checked("")
-                    self._view.title2.set_total(
-                        self._view.content.right.table.rowCount()
-                    )
-                    return
-            except Exception:
-                pass
+                            failed += 1
+                        done += 1
+                        if progress_items_cb is not None:
+                            try:
+                                progress_items_cb(done, total, "Đang xóa lịch làm việc")
+                            except Exception:
+                                pass
+                    return {"mode": "clear", "failed": failed}
 
-            # Persist to DB (effective from today) then reflect in UI.
-            try:
-                processed = self._service.apply_schedule_to_employees(
-                    employee_ids=[int(x) for x in checked_ids],
-                    schedule_id=int(schedule_id),
-                )
-                if int(processed or 0) <= 0:
+                # Apply schedule to employees (do per-employee to report progress)
+                for emp_id in emp_ids:
+                    try:
+                        ok, _msg, _ = self._service.apply_schedule_to_employee(
+                            employee_id=int(emp_id),
+                            schedule_id=int(schedule_id),
+                        )
+                        if not ok:
+                            failed += 1
+                    except Exception:
+                        failed += 1
+                    done += 1
+                    if progress_items_cb is not None:
+                        try:
+                            progress_items_cb(
+                                done, total, "Đang cập nhật lịch làm việc"
+                            )
+                        except Exception:
+                            pass
+
+                return {"mode": "apply", "failed": failed}
+
+            def _on_progress_items(done: int, total2: int, msg: str) -> None:
+                dlg = getattr(self, "_busy_dialog", None)
+                if dlg is None:
+                    return
+                try:
+                    dlg.set_count_target(int(done), int(total2), msg)
+                except Exception:
+                    pass
+
+            def _ok(payload: object) -> None:
+                self._close_busy()
+
+                data = payload if isinstance(payload, dict) else {}
+                failed = 0
+                try:
+                    failed = int(data.get("failed") or 0)
+                except Exception:
+                    failed = 0
+
+                # Update UI schedule column for checked rows.
+                if int(schedule_id or 0) == 0:
+                    self._view.content.right.apply_schedule_to_checked("")
+                else:
+                    self._view.content.right.apply_schedule_to_checked(schedule_name)
+
+                self._view.title2.set_total(self._view.content.right.table.rowCount())
+
+                if failed > 0:
                     MessageDialog.info(
                         self._parent_window,
                         "Thông báo",
-                        "Không thể cập nhật Lịch làm việc vào DB. Vui lòng kiểm tra cấu hình DB và thử lại.",
+                        f"Có {failed} nhân viên không thể cập nhật. Vui lòng thử lại.",
                     )
-                    return
-            except Exception:
-                logger.exception("Không thể cập nhật lịch làm việc vào DB")
+
+            def _err(_msg: str) -> None:
+                self._close_busy()
                 MessageDialog.info(
                     self._parent_window,
                     "Thông báo",
                     "Không thể cập nhật Lịch làm việc vào DB. Vui lòng kiểm tra cấu hình DB và thử lại.",
                 )
-                return
 
-            applied = self._view.content.right.apply_schedule_to_checked(schedule_name)
-            self._view.title2.set_total(self._view.content.right.table.rowCount())
-            if applied <= 0:
-                MessageDialog.info(
-                    self._parent_window,
-                    "Thông báo",
-                    "Không có nhân viên nào được áp dụng.",
-                )
+            self._apply_runner.run(
+                fn=_fn,
+                on_success=_ok,
+                on_error=_err,
+                on_progress_items=_on_progress_items,
+                coalesce=True,
+            )
         except Exception:
             logger.exception("Không thể áp dụng lịch làm việc")
 
@@ -939,14 +1202,72 @@ class ScheduleWorkController:
                 )
                 return
 
-            # Best-effort delete in DB; UI schedule column will be cleared.
-            for emp_id in checked_ids:
+            emp_ids = [int(x) for x in (checked_ids or []) if int(x) > 0]
+            emp_ids = list(dict.fromkeys(emp_ids))
+            total = len(emp_ids)
+            self._show_busy(
+                title="Xóa lịch NV",
+                message="Đang xóa lịch làm việc...",
+                total=total,
+            )
+
+            def _fn(_pct_cb=None, progress_items_cb=None) -> object:
+                done = 0
+                failed = 0
+                for emp_id in emp_ids:
+                    try:
+                        self._service.delete_employee_schedule(int(emp_id))
+                    except Exception:
+                        failed += 1
+                    done += 1
+                    if progress_items_cb is not None:
+                        try:
+                            progress_items_cb(done, total, "Đang xóa lịch làm việc")
+                        except Exception:
+                            pass
+                return {"failed": failed}
+
+            def _on_progress_items(done: int, total2: int, msg: str) -> None:
+                dlg = getattr(self, "_busy_dialog", None)
+                if dlg is None:
+                    return
                 try:
-                    self._service.delete_employee_schedule(int(emp_id))
+                    dlg.set_count_target(int(done), int(total2), msg)
                 except Exception:
                     pass
 
-            # Clear schedule column for checked rows
-            self._view.content.right.apply_schedule_to_checked("")
+            def _ok(payload: object) -> None:
+                self._close_busy()
+                data = payload if isinstance(payload, dict) else {}
+                try:
+                    failed = int(data.get("failed") or 0)
+                except Exception:
+                    failed = 0
+
+                # Clear schedule column for checked rows
+                self._view.content.right.apply_schedule_to_checked("")
+
+                if failed > 0:
+                    MessageDialog.info(
+                        self._parent_window,
+                        "Thông báo",
+                        f"Có {failed} nhân viên không thể xóa lịch. Vui lòng thử lại.",
+                    )
+
+            def _err(_msg: str) -> None:
+                self._close_busy()
+                MessageDialog.info(
+                    self._parent_window,
+                    "Thông báo",
+                    "Không thể xóa lịch NV. Vui lòng thử lại.",
+                )
+
+            self._delete_runner.run(
+                fn=_fn,
+                on_success=_ok,
+                on_error=_err,
+                on_progress_items=_on_progress_items,
+                coalesce=True,
+            )
         except Exception:
             logger.exception("Không thể xóa lịch NV")

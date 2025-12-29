@@ -13,6 +13,8 @@ from __future__ import annotations
 import logging
 from datetime import date
 
+from core.threads import BackgroundTaskRunner
+
 from PySide6.QtCore import QDate, QLocale
 
 from services.holiday_services import HolidayService
@@ -62,6 +64,7 @@ class HolidayController:
         self._title_bar2 = title_bar2
         self._content = content
         self._service = service or HolidayService()
+        self._runner = BackgroundTaskRunner(self._parent_window, name="holiday_refresh")
 
     def bind(self) -> None:
         self._title_bar2.add_clicked.connect(self.on_add)
@@ -70,17 +73,29 @@ class HolidayController:
         self.refresh()
 
     def refresh(self) -> None:
-        try:
+        def _fn() -> object:
             models = self._service.list_holidays()
-            rows = [
+            return [
                 (m.id, _to_display_date(m.holiday_date), m.holiday_info) for m in models
             ]
+
+        def _ok(result: object) -> None:
+            rows = list(result or []) if isinstance(result, list) else []
             self._content.set_holidays(rows)
             self._title_bar2.set_total(len(rows))
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách ngày lễ")
-            self._content.set_holidays([])
-            self._title_bar2.set_total(0)
+            try:
+                self._content.set_holidays([])
+            except Exception:
+                pass
+            try:
+                self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def on_add(self) -> None:
         dialog = HolidayDialog(mode="add", parent=self._parent_window)

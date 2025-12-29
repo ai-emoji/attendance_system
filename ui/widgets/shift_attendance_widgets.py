@@ -21,6 +21,7 @@ Ghi chú:
 from __future__ import annotations
 
 import datetime as _dt
+import time as _time
 
 from PySide6.QtCore import QDate, QLocale, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QFont, QIcon
@@ -79,26 +80,16 @@ from core.resource import (
 )
 
 from core.ui_settings import (
+    get_shift_attendance_state,
     get_shift_attendance_table_ui,
     ui_settings_bus,
+    update_shift_attendance_state,
     update_shift_attendance_table_ui,
 )
-from ui.dialog.shift_attendance_settings_dialog import ShiftAttendanceSettingsDialog
-from ui.controllers.import_shift_attendance_controllers import (
-    ImportShiftAttendanceController,
-)
+from core.db_connection_bus import db_connection_bus
 
 
 _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
-
-
-# In-memory state cache to avoid losing current search/view when switching tabs/views.
-# The main window recreates widgets when navigating; this lets Shift Attendance restore
-# the latest UI state without forcing an apparent refresh.
-_SHIFT_ATTENDANCE_STATE: dict[str, object] = {}
-
-# Tránh lag khi main window recreate widget: không lưu/restore bảng quá lớn.
-_STATE_TABLE_MAX_ROWS = 200
 
 
 def _fmt_date_ddmmyyyy(value: object | None) -> str:
@@ -616,53 +607,19 @@ class MainContent1(QWidget):
         layout.addWidget(self.table_frame, 1)
         layout.addWidget(footer)
 
+        # Persist only filter state (no table cache) to avoid stale UI data.
+        self._persist_timer: QTimer | None = None
+
         self.btn_refresh.clicked.connect(self._on_refresh_clicked)
         self.btn_import.clicked.connect(self._open_import_dialog)
         self.btn_view.clicked.connect(self.view_clicked.emit)
-        self.cbo_department.currentIndexChanged.connect(
-            lambda *_: self.department_changed.emit()
-        )
-        self.cbo_title.currentIndexChanged.connect(lambda *_: self.title_changed.emit())
-        self.cbo_search_by.currentIndexChanged.connect(
-            lambda *_: self.search_changed.emit()
-        )
-        self.inp_search_text.textChanged.connect(lambda *_: self.search_changed.emit())
 
-        # Debounced auto-save: keep state even when the main window recreates widgets.
-        self._save_timer: QTimer | None = None
-        try:
-            self.cbo_department.currentIndexChanged.connect(
-                lambda *_: self._schedule_save_state()
-            )
-        except Exception:
-            pass
-        try:
-            self.cbo_title.currentIndexChanged.connect(
-                lambda *_: self._schedule_save_state()
-            )
-        except Exception:
-            pass
-        try:
-            self.cbo_search_by.currentIndexChanged.connect(
-                lambda *_: self._schedule_save_state()
-            )
-        except Exception:
-            pass
-        try:
-            self.inp_search_text.textChanged.connect(
-                lambda *_: self._schedule_save_state()
-            )
-        except Exception:
-            pass
-        try:
-            self.date_from.dateChanged.connect(lambda *_: self._schedule_save_state())
-            self.date_to.dateChanged.connect(lambda *_: self._schedule_save_state())
-        except Exception:
-            pass
-        try:
-            self.table.itemChanged.connect(lambda *_: self._schedule_save_state())
-        except Exception:
-            pass
+        self.cbo_department.currentIndexChanged.connect(self._on_department_changed)
+        self.cbo_title.currentIndexChanged.connect(self._on_title_changed)
+        self.cbo_search_by.currentIndexChanged.connect(self._on_search_changed)
+        self.inp_search_text.textChanged.connect(self._on_search_changed)
+        self.date_from.dateChanged.connect(self._on_date_changed)
+        self.date_to.dateChanged.connect(self._on_date_changed)
 
         # Emoji checkbox toggle on click
         self.table.cellClicked.connect(self._on_cell_clicked)
@@ -681,53 +638,107 @@ class MainContent1(QWidget):
             pass
 
     def _on_refresh_clicked(self) -> None:
-        # User explicitly requests refresh: clear cached state.
+        # User explicitly requests refresh: clear persisted filters so the view
+        # doesn't immediately restore old values.
         try:
-            _SHIFT_ATTENDANCE_STATE.pop("content1", None)
-        except Exception:
-            pass
-        try:
-            _SHIFT_ATTENDANCE_STATE.pop("content2", None)
+            update_shift_attendance_state(
+                content1={
+                    "department_id": None,
+                    "title_id": None,
+                    "search_by_data": "auto",
+                    "search_text": "",
+                    "date_from": "",
+                    "date_to": "",
+                }
+            )
         except Exception:
             pass
         self.refresh_clicked.emit()
 
-    def _schedule_save_state(self) -> None:
+    def _on_department_changed(self, *_args) -> None:
+        self.department_changed.emit()
+        self._schedule_persist_state()
+
+    def _on_title_changed(self, *_args) -> None:
+        self.title_changed.emit()
+        self._schedule_persist_state()
+
+    def _on_search_changed(self, *_args) -> None:
+        self.search_changed.emit()
+        self._schedule_persist_state()
+
+    def _on_date_changed(self, *_args) -> None:
+        self._schedule_persist_state()
+
+    def _schedule_persist_state(self) -> None:
         try:
-            if self._save_timer is None:
-                self._save_timer = QTimer(self)
-                self._save_timer.setSingleShot(True)
-                self._save_timer.timeout.connect(self._save_state)
-            self._save_timer.start(150)
+            if self._persist_timer is None:
+                self._persist_timer = QTimer(self)
+                self._persist_timer.setSingleShot(True)
+                self._persist_timer.timeout.connect(self._persist_state)
+            # Debounce to avoid writing to disk on every key stroke.
+            self._persist_timer.start(250)
         except Exception:
             pass
 
+    def restore_cached_state_if_any(self) -> bool:
+        """Public wrapper so controller can restore state before resetting fields."""
+        try:
+            return bool(self._restore_state_if_any())
+        except Exception:
+            return False
+
     def hideEvent(self, event) -> None:
         try:
-            self._save_state()
+            self._persist_state()
         except Exception:
             pass
+
         try:
             super().hideEvent(event)
         except Exception:
             return
 
-    def _save_state(self) -> None:
-        _SHIFT_ATTENDANCE_STATE["content1"] = {
-            "department_index": int(self.cbo_department.currentIndex()),
-            "title_index": int(self.cbo_title.currentIndex()),
-            "search_by_data": self.cbo_search_by.currentData(),
-            "search_text": str(self.inp_search_text.text() or ""),
-            "date_from": self.date_from.date() if hasattr(self, "date_from") else None,
-            "date_to": self.date_to.date() if hasattr(self, "date_to") else None,
-            "total": str(self.label_total.text() or ""),
-            "table": self._capture_table_state(),
-        }
+    def _persist_state(self) -> None:
+        try:
+            df = self.date_from.date().toString("yyyy-MM-dd")
+        except Exception:
+            df = ""
+        try:
+            dt = self.date_to.date().toString("yyyy-MM-dd")
+        except Exception:
+            dt = ""
+        try:
+            update_shift_attendance_state(
+                content1={
+                    "department_id": self.cbo_department.currentData(),
+                    "title_id": self.cbo_title.currentData(),
+                    "search_by_data": self.cbo_search_by.currentData(),
+                    "search_text": str(self.inp_search_text.text() or ""),
+                    "date_from": str(df or ""),
+                    "date_to": str(dt or ""),
+                }
+            )
+        except Exception:
+            pass
 
-    def _restore_state_if_any(self) -> None:
-        state = _SHIFT_ATTENDANCE_STATE.get("content1")
+    def _restore_state_if_any(self) -> bool:
+        st = get_shift_attendance_state()
+        state = st.get("content1") if isinstance(st, dict) else None
         if not isinstance(state, dict) or not state:
-            return
+            return False
+
+        restored_any = False
+
+        # Keep desired IDs so controller dropdown reload can restore selection.
+        try:
+            self._desired_department_id = state.get("department_id")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        try:
+            self._desired_title_id = state.get("title_id")  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
         def _block(on: bool) -> None:
             try:
@@ -754,15 +765,46 @@ class MainContent1(QWidget):
 
         _block(True)
         try:
-            dep_idx = int(state.get("department_index") or 0)
-            if 0 <= dep_idx < self.cbo_department.count():
-                self.cbo_department.setCurrentIndex(dep_idx)
+            # Prefer restoring by itemData (stable across reloads), fallback to index.
+            dep_id = state.get("department_id")
+            if dep_id not in (None, "", 0, "0"):
+                target = dep_id
+                try:
+                    target = int(target)
+                except Exception:
+                    target = dep_id
+                for i in range(self.cbo_department.count()):
+                    if self.cbo_department.itemData(i) == target:
+                        self.cbo_department.setCurrentIndex(int(i))
+                        restored_any = True
+                        break
+            else:
+                dep_idx = int(state.get("department_index") or 0)
+                if 0 <= dep_idx < self.cbo_department.count():
+                    self.cbo_department.setCurrentIndex(dep_idx)
+                    if int(dep_idx) != 0:
+                        restored_any = True
         except Exception:
             pass
         try:
-            title_idx = int(state.get("title_index") or 0)
-            if 0 <= title_idx < self.cbo_title.count():
-                self.cbo_title.setCurrentIndex(title_idx)
+            title_id = state.get("title_id")
+            if title_id not in (None, "", 0, "0"):
+                target = title_id
+                try:
+                    target = int(target)
+                except Exception:
+                    target = title_id
+                for i in range(self.cbo_title.count()):
+                    if self.cbo_title.itemData(i) == target:
+                        self.cbo_title.setCurrentIndex(int(i))
+                        restored_any = True
+                        break
+            else:
+                title_idx = int(state.get("title_index") or 0)
+                if 0 <= title_idx < self.cbo_title.count():
+                    self.cbo_title.setCurrentIndex(title_idx)
+                    if int(title_idx) != 0:
+                        restored_any = True
         except Exception:
             pass
         try:
@@ -775,108 +817,34 @@ class MainContent1(QWidget):
                     break
             if idx >= 0:
                 self.cbo_search_by.setCurrentIndex(int(idx))
+                restored_any = True
         except Exception:
             pass
         try:
             self.inp_search_text.setText(str(state.get("search_text") or ""))
+            if str(state.get("search_text") or "") != "":
+                restored_any = True
         except Exception:
             pass
         try:
-            df = state.get("date_from")
-            dt = state.get("date_to")
-            if isinstance(df, QDate):
-                self.date_from.setDate(df)
-            if isinstance(dt, QDate):
-                self.date_to.setDate(dt)
-        except Exception:
-            pass
-        try:
-            total_txt = str(state.get("total") or "")
-            if total_txt:
-                self.label_total.setText(total_txt)
-        except Exception:
-            pass
-        try:
-            self._restore_table_state(state.get("table"))
+            df_s = str(state.get("date_from") or "").strip()
+            dt_s = str(state.get("date_to") or "").strip()
+            if df_s:
+                qd = QDate.fromString(df_s, "yyyy-MM-dd")
+                if qd.isValid():
+                    self.date_from.setDate(qd)
+                    restored_any = True
+            if dt_s:
+                qd2 = QDate.fromString(dt_s, "yyyy-MM-dd")
+                if qd2.isValid():
+                    self.date_to.setDate(qd2)
+                    restored_any = True
         except Exception:
             pass
         finally:
             _block(False)
 
-    def _capture_table_state(self) -> list[list[dict[str, object]]] | None:
-        try:
-            rows = int(self.table.rowCount())
-            cols = int(self.table.columnCount())
-        except Exception:
-            return None
-
-        # Nếu bảng quá lớn, không cache cell-by-cell (rất chậm khi restore).
-        try:
-            if rows > int(_STATE_TABLE_MAX_ROWS):
-                return None
-        except Exception:
-            return None
-
-        data: list[list[dict[str, object]]] = []
-        for r in range(rows):
-            row_items: list[dict[str, object]] = []
-            for c in range(cols):
-                item = self.table.item(int(r), int(c))
-                if item is None:
-                    row_items.append({"text": "", "roles": {}})
-                    continue
-                roles: dict[int, object] = {}
-                # Preserve the roles used by controller (id + attendance_code).
-                try:
-                    v0 = item.data(Qt.ItemDataRole.UserRole)
-                    if v0 is not None:
-                        roles[int(Qt.ItemDataRole.UserRole)] = v0
-                except Exception:
-                    pass
-                try:
-                    v1 = item.data(Qt.ItemDataRole.UserRole + 1)
-                    if v1 is not None:
-                        roles[int(Qt.ItemDataRole.UserRole + 1)] = v1
-                except Exception:
-                    pass
-                row_items.append({"text": str(item.text() or ""), "roles": roles})
-            data.append(row_items)
-        return data
-
-    def _restore_table_state(self, payload: object) -> None:
-        if not isinstance(payload, list):
-            return
-        try:
-            cols = int(self.table.columnCount())
-        except Exception:
-            return
-
-        self.table.setRowCount(0)
-        self.table.setRowCount(len(payload))
-        for r, row_items in enumerate(payload):
-            if not isinstance(row_items, list):
-                continue
-            for c in range(min(cols, len(row_items))):
-                cell = row_items[c]
-                if not isinstance(cell, dict):
-                    continue
-                txt = str(cell.get("text") or "")
-                item = QTableWidgetItem(txt)
-                roles = cell.get("roles")
-                if isinstance(roles, dict):
-                    for k, v in roles.items():
-                        try:
-                            item.setData(Qt.ItemDataRole(int(k)), v)
-                        except Exception:
-                            pass
-                self.table.setItem(int(r), int(c), item)
-                if int(c) == 0:
-                    _apply_check_item_style(item, checked=(txt.strip() == "✅"))
-        # Re-apply UI styling (alignment/bold/date formatting) to restored items.
-        try:
-            self.apply_ui_settings()
-        except Exception:
-            pass
+        return bool(restored_any)
 
     def _on_cell_clicked(self, row: int, col: int) -> None:
         if int(col) != 0:
@@ -887,10 +855,12 @@ class MainContent1(QWidget):
                 return
             cur = str(item.text() or "").strip()
             new_checked = cur != "✅"
+            restored_any = True
             item.setText("✅" if new_checked else "❌")
             _apply_check_item_style(item, checked=bool(new_checked))
         except Exception:
             pass
+            restored_any = True
 
     def get_checked_employee_keys(self) -> tuple[list[int], list[str]]:
         """Returns (employee_ids, attendance_codes) for checked rows."""
@@ -939,10 +909,37 @@ class MainContent1(QWidget):
         return (uniq_ids, uniq_codes)
 
     def _open_import_dialog(self) -> None:
-        ImportShiftAttendanceController(parent=self).open()
+        from ui.controllers.import_shift_attendance_controllers import (
+            ImportShiftAttendanceController,
+        )
+
+        imported = False
+        try:
+            imported = bool(ImportShiftAttendanceController(parent=self).open())
+        except Exception:
+            try:
+                ImportShiftAttendanceController(parent=self).open()
+            except Exception:
+                pass
+            imported = False
+
+        # If import updated DB, force a real reload instead of restoring cached grid.
+        if imported:
+            try:
+                self._on_refresh_clicked()
+            except Exception:
+                pass
 
     def apply_ui_settings(self) -> None:
         ui = get_shift_attendance_table_ui()
+
+        # Shift Attendance screen: allow hiding the import button via UI settings.
+        try:
+            btn = getattr(self, "btn_import", None)
+            if btn is not None:
+                btn.setVisible(bool(getattr(ui, "show_import_button", True)))
+        except Exception:
+            pass
 
         column_count = int(self.table.columnCount())
         defined_count = int(len(self._COLUMNS))
@@ -1134,17 +1131,13 @@ class MainContent2(QWidget):
                 self.btn_hhmm.blockSignals(False)
                 self.btn_hhmmss.blockSignals(False)
             self.set_time_show_seconds(bool(show_seconds))
+            self._schedule_persist_state()
 
         self.btn_hhmm.clicked.connect(lambda: _set_time_mode(False))
         self.btn_hhmmss.clicked.connect(lambda: _set_time_mode(True))
 
-        # Debounced auto-save: keep grid state across view switches.
-        self._save_timer: QTimer | None = None
-        try:
-            self.btn_hhmm.clicked.connect(lambda *_: self._schedule_save_state())
-            self.btn_hhmmss.clicked.connect(lambda *_: self._schedule_save_state())
-        except Exception:
-            pass
+        # Persist small UI state only (no table cache).
+        self._persist_timer: QTimer | None = None
 
         self.label_columns = _mk_label("Hiển thị cột")
 
@@ -1262,11 +1255,6 @@ class MainContent2(QWidget):
         # Emoji checkbox toggle on click
         self.table.cellClicked.connect(self._on_cell_clicked)
 
-        try:
-            self.table.itemChanged.connect(lambda *_: self._schedule_save_state())
-        except Exception:
-            pass
-
         self.table_frame = _wrap_table_in_frame(
             self, self.table, "shift_attendance_table2_frame"
         )
@@ -1281,11 +1269,6 @@ class MainContent2(QWidget):
         # Open columns window (buttons)
         self.btn_columns.clicked.connect(self._open_columns_buttons_window)
 
-        try:
-            self.btn_columns.clicked.connect(lambda *_: self._schedule_save_state())
-        except Exception:
-            pass
-
         # Apply UI settings and live-update when changed.
         self.apply_ui_settings()
         try:
@@ -1293,138 +1276,74 @@ class MainContent2(QWidget):
         except Exception:
             pass
 
-        # Restore previous audit/grid state after controller binding.
+        # Restore small UI state after binding (time format only).
         try:
-            QTimer.singleShot(0, self._restore_state_if_any)
+            QTimer.singleShot(0, self._restore_view_state)
         except Exception:
             pass
 
-    def _schedule_save_state(self) -> None:
+    def restore_cached_state_if_any(self) -> bool:
+        """Không restore bảng từ cache; luôn để controller reload dữ liệu."""
         try:
-            if self._save_timer is None:
-                self._save_timer = QTimer(self)
-                self._save_timer.setSingleShot(True)
-                self._save_timer.timeout.connect(self._save_state)
-            self._save_timer.start(150)
+            self._restore_view_state()
         except Exception:
             pass
+        return False
 
     def hideEvent(self, event) -> None:
         try:
-            self._save_state()
+            self._persist_state()
         except Exception:
             pass
+
         try:
             super().hideEvent(event)
         except Exception:
             return
 
-    def _save_state(self) -> None:
-        _SHIFT_ATTENDANCE_STATE["content2"] = {
-            "show_seconds": bool(getattr(self, "_show_seconds", True)),
-            "table": self._capture_table_state(),
-        }
-
-    def _restore_state_if_any(self) -> None:
-        state = _SHIFT_ATTENDANCE_STATE.get("content2")
-        if not isinstance(state, dict) or not state:
-            return
-
-        # Avoid triggering any refresh signals; we only restore UI content.
+    def _schedule_persist_state(self) -> None:
         try:
-            self.table.blockSignals(True)
+            if self._persist_timer is None:
+                self._persist_timer = QTimer(self)
+                self._persist_timer.setSingleShot(True)
+                self._persist_timer.timeout.connect(self._persist_state)
+            self._persist_timer.start(200)
         except Exception:
             pass
-        try:
-            show_seconds = bool(state.get("show_seconds", True))
-            self.set_time_show_seconds(show_seconds)
-            # Sync button check state without emitting.
-            try:
-                self.btn_hhmm.blockSignals(True)
-                self.btn_hhmmss.blockSignals(True)
-                self.btn_hhmm.setChecked(not show_seconds)
-                self.btn_hhmmss.setChecked(bool(show_seconds))
-            finally:
-                try:
-                    self.btn_hhmm.blockSignals(False)
-                    self.btn_hhmmss.blockSignals(False)
-                except Exception:
-                    pass
 
-            self._restore_table_state(state.get("table"))
+    def _persist_state(self) -> None:
+        try:
+            update_shift_attendance_state(
+                content2={"show_seconds": bool(getattr(self, "_show_seconds", True))}
+            )
+        except Exception:
+            pass
+
+    def _restore_view_state(self) -> None:
+        st = get_shift_attendance_state()
+        c2 = st.get("content2") if isinstance(st, dict) else None
+        if not isinstance(c2, dict):
+            c2 = {}
+
+        show_seconds = bool(c2.get("show_seconds", True))
+
+        try:
+            self.set_time_show_seconds(show_seconds)
+        except Exception:
+            pass
+
+        # Sync button check state without emitting.
+        try:
+            self.btn_hhmm.blockSignals(True)
+            self.btn_hhmmss.blockSignals(True)
+            self.btn_hhmm.setChecked(not show_seconds)
+            self.btn_hhmmss.setChecked(bool(show_seconds))
         finally:
             try:
-                self.table.blockSignals(False)
+                self.btn_hhmm.blockSignals(False)
+                self.btn_hhmmss.blockSignals(False)
             except Exception:
                 pass
-
-    def _capture_table_state(self) -> list[list[dict[str, object]]] | None:
-        try:
-            rows = int(self.table.rowCount())
-            cols = int(self.table.columnCount())
-        except Exception:
-            return None
-
-        # Nếu bảng quá lớn, không cache cell-by-cell (rất chậm khi restore).
-        try:
-            if rows > int(_STATE_TABLE_MAX_ROWS):
-                return None
-        except Exception:
-            return None
-
-        data: list[list[dict[str, object]]] = []
-        for r in range(rows):
-            row_items: list[dict[str, object]] = []
-            for c in range(cols):
-                item = self.table.item(int(r), int(c))
-                if item is None:
-                    row_items.append({"text": "", "roles": {}})
-                    continue
-                roles: dict[int, object] = {}
-                try:
-                    v0 = item.data(Qt.ItemDataRole.UserRole)
-                    if v0 is not None:
-                        roles[int(Qt.ItemDataRole.UserRole)] = v0
-                except Exception:
-                    pass
-                row_items.append({"text": str(item.text() or ""), "roles": roles})
-            data.append(row_items)
-        return data
-
-    def _restore_table_state(self, payload: object) -> None:
-        if not isinstance(payload, list):
-            return
-        try:
-            cols = int(self.table.columnCount())
-        except Exception:
-            return
-
-        self.table.setRowCount(0)
-        self.table.setRowCount(len(payload))
-        for r, row_items in enumerate(payload):
-            if not isinstance(row_items, list):
-                continue
-            for c in range(min(cols, len(row_items))):
-                cell = row_items[c]
-                if not isinstance(cell, dict):
-                    continue
-                txt = str(cell.get("text") or "")
-                item = QTableWidgetItem(txt)
-                roles = cell.get("roles")
-                if isinstance(roles, dict):
-                    for k, v in roles.items():
-                        try:
-                            item.setData(Qt.ItemDataRole(int(k)), v)
-                        except Exception:
-                            pass
-                # Time columns store raw in UserRole; keep it if present.
-                self.table.setItem(int(r), int(c), item)
-                if int(c) == 0:
-                    _apply_check_item_style(item, checked=(txt.strip() == "✅"))
-        try:
-            self.apply_ui_settings()
-        except Exception:
-            pass
 
     def _format_time_value(self, value: object | None) -> str:
         s = "" if value is None else str(value)
@@ -1512,6 +1431,10 @@ class MainContent2(QWidget):
 
     def _open_columns_dialog(self) -> None:
         # Kept for compatibility (other entry points may still open the full settings dialog)
+        from ui.dialog.shift_attendance_settings_dialog import (
+            ShiftAttendanceSettingsDialog,
+        )
+
         dlg = ShiftAttendanceSettingsDialog(self)
         dlg.exec()
 
@@ -1524,6 +1447,15 @@ class MainContent2(QWidget):
 
     def apply_ui_settings(self) -> None:
         ui = get_shift_attendance_table_ui()
+
+        # Shift Attendance screen: allow hiding the import button via UI settings.
+        # (This class may not have the button; keep this best-effort.)
+        try:
+            btn = getattr(self, "btn_import", None)
+            if btn is not None:
+                btn.setVisible(bool(getattr(ui, "show_import_button", True)))
+        except Exception:
+            pass
 
         column_count = int(self.table.columnCount())
         defined_count = int(len(self._COLUMNS))

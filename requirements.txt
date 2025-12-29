@@ -3,8 +3,6 @@ PySide6
 pandas
 openpyxl
 mysql-connector-python
-
-# Optional (used by build scripts / tooling)
 Pillow
 pyinstaller
 cryptography

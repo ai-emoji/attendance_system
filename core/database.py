@@ -13,9 +13,25 @@ from pathlib import Path
 from datetime import date, datetime
 from typing import Optional
 
-import mysql.connector
+_MYSQL_CONNECTOR = None
 
-from core.resource import resource_path
+
+def _mysql_connector_module():
+    """Lazy import mysql.connector to avoid slow UI startup.
+
+    Importing mysql-connector-python can be expensive on some machines,
+    so we only import it when a DB operation is actually performed.
+    """
+
+    global _MYSQL_CONNECTOR
+    if _MYSQL_CONNECTOR is None:
+        import mysql.connector  # type: ignore
+
+        _MYSQL_CONNECTOR = mysql.connector
+    return _MYSQL_CONNECTOR
+
+
+from core.resource import DB_CONNECTION_TIMEOUT, resource_path
 
 
 # Cấu hình logging
@@ -43,6 +59,8 @@ class Database:
         "database": "",
         "charset": "utf8mb4",
         "use_unicode": True,
+        # Avoid long UI freezes on unreachable DB.
+        "connection_timeout": int(DB_CONNECTION_TIMEOUT),
     }
 
     # One-time schema sanity checks (best-effort).
@@ -50,6 +68,84 @@ class Database:
 
     # Per-year table creation cache (best-effort).
     _YEAR_TABLES_ENSURED: set[tuple[str, int]] = set()
+
+    @staticmethod
+    def _column_exists(
+        cursor, schema_name: str | None, table_name: str, column_name: str
+    ) -> bool:
+        try:
+            tn = str(table_name or "").strip()
+            cn = str(column_name or "").strip()
+            if not tn or not cn:
+                return False
+            if schema_name:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME=%s",
+                    (schema_name, tn, cn),
+                )
+            else:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    "WHERE TABLE_NAME=%s AND COLUMN_NAME=%s",
+                    (tn, cn),
+                )
+            row = cursor.fetchone()
+            try:
+                return bool(row and int(row[0]) > 0)
+            except Exception:
+                return False
+        except Exception:
+            return False
+
+    @staticmethod
+    def _ensure_table_columns_best_effort(
+        conn,
+        *,
+        table_name: str,
+        columns: list[tuple[str, str]],
+        log_prefix: str,
+    ) -> None:
+        """Best-effort add missing columns to an existing table.
+
+        columns: list of (column_name, alter_sql_fragment)
+          - alter_sql_fragment example: "ADD COLUMN in_1_symbol VARCHAR(50) NULL"
+        """
+
+        cursor = None
+        try:
+            schema_name = str(Database.CONFIG.get("database") or "").strip() or None
+            tn = str(table_name or "").strip()
+            if not tn:
+                return
+            cursor = Database.get_cursor(conn, dictionary=False)
+            for col_name, alter_fragment in columns or []:
+                cn = str(col_name or "").strip()
+                frag = str(alter_fragment or "").strip()
+                if not cn or not frag:
+                    continue
+                if Database._column_exists(cursor, schema_name, tn, cn):
+                    continue
+
+                try:
+                    cursor.execute(f"ALTER TABLE `{tn}` {frag}")
+                    conn.commit()
+                    logger.info("✅ Auto-migrate: %s added %s.%s", log_prefix, tn, cn)
+                except Exception:
+                    logger.warning(
+                        "⚠️ Không thể tự động thêm cột %s.%s. Vui lòng chạy script cập nhật CSDL (creater_database.SQL).",
+                        tn,
+                        cn,
+                        exc_info=True,
+                    )
+        except Exception:
+            logger.debug("Schema ensure columns failed (%s)", log_prefix, exc_info=True)
+        finally:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def _parse_date_any(v: object | None) -> date | None:
@@ -135,6 +231,21 @@ class Database:
                 conn.commit()
             except Exception:
                 pass
+
+            # Best-effort: ensure new columns exist on existing yearly tables too.
+            # Older DBs may have attendance_audit_YYYY created before new columns existed.
+            if bt == "attendance_audit":
+                Database._ensure_table_columns_best_effort(
+                    conn,
+                    table_name=str(yt),
+                    columns=[
+                        ("total", "ADD COLUMN total DECIMAL(10,2) NULL"),
+                        ("shift_code", "ADD COLUMN shift_code VARCHAR(255) NULL"),
+                        ("in_1_symbol", "ADD COLUMN in_1_symbol VARCHAR(50) NULL"),
+                    ],
+                    log_prefix=f"{bt}_{y}",
+                )
+
             Database._YEAR_TABLES_ENSURED.add(key)
             return yt
         except Exception:
@@ -203,6 +314,19 @@ class Database:
                         "Vui lòng chạy script cập nhật CSDL (creater_database.SQL).",
                         exc_info=True,
                     )
+
+            # attendance_audit: keep compatibility with newer UI/service logic.
+            # NOTE: yearly tables are handled in ensure_year_table().
+            Database._ensure_table_columns_best_effort(
+                conn,
+                table_name="attendance_audit",
+                columns=[
+                    ("total", "ADD COLUMN total DECIMAL(10,2) NULL"),
+                    ("shift_code", "ADD COLUMN shift_code VARCHAR(255) NULL"),
+                    ("in_1_symbol", "ADD COLUMN in_1_symbol VARCHAR(50) NULL"),
+                ],
+                log_prefix="attendance_audit",
+            )
         except Exception:
             logger.debug("Schema ensure failed", exc_info=True)
         finally:
@@ -258,7 +382,23 @@ class Database:
             logger.debug(f"Không thể load db_config.json: {exc}")
 
     @staticmethod
-    def connect():
+    def is_configured(*, reload: bool = True) -> bool:
+        """Return True if DB connection settings look configured (host/user/database not empty)."""
+
+        try:
+            if reload:
+                Database.load_config_from_file()
+        except Exception:
+            # Best-effort: treat as not configured.
+            return False
+
+        host = str(Database.CONFIG.get("host") or "").strip()
+        user = str(Database.CONFIG.get("user") or "").strip()
+        database = str(Database.CONFIG.get("database") or "").strip()
+        return bool(host and user and database)
+
+    @staticmethod
+    def connect(ensure_schema: bool = True):
         """
         Kết nối đến MySQL.
 
@@ -280,21 +420,34 @@ class Database:
                 "Chưa cấu hình kết nối CSDL. Vào 'Kết nối CSDL SQL' để thiết lập (host/user/database)."
             )
 
+        mc = _mysql_connector_module()
+
         try:
-            conn = mysql.connector.connect(**Database.CONFIG)
+            connect_kwargs = dict(Database.CONFIG)
+            try:
+                timeout = connect_kwargs.get("connection_timeout")
+                timeout_int = (
+                    int(timeout) if timeout is not None else int(DB_CONNECTION_TIMEOUT)
+                )
+            except Exception:
+                timeout_int = int(DB_CONNECTION_TIMEOUT)
+            connect_kwargs["connection_timeout"] = max(1, int(timeout_int))
+
+            conn = mc.connect(**connect_kwargs)
             logger.info("✅ Kết nối MySQL thành công")
 
             # Best-effort schema checks (once per process)
-            try:
-                Database._ensure_schema(conn)
-            except Exception:
-                pass
+            if ensure_schema:
+                try:
+                    Database._ensure_schema(conn)
+                except Exception:
+                    pass
 
             return conn
-        except mysql.connector.Error as err:
-            if err.errno == mysql.connector.errorcode.ER_ACCESS_DENIED_ERROR:
+        except mc.Error as err:
+            if err.errno == mc.errorcode.ER_ACCESS_DENIED_ERROR:
                 logger.error("❌ Tên đăng nhập hoặc mật khẩu sai")
-            elif err.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
+            elif err.errno == mc.errorcode.ER_BAD_DB_ERROR:
                 logger.error("❌ Database không tồn tại")
             else:
                 logger.error(f"❌ Lỗi kết nối MySQL: {err}")
@@ -338,6 +491,7 @@ class Database:
             result = Database.execute_query("SELECT * FROM users WHERE id = %s", (1,), "one")
         """
         cursor = None
+        mc = _mysql_connector_module()
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn, dictionary=True)
@@ -352,7 +506,7 @@ class Database:
                     return cursor.fetchall()
                 else:
                     return None
-        except mysql.connector.Error as err:
+        except mc.Error as err:
             logger.error(
                 f"❌ Lỗi execute_query: {err}\n   Query: {query}\n   Params: {params}"
             )
@@ -380,6 +534,7 @@ class Database:
             affected = Database.execute_update("DELETE FROM users WHERE id = %s", (1,))
         """
         cursor = None
+        mc = _mysql_connector_module()
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn)
@@ -393,7 +548,7 @@ class Database:
                     f"✅ Thực thi UPDATE/INSERT/DELETE thành công: {affected} dòng bị ảnh hưởng"
                 )
                 return affected
-        except mysql.connector.Error as err:
+        except mc.Error as err:
             logger.error(
                 f"❌ Lỗi execute_update: {err}\n   Query: {query}\n   Params: {params}"
             )
@@ -421,6 +576,7 @@ class Database:
             new_id = Database.execute_insert("INSERT INTO users (name, email) VALUES (%s, %s)", ("John", "john@example.com"))
         """
         cursor = None
+        mc = _mysql_connector_module()
         try:
             with Database.connect() as conn:
                 cursor = Database.get_cursor(conn)
@@ -432,7 +588,7 @@ class Database:
                 insert_id = cursor.lastrowid
                 logger.info(f"✅ INSERT thành công, ID: {insert_id}")
                 return insert_id
-        except mysql.connector.Error as err:
+        except mc.Error as err:
             logger.error(
                 f"❌ Lỗi execute_insert: {err}\n   Query: {query}\n   Params: {params}"
             )
@@ -457,7 +613,3 @@ class Database:
                 return True
         except Exception:
             return False
-
-
-# Load cấu hình từ file khi import module (nếu có)
-Database.load_config_from_file()

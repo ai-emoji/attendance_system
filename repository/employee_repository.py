@@ -1029,17 +1029,21 @@ class EmployeeRepository:
             else "NULL AS contract1_term"
         )
 
+        # These fragments must include their alias exactly once.
+        # (Avoid generating invalid SQL like 'NULL AS mcc_code AS mcc_code')
         mcc_code_sel = (
-            "e.mcc_code" if EmployeeRepository._has_mcc_code else "NULL AS mcc_code"
+            "e.mcc_code AS mcc_code"
+            if EmployeeRepository._has_mcc_code
+            else "NULL AS mcc_code"
         )
         name_on_mcc_sel = (
-            "e.name_on_mcc"
+            "e.name_on_mcc AS name_on_mcc"
             if EmployeeRepository._has_name_on_mcc
             else "NULL AS name_on_mcc"
         )
 
         employment_status_sel = (
-            "e.employment_status"
+            "e.employment_status AS employment_status"
             if EmployeeRepository._has_employment_status
             else "NULL AS employment_status"
         )
@@ -1049,9 +1053,9 @@ class EmployeeRepository:
                 e.id,
                 {stt_expr} AS stt,
                 e.employee_code,
-                {mcc_code_sel} AS mcc_code,
+                {mcc_code_sel},
                 e.full_name,
-                {name_on_mcc_sel} AS name_on_mcc,
+                {name_on_mcc_sel},
                 e.start_date,
                 e.title_id,
                 e.department_id,
@@ -1081,7 +1085,7 @@ class EmployeeRepository:
                 e.child_dob_2,
                 e.child_dob_3,
                 e.child_dob_4,
-                {employment_status_sel} AS employment_status,
+                {employment_status_sel},
                 e.note
             FROM employees e
             LEFT JOIN job_titles jt ON jt.id = e.title_id

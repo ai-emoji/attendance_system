@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 
+from core.threads import BackgroundTaskRunner
+
 from services.department_services import DepartmentService
 from services.title_services import TitleService
 from ui.dialog.title_dialog import MessageDialog, TitleDialog
@@ -30,6 +32,7 @@ class TitleController:
         self._title_bar2 = title_bar2
         self._content = content
         self._service = service or TitleService()
+        self._runner = BackgroundTaskRunner(self._parent_window, name="title_refresh")
 
     def bind(self) -> None:
         self._title_bar2.add_clicked.connect(self.on_add)
@@ -39,15 +42,28 @@ class TitleController:
         self.refresh()
 
     def refresh(self) -> None:
-        try:
+        def _fn() -> object:
             models = self._service.list_titles()
             rows = [(m.id, m.title_name) for m in models]
+            return rows
+
+        def _ok(result: object) -> None:
+            rows = list(result or []) if isinstance(result, list) else []
             self._content.set_titles(rows)
             self._title_bar2.set_total(len(rows))
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách chức danh")
-            self._content.set_titles([])
-            self._title_bar2.set_total(0)
+            try:
+                self._content.set_titles([])
+            except Exception:
+                pass
+            try:
+                self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _list_departments_dropdown(self) -> list[tuple[int, str]]:
         try:

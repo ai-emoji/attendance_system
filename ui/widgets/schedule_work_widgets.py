@@ -77,7 +77,7 @@ _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
 _SCHEDULE_WORK_STATE: dict[str, object] = {}
 
 # Tránh lag khi view bị recreate: không lưu/restore bảng quá lớn.
-_STATE_TABLE_MAX_ROWS = 200
+_STATE_TABLE_MAX_ROWS = 3000
 
 
 def _to_alignment_flag(align: str) -> Qt.AlignmentFlag:
@@ -255,10 +255,41 @@ class ScheduleWorkView(QWidget):
             pass
 
         # Restore previous state after controllers have had a chance to bind.
+        self._did_restore_cached_state = False
         try:
-            QTimer.singleShot(0, self._restore_state_if_any)
+            QTimer.singleShot(0, self.restore_cached_state_if_any)
         except Exception:
             pass
+
+    def restore_cached_state_if_any(self) -> dict[str, bool]:
+        """Restore cached UI state.
+
+        Returns flags so controller can avoid overwriting restored tables on bind.
+        """
+        if bool(getattr(self, "_did_restore_cached_state", False)):
+            return {
+                "restored_right_table": False,
+                "restored_temp_table": False,
+                "restored_any": False,
+            }
+        flags = self._restore_state_if_any()
+        try:
+            self._did_restore_cached_state = True
+        except Exception:
+            pass
+        return flags
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        # When switching tabs, the view may be destroyed quickly; ensure filters are saved.
+        try:
+            self._save_timer.stop()
+        except Exception:
+            pass
+        try:
+            self._save_state()
+        except Exception:
+            pass
+        return super().hideEvent(event)
 
     def _schedule_save_state(self, *_a) -> None:
         try:
@@ -314,26 +345,125 @@ class ScheduleWorkView(QWidget):
         except Exception:
             return
 
+        # Restoring lots of items can freeze UI; do incremental restore when large.
+        total_cells = 0
+        try:
+            for row_items in payload:
+                if isinstance(row_items, list):
+                    total_cells += min(cols, len(row_items))
+        except Exception:
+            total_cells = 0
+
+        def _restore_sync() -> None:
+            table.setRowCount(0)
+            table.setRowCount(len(payload))
+            for r, row_items in enumerate(payload):
+                if not isinstance(row_items, list):
+                    continue
+                for c in range(min(cols, len(row_items))):
+                    cell = row_items[c]
+                    if not isinstance(cell, dict):
+                        continue
+                    txt = str(cell.get("text") or "")
+                    it = QTableWidgetItem(txt)
+                    it.setFlags(
+                        Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                    )
+                    if check_col is not None and int(c) == int(check_col):
+                        it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                        try:
+                            f = QFont(UI_FONT, int(CONTENT_FONT) + 0)
+                            it.setFont(f)
+                        except Exception:
+                            pass
+                    table.setItem(int(r), int(c), it)
+
+        if total_cells <= 500:
+            _restore_sync()
+            return
+
         table.setRowCount(0)
         table.setRowCount(len(payload))
-        for r, row_items in enumerate(payload):
-            if not isinstance(row_items, list):
-                continue
-            for c in range(min(cols, len(row_items))):
-                cell = row_items[c]
-                if not isinstance(cell, dict):
+        try:
+            table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            table.blockSignals(True)
+        except Exception:
+            pass
+
+        rows = len(payload)
+        budget_ms = 10.0
+        r = 0
+        c = 0
+
+        timer = QTimer(table)
+        timer.setInterval(0)
+        try:
+            setattr(table, "_restore_state_timer", timer)
+        except Exception:
+            pass
+
+        def _tick() -> None:
+            nonlocal r, c
+            start = time.perf_counter()
+            while r < rows:
+                row_items = payload[r] if isinstance(payload[r], list) else None
+                if not row_items:
+                    r += 1
+                    c = 0
                     continue
-                txt = str(cell.get("text") or "")
-                it = QTableWidgetItem(txt)
-                it.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-                if check_col is not None and int(c) == int(check_col):
-                    it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    try:
-                        f = QFont(UI_FONT, int(CONTENT_FONT) + 0)
-                        it.setFont(f)
-                    except Exception:
-                        pass
-                table.setItem(int(r), int(c), it)
+
+                limit = min(cols, len(row_items))
+                while c < limit:
+                    cell = row_items[c]
+                    if isinstance(cell, dict):
+                        txt = str(cell.get("text") or "")
+                        it = QTableWidgetItem(txt)
+                        it.setFlags(
+                            Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                        )
+                        if check_col is not None and int(c) == int(check_col):
+                            it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                            try:
+                                f = QFont(UI_FONT, int(CONTENT_FONT) + 0)
+                                it.setFont(f)
+                            except Exception:
+                                pass
+                        table.setItem(int(r), int(c), it)
+
+                    c += 1
+                    if (time.perf_counter() - start) * 1000.0 >= budget_ms:
+                        return
+
+                r += 1
+                c = 0
+
+            try:
+                timer.stop()
+            except Exception:
+                pass
+            try:
+                table.blockSignals(False)
+            except Exception:
+                pass
+            try:
+                table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                delattr(table, "_restore_state_timer")
+            except Exception:
+                pass
+
+        try:
+            timer.timeout.connect(_tick)
+        except Exception:
+            _restore_sync()
+            return
+        timer.start()
+        _tick()
 
     def _save_state(self) -> None:
         try:
@@ -388,10 +518,16 @@ class ScheduleWorkView(QWidget):
         }
         _SCHEDULE_WORK_STATE["view"] = state
 
-    def _restore_state_if_any(self) -> None:
+    def _restore_state_if_any(self) -> dict[str, bool]:
         state = _SCHEDULE_WORK_STATE.get("view")
+        restored_right_table = False
+        restored_temp_table = False
         if not isinstance(state, dict) or not state:
-            return
+            return {
+                "restored_right_table": False,
+                "restored_temp_table": False,
+                "restored_any": False,
+            }
 
         def _block_all(on: bool) -> None:
             try:
@@ -446,6 +582,11 @@ class ScheduleWorkView(QWidget):
             try:
                 sel = (state.get("left") or {}).get("selected")
                 if isinstance(sel, dict):
+                    # Store desired ctx so it can be applied after tree data loads.
+                    try:
+                        self.content.left.set_desired_selection_ctx(sel)
+                    except Exception:
+                        pass
                     node_id = int(sel.get("id") or 0)
                     node_type = str(sel.get("type") or "dept")
                     if node_id > 0:
@@ -485,6 +626,10 @@ class ScheduleWorkView(QWidget):
             try:
                 right = state.get("right") or {}
                 target = right.get("schedule_data")
+                try:
+                    self.content.right.set_desired_schedule_data(target)
+                except Exception:
+                    pass
                 idx = -1
                 for i in range(self.content.right.cbo_schedule.count()):
                     if self.content.right.cbo_schedule.itemData(i) == target:
@@ -499,6 +644,9 @@ class ScheduleWorkView(QWidget):
                     self.content.right.table,
                     (state.get("right") or {}).get("table"),
                     check_col=self.content.right.COL_CHECK,
+                )
+                restored_right_table = isinstance(
+                    (state.get("right") or {}).get("table"), list
                 )
                 # Restore header checkbox text
                 header_txt = str((state.get("right") or {}).get("header_check") or "")
@@ -520,6 +668,10 @@ class ScheduleWorkView(QWidget):
                 pass
             try:
                 target = (state.get("temp") or {}).get("schedule_data")
+                try:
+                    self.content.temp.set_desired_schedule_data(target)
+                except Exception:
+                    pass
                 idx = -1
                 for i in range(self.content.temp.cbo_schedule.count()):
                     if self.content.temp.cbo_schedule.itemData(i) == target:
@@ -541,6 +693,9 @@ class ScheduleWorkView(QWidget):
                     (state.get("temp") or {}).get("table"),
                     check_col=self.content.temp.COL_CHECK,
                 )
+                restored_temp_table = isinstance(
+                    (state.get("temp") or {}).get("table"), list
+                )
                 header_txt = str((state.get("temp") or {}).get("header_check") or "")
                 if header_txt in {"✅", "❌"}:
                     self.content.temp._set_header_check_text(header_txt)
@@ -548,6 +703,12 @@ class ScheduleWorkView(QWidget):
                 pass
         finally:
             _block_all(False)
+
+        return {
+            "restored_right_table": bool(restored_right_table),
+            "restored_temp_table": bool(restored_temp_table),
+            "restored_any": bool(restored_right_table or restored_temp_table),
+        }
 
 
 def _mk_font_normal() -> QFont:
@@ -856,6 +1017,9 @@ class MainLeft(QWidget):
         self._dept_parent_by_id: dict[int, int | None] = {}
         self._dept_name_by_id: dict[int, str] = {}
 
+        # Desired selection context to restore after tree rebuild.
+        self._desired_ctx: dict | None = None
+
         self.tree = QTreeWidget(self)
         self.tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tree.setColumnCount(1)
@@ -863,6 +1027,15 @@ class MainLeft(QWidget):
         self.tree.setIndentation(0)
         self.tree.setRootIsDecorated(False)
         self.tree.setExpandsOnDoubleClick(False)
+        # Reduce layout/paint overhead for large trees.
+        try:
+            self.tree.setAnimated(False)
+        except Exception:
+            pass
+        try:
+            self.tree.setUniformRowHeights(True)
+        except Exception:
+            pass
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -898,6 +1071,23 @@ class MainLeft(QWidget):
         rows: list[tuple[int, int | None, str, str]],
         titles: list[tuple[int, int | None, str]] | None = None,
     ) -> None:
+        # Preserve current/desired selection before rebuilding.
+        try:
+            desired = self._desired_ctx or self.get_selected_node_context()
+        except Exception:
+            desired = self._desired_ctx
+
+        try:
+            self.tree.blockSignals(True)
+        except Exception:
+            pass
+
+        # Avoid visible "giật" while clearing/rebuilding the whole tree.
+        try:
+            self.tree.setUpdatesEnabled(False)
+        except Exception:
+            pass
+
         self.tree.clear()
         titles = titles or []
 
@@ -986,7 +1176,60 @@ class MainLeft(QWidget):
                     build(item, int(node_id), next_prefix_parts)
 
         build(None, None, [])
-        self.tree.expandAll()
+        try:
+            self.tree.expandAll()
+        except Exception:
+            pass
+
+        # Restore selection by stable ctx (type + id) after rebuild.
+        try:
+            self._desired_ctx = desired if isinstance(desired, dict) else None
+            if isinstance(desired, dict):
+                node_id = int(desired.get("id") or 0)
+                node_type = str(desired.get("type") or "dept")
+                if node_type not in ("dept", "title"):
+                    node_type = "dept"
+                if node_id > 0:
+                    found = None
+                    stack: list[QTreeWidgetItem] = []
+                    for i in range(self.tree.topLevelItemCount()):
+                        it = self.tree.topLevelItem(i)
+                        if it is not None:
+                            stack.append(it)
+                    while stack:
+                        it = stack.pop(0)
+                        try:
+                            it_id = int(it.data(0, Qt.ItemDataRole.UserRole) or 0)
+                            it_type = str(
+                                it.data(0, Qt.ItemDataRole.UserRole + 2) or "dept"
+                            )
+                        except Exception:
+                            it_id, it_type = (0, "dept")
+                        if it_id == node_id and it_type == node_type:
+                            found = it
+                            break
+                        for j in range(it.childCount()):
+                            stack.append(it.child(j))
+                    if found is not None:
+                        self.tree.setCurrentItem(found)
+        except Exception:
+            pass
+        finally:
+            try:
+                self.tree.blockSignals(False)
+            except Exception:
+                pass
+            try:
+                self.tree.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.tree.viewport().update()
+            except Exception:
+                pass
+
+    def set_desired_selection_ctx(self, ctx: dict | None) -> None:
+        self._desired_ctx = ctx if isinstance(ctx, dict) else None
 
     def get_selected_node_context(self) -> dict | None:
         item = self.tree.currentItem()
@@ -1054,6 +1297,8 @@ class MainRight(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet(f"background-color: {MAIN_CONTENT_BG_COLOR};")
 
+        self._desired_schedule_data: object | None = None
+
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 10, 12, 10)
         root.setSpacing(8)
@@ -1108,10 +1353,18 @@ class MainRight(QWidget):
         except Exception:
             pass
 
-            self._render_timer: QTimer | None = None
-            self._render_rows: list[dict] | list[object] = []
-            self._render_schedule_map: dict[int, str] = {}
-            self._render_index: int = 0
+        # Reserve scrollbar space up-front to avoid columns "nhảy" when it appears.
+        try:
+            self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        except Exception:
+            pass
+
+        # Chunked rendering state (always initialized).
+        self._render_timer: QTimer | None = None
+        self._render_rows: list[dict] | list[object] = []
+        self._render_schedule_map: dict[int, str] = {}
+        self._render_index: int = 0
+        self._is_chunk_rendering: bool = False
         self.table.setAlternatingRowColors(True)
         self.table.setWordWrap(False)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1347,7 +1600,9 @@ class MainRight(QWidget):
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         try:
             if obj is self.table.viewport() and event.type() == QEvent.Type.Resize:
-                self._fit_columns_to_viewport()
+                # Avoid repeated re-fit during chunk render (causes visible jitter).
+                if not bool(getattr(self, "_is_chunk_rendering", False)):
+                    self._fit_columns_to_viewport()
         except Exception:
             pass
         return super().eventFilter(obj, event)
@@ -1453,6 +1708,10 @@ class MainRight(QWidget):
     ) -> None:
         """Keep total visible column width within viewport when user drags a header."""
 
+        # Ignore resize bookkeeping while we are populating rows.
+        if bool(getattr(self, "_is_chunk_rendering", False)):
+            return
+
         if self._is_adjusting_columns:
             return
 
@@ -1542,6 +1801,11 @@ class MainRight(QWidget):
             self._is_adjusting_columns = False
 
     def set_schedules(self, items: list[tuple[int, str]]) -> None:
+        try:
+            prev = self.cbo_schedule.currentData()
+        except Exception:
+            prev = None
+
         self.cbo_schedule.clear()
         # Index 0: placeholder (không áp dụng)
         self.cbo_schedule.addItem("-- Chọn lịch làm việc --", None)
@@ -1552,6 +1816,24 @@ class MainRight(QWidget):
                 self.cbo_schedule.addItem(str(name or ""), int(sid))
             except Exception:
                 continue
+
+        # Restore desired/previous selection after repopulating.
+        target = self._desired_schedule_data
+        if target is None:
+            target = prev
+        try:
+            idx = -1
+            for i in range(self.cbo_schedule.count()):
+                if self.cbo_schedule.itemData(i) == target:
+                    idx = i
+                    break
+            if idx >= 0:
+                self.cbo_schedule.setCurrentIndex(int(idx))
+        except Exception:
+            pass
+
+    def set_desired_schedule_data(self, data: object) -> None:
+        self._desired_schedule_data = data
 
     def apply_schedule_name_map(self, schedule_by_employee_id: dict[int, str]) -> None:
         if not schedule_by_employee_id:
@@ -1688,6 +1970,10 @@ class MainRight(QWidget):
                 self._render_timer.stop()
         except Exception:
             pass
+        try:
+            self._is_chunk_rendering = False
+        except Exception:
+            pass
         self._render_rows = []
         self._render_schedule_map = {}
         self._render_index = 0
@@ -1703,6 +1989,11 @@ class MainRight(QWidget):
 
         self.cancel_render()
         self.table.setRowCount(0)
+
+        try:
+            self._is_chunk_rendering = True
+        except Exception:
+            pass
 
         if not rows:
             try:
@@ -1752,6 +2043,12 @@ class MainRight(QWidget):
         except Exception:
             pass
 
+        # Reduce repaints while we set many items.
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+
         try:
             while self._render_index < len(self._render_rows):
                 r = int(self._render_index)
@@ -1795,27 +2092,39 @@ class MainRight(QWidget):
                 self.table.setItem(r, self.COL_ID, it_id)
 
                 it_code = QTableWidgetItem(str(emp_code or ""))
-                it_code.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_code.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_EMP_CODE, it_code)
 
                 it_mcc = QTableWidgetItem(str(mcc_code or ""))
-                it_mcc.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_mcc.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_MCC_CODE, it_mcc)
 
                 it_name = QTableWidgetItem(str(full_name or ""))
-                it_name.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_name.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_FULL_NAME, it_name)
 
                 it_dept = QTableWidgetItem(str(department_name or ""))
-                it_dept.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_dept.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_DEPARTMENT, it_dept)
 
                 it_title = QTableWidgetItem(str(title_name or ""))
-                it_title.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_title.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_TITLE, it_title)
 
                 it_sched = QTableWidgetItem(str(schedule_name or ""))
-                it_sched.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_sched.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_SCHEDULE, it_sched)
 
                 try:
@@ -1832,6 +2141,10 @@ class MainRight(QWidget):
                 self.table.blockSignals(False)
             except Exception:
                 pass
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
 
         try:
             self.table.viewport().update()
@@ -1846,6 +2159,11 @@ class MainRight(QWidget):
                 pass
 
             try:
+                self._is_chunk_rendering = False
+            except Exception:
+                pass
+
+            try:
                 self.apply_ui_settings()
             except Exception:
                 pass
@@ -1855,7 +2173,11 @@ class MainRight(QWidget):
             except Exception:
                 pass
 
-
+            # Fit once after render completes (prevents column jitter).
+            try:
+                self._fit_columns_to_viewport()
+            except Exception:
+                pass
 
     def get_checked_employee_ids(self) -> list[int]:
         ids: list[int] = []
@@ -1993,6 +2315,8 @@ class TempScheduleContent(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet(f"background-color: {MAIN_CONTENT_BG_COLOR};")
 
+        self._desired_schedule_data: object | None = None
+
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 10, 12, 10)
         root.setSpacing(8)
@@ -2115,9 +2439,16 @@ class TempScheduleContent(QWidget):
         except Exception:
             pass
 
+        # Reserve scrollbar space up-front to avoid columns "nhảy" when it appears.
+        try:
+            self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        except Exception:
+            pass
+
         self._render_timer: QTimer | None = None
         self._render_rows: list[dict] = []
         self._render_index: int = 0
+        self._is_chunk_rendering: bool = False
         self.table.setAlternatingRowColors(True)
         self.table.setWordWrap(False)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -2315,7 +2646,8 @@ class TempScheduleContent(QWidget):
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         try:
             if obj is self.table.viewport() and event.type() == QEvent.Type.Resize:
-                self._fit_columns_to_viewport()
+                if not bool(getattr(self, "_is_chunk_rendering", False)):
+                    self._fit_columns_to_viewport()
         except Exception:
             pass
         return super().eventFilter(obj, event)
@@ -2414,6 +2746,9 @@ class TempScheduleContent(QWidget):
     def _on_header_section_resized(
         self, logical_index: int, old_size: int, new_size: int
     ) -> None:
+        # Ignore resize bookkeeping while we are populating rows.
+        if bool(getattr(self, "_is_chunk_rendering", False)):
+            return
         if self._is_adjusting_columns:
             return
 
@@ -2600,6 +2935,10 @@ class TempScheduleContent(QWidget):
                 self._render_timer.stop()
         except Exception:
             pass
+        try:
+            self._is_chunk_rendering = False
+        except Exception:
+            pass
         self._render_rows = []
         self._render_index = 0
 
@@ -2608,6 +2947,11 @@ class TempScheduleContent(QWidget):
 
         self.cancel_render()
         self.table.setRowCount(0)
+
+        try:
+            self._is_chunk_rendering = True
+        except Exception:
+            pass
         if not rows:
             try:
                 self._set_header_check_text("❌")
@@ -2647,6 +2991,11 @@ class TempScheduleContent(QWidget):
             pass
 
         try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+
+        try:
             while self._render_index < len(self._render_rows):
                 r = int(self._render_index)
                 item = self._render_rows[r] or {}
@@ -2675,15 +3024,21 @@ class TempScheduleContent(QWidget):
                 self.table.setItem(r, self.COL_CHECK, chk)
 
                 it_code = QTableWidgetItem(str(emp_code or ""))
-                it_code.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_code.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_EMP_CODE, it_code)
 
                 it_name = QTableWidgetItem(str(full_name or ""))
-                it_name.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_name.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_FULL_NAME, it_name)
 
                 it_from = QTableWidgetItem(self._fmt_date(from_date))
-                it_from.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_from.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_FROM_DATE, it_from)
 
                 it_to = QTableWidgetItem(self._fmt_date(to_date))
@@ -2691,7 +3046,9 @@ class TempScheduleContent(QWidget):
                 self.table.setItem(r, self.COL_TO_DATE, it_to)
 
                 it_sched = QTableWidgetItem(str(schedule_name or ""))
-                it_sched.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                it_sched.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
                 self.table.setItem(r, self.COL_SCHEDULE, it_sched)
 
                 try:
@@ -2705,6 +3062,10 @@ class TempScheduleContent(QWidget):
         finally:
             try:
                 self.table.blockSignals(False)
+            except Exception:
+                pass
+            try:
+                self.table.setUpdatesEnabled(True)
             except Exception:
                 pass
 
@@ -2721,6 +3082,11 @@ class TempScheduleContent(QWidget):
                 pass
 
             try:
+                self._is_chunk_rendering = False
+            except Exception:
+                pass
+
+            try:
                 self.apply_ui_settings()
             except Exception:
                 pass
@@ -2730,7 +3096,10 @@ class TempScheduleContent(QWidget):
             except Exception:
                 pass
 
-
+            try:
+                self._fit_columns_to_viewport()
+            except Exception:
+                pass
 
     def get_selected_assignment_id(self) -> int | None:
         try:
@@ -2851,6 +3220,11 @@ class TempScheduleContent(QWidget):
                 pass
 
     def set_schedules(self, items: list[tuple[int, str]]) -> None:
+        try:
+            prev = self.cbo_schedule.currentData()
+        except Exception:
+            prev = None
+
         self.cbo_schedule.clear()
         self.cbo_schedule.addItem("-- Chọn lịch làm việc --", None)
         self.cbo_schedule.addItem("Chưa sắp xếp ca", 0)
@@ -2859,6 +3233,23 @@ class TempScheduleContent(QWidget):
                 self.cbo_schedule.addItem(str(name or ""), int(sid))
             except Exception:
                 continue
+
+        target = self._desired_schedule_data
+        if target is None:
+            target = prev
+        try:
+            idx = -1
+            for i in range(self.cbo_schedule.count()):
+                if self.cbo_schedule.itemData(i) == target:
+                    idx = i
+                    break
+            if idx >= 0:
+                self.cbo_schedule.setCurrentIndex(int(idx))
+        except Exception:
+            pass
+
+    def set_desired_schedule_data(self, data: object) -> None:
+        self._desired_schedule_data = data
 
 
 class MainContent(QWidget):

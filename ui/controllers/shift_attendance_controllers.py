@@ -15,6 +15,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    import shiboken6  # type: ignore
+except Exception:  # pragma: no cover
+    shiboken6 = None
+
 from PySide6.QtCore import (
     QDate,
     QElapsedTimer,
@@ -25,7 +30,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtWidgets import QFileDialog, QDialog
+from PySide6.QtWidgets import QFileDialog, QDialog, QSplitter
 from PySide6.QtWidgets import QTableWidgetItem
 
 from export.export_details import export_shift_attendance_details_xlsx
@@ -43,6 +48,7 @@ from ui.controllers.shift_attendance_maincontent2_controllers import (
     ShiftAttendanceMainContent2Controller,
 )
 from core.attendance_symbol_bus import attendance_symbol_bus
+from core.db_connection_bus import db_connection_bus
 from core.threads import BackgroundTaskRunner
 from core.ui_settings import get_last_save_dir, set_last_save_dir
 from ui.dialog.export_grid_list_dialog import ExportGridListDialog, NoteStyle
@@ -51,6 +57,51 @@ from ui.dialog.loading_dialog import LoadingDialog
 
 
 logger = logging.getLogger(__name__)
+
+
+# Runtime cache for MainContent1 filtered rows (in-memory, per app session).
+# Purpose: when navigating away and coming back to Shift Attendance view, restore
+# the filtered employee list without re-querying DB, and without appearing reset.
+_SHIFT_ATTENDANCE_MC1_CACHE: dict[str, Any] = {
+    "key": None,
+    "rows": None,
+    "schedule_map": None,
+}
+
+
+# Runtime cache for MainContent2 audit grid (in-memory, per app session).
+# Purpose: when navigating away and coming back to Shift Attendance view, restore
+# the last displayed audit grid without immediately clearing/reloading.
+_SHIFT_ATTENDANCE_MC2_CACHE: dict[str, Any] = {
+    "from_date": None,
+    "to_date": None,
+    "rows": None,
+    "mode": None,
+    "department_id": None,
+    "title_id": None,
+    "employee_ids": None,
+    "attendance_codes": None,
+    "show_seconds": None,
+}
+
+
+def _qt_alive(obj: object) -> bool:
+    """Return True if a PySide6 QObject still has a live C++ instance."""
+    if obj is None:
+        return False
+    if shiboken6 is not None:
+        try:
+            return bool(shiboken6.isValid(obj))
+        except Exception:
+            pass
+    # Fallback: touching any Qt property will raise RuntimeError if deleted.
+    try:
+        getattr(obj, "objectName")()
+        return True
+    except RuntimeError:
+        return False
+    except Exception:
+        return True
 
 
 class ShiftAttendanceController:
@@ -92,14 +143,136 @@ class ShiftAttendanceController:
 
         # Cache attendance symbols to avoid repeated DB calls during render.
         self._symbols_by_code_cache: dict[str, dict[str, Any]] | None = None
+        self._symbols_loading = False
+        self._symbols_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="attendance_symbols"
+        )
+
+        # Background loaders for dropdown filters (avoid UI freeze when DB is slow/unavailable).
+        self._departments_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="shift_attendance_departments"
+        )
+        self._titles_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="shift_attendance_titles"
+        )
 
         # Background runner for export (do not touch Qt widgets in worker thread).
-        self._export_runner = BackgroundTaskRunner(parent=self._parent_window, name="export")
+        self._export_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="export"
+        )
+
+        # Background loader for MainContent1 (employee list) using core/threads.py.
+        self._employees_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="shift_attendance_employees"
+        )
 
         # Export snapshot state (UI-thread chunking) + loading dialog.
         self._export_snapshot_timer: QTimer | None = None
         self._export_snapshot_state: dict[str, Any] | None = None
         self._export_loading_dialog: LoadingDialog | None = None
+
+        self._disposed = False
+
+        # Subscribe immediately so we don't miss DB-connect events if the user
+        # opens the CSDL dialog before bind() runs (bind is deferred by main_window).
+        try:
+            db_connection_bus.connect_changed_weak(self._on_db_connection_changed)
+        except Exception:
+            pass
+
+    def _ui_alive(self) -> bool:
+        if bool(self._disposed):
+            return False
+        return _qt_alive(self._content1)
+
+    def _dispose(self) -> None:
+        """Stop any pending async/timer UI work.
+
+        Tabs/widgets can be destroyed while background tasks/timers are still queued.
+        This method makes all pending UI updates no-op.
+        """
+        if bool(self._disposed):
+            return
+        self._disposed = True
+
+        # Stop timers/snapshots first.
+        try:
+            self._cancel_employee_render()
+        except Exception:
+            pass
+        try:
+            self._cancel_audit_render()
+        except Exception:
+            pass
+        try:
+            self._cancel_export_snapshot()
+        except Exception:
+            pass
+
+        # Cancel background runners (best-effort).
+        for runner_attr in (
+            "_symbols_runner",
+            "_departments_runner",
+            "_titles_runner",
+            "_employees_runner",
+            "_export_runner",
+        ):
+            try:
+                r = getattr(self, runner_attr, None)
+                if r is not None:
+                    getattr(r, "cancel_current")()
+            except Exception:
+                pass
+
+        # Cancel employee loader thread/worker.
+        try:
+            if self._employee_loader_worker is not None:
+                try:
+                    getattr(self._employee_loader_worker, "cancel")()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if self._employee_loader_thread is not None:
+                try:
+                    self._employee_loader_thread.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._employee_loader_thread = None
+        self._employee_loader_worker = None
+        self._employee_loader_bridge = None
+
+        # Cancel audit loader thread/worker.
+        try:
+            if self._audit_loader_worker is not None:
+                try:
+                    getattr(self._audit_loader_worker, "cancel")()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if self._audit_loader_thread is not None:
+                try:
+                    self._audit_loader_thread.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._audit_loader_thread = None
+        self._audit_loader_worker = None
+        self._audit_loader_bridge = None
+
+        # Disconnect global bus signals to avoid late callbacks.
+        try:
+            attendance_symbol_bus.changed.disconnect(
+                self._on_attendance_symbols_changed
+            )
+        except Exception:
+            pass
 
     def _cancel_export_snapshot(self) -> None:
         try:
@@ -200,7 +373,9 @@ class ShiftAttendanceController:
 
         src_rows = list(range(int(total_rows)))
         if rows_to_export is not None:
-            src_rows = [int(r) for r in (rows_to_export or []) if 0 <= int(r) < int(total_rows)]
+            src_rows = [
+                int(r) for r in (rows_to_export or []) if 0 <= int(r) < int(total_rows)
+            ]
 
         state: dict[str, Any] = {
             "i": 0,
@@ -234,7 +409,9 @@ class ShiftAttendanceController:
             if n <= 0:
                 # Empty export: still allow export function to decide.
                 try:
-                    loading.set_indeterminate(True, message="Đang xuất Excel, xin chờ...")
+                    loading.set_indeterminate(
+                        True, message="Đang xuất Excel, xin chờ..."
+                    )
                 except Exception:
                     pass
 
@@ -243,7 +420,9 @@ class ShiftAttendanceController:
                     hidden_cols=st.get("hidden_cols", set()) or set(),
                     rows=[],
                 )
-                self._start_export_worker(title=title, loading=loading, snapshot=snapshot, do_export=do_export)
+                self._start_export_worker(
+                    title=title, loading=loading, snapshot=snapshot, do_export=do_export
+                )
                 return
 
             # Process a chunk of rows per tick to keep UI responsive.
@@ -267,13 +446,17 @@ class ShiftAttendanceController:
             st["rows"] = out_rows
 
             try:
-                loading.set_count_target(int(end), int(n), message="Đang chuẩn bị dữ liệu...")
+                loading.set_count_target(
+                    int(end), int(n), message="Đang chuẩn bị dữ liệu..."
+                )
             except Exception:
                 pass
 
             if int(end) >= int(n):
                 try:
-                    loading.set_indeterminate(True, message="Đang xuất Excel, xin chờ...")
+                    loading.set_indeterminate(
+                        True, message="Đang xuất Excel, xin chờ..."
+                    )
                 except Exception:
                     pass
                 snapshot = _make_snapshot(
@@ -281,9 +464,13 @@ class ShiftAttendanceController:
                     hidden_cols=st.get("hidden_cols", set()) or set(),
                     rows=st.get("rows", []) or [],
                 )
-                self._start_export_worker(title=title, loading=loading, snapshot=snapshot, do_export=do_export)
+                self._start_export_worker(
+                    title=title, loading=loading, snapshot=snapshot, do_export=do_export
+                )
 
-        def _make_snapshot(*, headers: list[str], hidden_cols: set[int], rows: list[list[str]]):
+        def _make_snapshot(
+            *, headers: list[str], hidden_cols: set[int], rows: list[list[str]]
+        ):
             class _SnapHeader:
                 def __init__(self, txt: str) -> None:
                     self._txt = str(txt or "")
@@ -341,7 +528,9 @@ class ShiftAttendanceController:
                         return None
                     return _SnapItem(v)
 
-            return _TableSnapshot(headers_in=headers, hidden_cols_in=hidden_cols, rows_in=rows)
+            return _TableSnapshot(
+                headers_in=headers, hidden_cols_in=hidden_cols, rows_in=rows
+            )
 
         try:
             timer.timeout.connect(_tick)
@@ -406,18 +595,79 @@ class ShiftAttendanceController:
                 pass
             MessageDialog.info(self._parent_window, str(title), str(msg))
 
-        self._export_runner.run(fn=_fn, on_success=_on_success, on_error=_on_error, coalesce=True)
+        self._export_runner.run(
+            fn=_fn, on_success=_on_success, on_error=_on_error, coalesce=True
+        )
 
     def _get_symbols_by_code_cached(self) -> dict[str, dict[str, Any]]:
+        # Never hit DB on UI thread here; that would freeze tab switching.
         if self._symbols_by_code_cache is not None:
             return self._symbols_by_code_cache
-        try:
-            self._symbols_by_code_cache = AttendanceSymbolService().list_rows_by_code() or {}
-        except Exception:
-            self._symbols_by_code_cache = {}
+
+        # Kick off background load once; return defaults now.
+        self._ensure_symbols_cache_async()
+        self._symbols_by_code_cache = {}
         return self._symbols_by_code_cache
 
+    def _ensure_symbols_cache_async(self) -> None:
+        if bool(self._symbols_loading):
+            return
+        self._symbols_loading = True
+
+        def _fn() -> object:
+            return AttendanceSymbolService().list_rows_by_code() or {}
+
+        def _ok(result: object) -> None:
+            try:
+                self._symbols_by_code_cache = (
+                    dict(result or {}) if isinstance(result, dict) else {}
+                )
+            finally:
+                self._symbols_loading = False
+
+        def _err(_msg: str) -> None:
+            try:
+                self._symbols_by_code_cache = {}
+            finally:
+                self._symbols_loading = False
+
+        try:
+            self._symbols_runner.run(
+                fn=_fn, on_success=_ok, on_error=_err, coalesce=True
+            )
+        except Exception:
+            self._symbols_loading = False
+
     def _cancel_employee_render(self) -> None:
+        # Defensive: if a render tick exited early while updates were disabled,
+        # the table may stop repainting and appear "hidden" until the view is reopened.
+        try:
+            if self._content1 is not None and _qt_alive(self._content1):
+                t = getattr(self._content1, "table", None)
+                if _qt_alive(t):
+                    try:
+                        t.setUpdatesEnabled(True)
+                    except Exception:
+                        pass
+                    try:
+                        t.viewport().update()
+                    except Exception:
+                        pass
+                f = getattr(self._content1, "table_frame", None)
+                if _qt_alive(f):
+                    try:
+                        f.setVisible(True)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Also ensure the splitter hasn't collapsed one pane.
+        try:
+            self._ensure_splitter_sane()
+        except Exception:
+            pass
+
         try:
             if self._employee_render_timer is not None:
                 try:
@@ -464,6 +714,17 @@ class ShiftAttendanceController:
             self._audit_render_tick = None
 
     def bind(self) -> None:
+        # Ensure we stop background/timer work if the widget is destroyed.
+        try:
+            self._content1.destroyed.connect(self._dispose)
+        except Exception:
+            pass
+        try:
+            if self._content2 is not None:
+                self._content2.destroyed.connect(self._dispose)
+        except Exception:
+            pass
+
         self._content1.refresh_clicked.connect(self.on_refresh_clicked)
         self._content1.department_changed.connect(self.refresh)
         try:
@@ -477,6 +738,12 @@ class ShiftAttendanceController:
             attendance_symbol_bus.changed.connect(self._on_attendance_symbols_changed)
         except Exception:
             pass
+
+        # Reload UI when DB connection becomes available.
+        try:
+            db_connection_bus.connect_changed_weak(self._on_db_connection_changed)
+        except Exception:
+            pass
         if self._content2 is not None:
             self._content1.view_clicked.connect(self.on_view_clicked)
             try:
@@ -488,37 +755,127 @@ class ShiftAttendanceController:
             except Exception:
                 pass
 
-        # Initial
-        self._load_departments()
-        self._load_titles()
-        self._reset_fields(clear_table=False)
-        # Defer heavy work to the event loop so the widget can paint first.
+        # Initial: load dropdowns without blocking UI.
         try:
-            QTimer.singleShot(0, self.refresh)
+            QTimer.singleShot(0, self._load_departments_async)
+            QTimer.singleShot(0, self._load_titles_async)
+            QTimer.singleShot(0, self._ensure_symbols_cache_async)
         except Exception:
-            self.refresh()
+            self._load_departments_async()
+            self._load_titles_async()
+
+        # If the main window recreated widgets while navigating, try restoring
+        # cached filter state first; do not wipe filters in that case.
+        restored = False
+        try:
+            if hasattr(self._content1, "restore_cached_state_if_any"):
+                restored = bool(self._content1.restore_cached_state_if_any())
+        except Exception:
+            restored = False
+        if not restored:
+            self._reset_fields(clear_table=False)
+
+        # If returning to the view and the table payload was restored, don't
+        # immediately refresh (it would overwrite the restored table and look like reset).
+        restored_table = False
+        try:
+            # Attempt to restore cached filtered rows for MainContent1.
+            restored_table = bool(self._restore_mc1_table_from_runtime_cache())
+        except Exception:
+            restored_table = False
+
+        if not restored_table:
+            try:
+                restored_table = bool(
+                    getattr(self._content1, "_state_restored_table", False)
+                )
+            except Exception:
+                restored_table = False
+
+        # Defer heavy work to the event loop so the widget can paint first.
+        if not restored_table:
+            try:
+                QTimer.singleShot(0, self.refresh)
+            except Exception:
+                self.refresh()
 
         # Default: show ALL audit rows for current date range when opening.
         # Load in background (no modal dialog) to avoid blocking initial navigation.
         if self._content2 is not None:
-            self._audit_mode = "default"
+            restored2 = False
+            try:
+                if hasattr(self._content2, "restore_cached_state_if_any"):
+                    restored2 = bool(self._content2.restore_cached_state_if_any())
+            except Exception:
+                restored2 = False
+
+            restored_audit = False
+            try:
+                restored_audit = bool(self._restore_mc2_table_from_runtime_cache())
+            except Exception:
+                restored_audit = False
+
+            # If returning to the view and we restored the grid, don't immediately reload.
+            if (not restored2) and (not restored_audit):
+                self._audit_mode = "default"
+                try:
+                    QTimer.singleShot(
+                        0,
+                        lambda: self._load_audit_for_current_range_background(
+                            employee_ids=None,
+                            attendance_codes=None,
+                            department_id=self._selected_department_id(),
+                            title_id=self._selected_title_id(),
+                        ),
+                    )
+                except Exception:
+                    self._load_audit_for_current_range_background(
+                        employee_ids=None,
+                        attendance_codes=None,
+                        department_id=self._selected_department_id(),
+                        title_id=self._selected_title_id(),
+                    )
+
+    def _on_db_connection_changed(self) -> None:
+        """DB is configured+reachable now -> reload dropdowns + data."""
+        if not self._ui_alive():
+            return
+        try:
+            QTimer.singleShot(0, self._load_departments_async)
+            QTimer.singleShot(0, self._load_titles_async)
+            QTimer.singleShot(0, self._ensure_symbols_cache_async)
+            QTimer.singleShot(0, self.refresh)
+        except Exception:
+            try:
+                self._load_departments_async()
+                self._load_titles_async()
+                self._ensure_symbols_cache_async()
+                self.refresh()
+            except Exception:
+                pass
+
+        # If audit tab exists, reload audit in background.
+        if self._content2 is not None:
             try:
                 QTimer.singleShot(
                     0,
                     lambda: self._load_audit_for_current_range_background(
                         employee_ids=None,
                         attendance_codes=None,
-                        department_id=None,
-                        title_id=None,
+                        department_id=self._selected_department_id(),
+                        title_id=self._selected_title_id(),
                     ),
                 )
             except Exception:
-                self._load_audit_for_current_range_background(
-                    employee_ids=None,
-                    attendance_codes=None,
-                    department_id=None,
-                    title_id=None,
-                )
+                try:
+                    self._load_audit_for_current_range_background(
+                        employee_ids=None,
+                        attendance_codes=None,
+                        department_id=self._selected_department_id(),
+                        title_id=self._selected_title_id(),
+                    )
+                except Exception:
+                    pass
 
     def _on_attendance_symbols_changed(self) -> None:
         # Invalidate cached symbols.
@@ -526,6 +883,11 @@ class ShiftAttendanceController:
             self._symbols_by_code_cache = None
         except Exception:
             pass
+        try:
+            self._symbols_loading = False
+        except Exception:
+            pass
+        self._ensure_symbols_cache_async()
         # Only reload audit table; do not reset filters or main employee list.
         if self._content2 is None:
             return
@@ -535,7 +897,7 @@ class ShiftAttendanceController:
                 checked_ids, checked_codes = self._content1.get_checked_employee_keys()
             except Exception:
                 checked_ids, checked_codes = ([], [])
-            self._load_audit_for_current_range(
+            self._load_audit_for_current_range_background(
                 employee_ids=checked_ids or None,
                 attendance_codes=checked_codes or None,
                 department_id=None,
@@ -543,7 +905,7 @@ class ShiftAttendanceController:
             )
             return
 
-        self._load_audit_for_current_range(
+        self._load_audit_for_current_range_background(
             employee_ids=None,
             attendance_codes=None,
             department_id=self._selected_department_id(),
@@ -1419,7 +1781,9 @@ class ShiftAttendanceController:
                     for r in range(int(rc)):
                         try:
                             it = getattr(snapshot_table, "item")(int(r), int(code_col))
-                            code = "" if it is None else str(getattr(it, "text")() or "")
+                            code = (
+                                "" if it is None else str(getattr(it, "text")() or "")
+                            )
                             code = code.strip()
                         except Exception:
                             code = ""
@@ -1431,7 +1795,12 @@ class ShiftAttendanceController:
                         codes.append(code)
 
                 if codes:
-                    dept_txt, title_txt = EmployeeService().get_department_title_text_by_employee_codes(codes)
+                    (
+                        dept_txt,
+                        title_txt,
+                    ) = EmployeeService().get_department_title_text_by_employee_codes(
+                        codes
+                    )
             except Exception:
                 dept_txt = ""
                 title_txt = ""
@@ -1517,6 +1886,20 @@ class ShiftAttendanceController:
 
         from_date, to_date = self._current_date_range()
         try:
+            self._audit_last_query = {
+                "from_date": from_date,
+                "to_date": to_date,
+                "employee_ids": list(employee_ids or []) if employee_ids else None,
+                "attendance_codes": list(attendance_codes or [])
+                if attendance_codes
+                else None,
+                "department_id": department_id,
+                "title_id": title_id,
+                "mode": str(self._audit_mode or ""),
+            }
+        except Exception:
+            pass
+        try:
             rows = self._mc2_controller.list_attendance_audit_arranged(
                 from_date=from_date,
                 to_date=to_date,
@@ -1552,6 +1935,22 @@ class ShiftAttendanceController:
             return
 
         from_date, to_date = self._current_date_range()
+
+        # Remember query meta for runtime cache.
+        try:
+            self._audit_last_query = {
+                "from_date": from_date,
+                "to_date": to_date,
+                "employee_ids": list(employee_ids or []) if employee_ids else None,
+                "attendance_codes": list(attendance_codes or [])
+                if attendance_codes
+                else None,
+                "department_id": department_id,
+                "title_id": title_id,
+                "mode": str(self._audit_mode or ""),
+            }
+        except Exception:
+            pass
 
         # Cancel any in-flight table rendering.
         self._cancel_audit_render()
@@ -1608,6 +2007,11 @@ class ShiftAttendanceController:
             @Slot(list)
             def on_finished(self, rows: list) -> None:
                 try:
+                    # Cache immediately so navigating away mid-render can restore.
+                    try:
+                        self_parent._cache_mc2_runtime(list(rows or []))
+                    except Exception:
+                        pass
                     self_parent._render_audit_table_chunked(rows, None)
                 except Exception:
                     logger.exception("Không thể render attendance_audit")
@@ -1987,49 +2391,29 @@ class ShiftAttendanceController:
         dlg.exec()
 
     def _load_departments(self) -> None:
-        try:
-            items = self._service.list_departments_dropdown() or []
-        except Exception:
-            logger.exception("Không thể tải danh sách phòng ban")
-            items = []
-
-        cb = self._content1.cbo_department
-        old = cb.blockSignals(True)
-        try:
-            cb.clear()
-            cb.addItem("Tất cả phòng ban", None)
-            for dept_id, dept_name in items:
-                # Hiển thị kèm ID để dễ đối soát
-                cb.addItem(f"{dept_id} - {dept_name}", int(dept_id))
-        finally:
-            cb.blockSignals(old)
+        self._load_departments_async()
 
     def _load_titles(self) -> None:
-        cb = getattr(self._content1, "cbo_title", None)
-        if cb is None:
-            return
-
-        try:
-            items = self._service.list_titles_dropdown() or []
-        except Exception:
-            logger.exception("Không thể tải danh sách chức vụ")
-            items = []
-
-        old = cb.blockSignals(True)
-        try:
-            cb.clear()
-            cb.addItem("Tất cả chức vụ", None)
-            for title_id, title_name in items:
-                cb.addItem(f"{title_id} - {title_name}", int(title_id))
-        finally:
-            cb.blockSignals(old)
+        self._load_titles_async()
 
     def _selected_department_id(self) -> int | None:
         try:
             dept_id = self._content1.cbo_department.currentData()
-            return int(dept_id) if dept_id else None
+            if dept_id not in (None, "", 0, "0"):
+                return int(dept_id)
+        except Exception:
+            dept_id = None
+
+        # Fallback: when combobox items haven't loaded yet, use desired ID
+        # captured from persisted state restore.
+        try:
+            dept_id = getattr(self._content1, "_desired_department_id", None)
+            if dept_id not in (None, "", 0, "0"):
+                return int(dept_id)
         except Exception:
             return None
+
+        return None
 
     def _selected_title_id(self) -> int | None:
         try:
@@ -2037,18 +2421,40 @@ class ShiftAttendanceController:
             if cb is None:
                 return None
             title_id = cb.currentData()
-            return int(title_id) if title_id else None
+            if title_id not in (None, "", 0, "0"):
+                return int(title_id)
+        except Exception:
+            title_id = None
+
+        try:
+            title_id = getattr(self._content1, "_desired_title_id", None)
+            if title_id not in (None, "", 0, "0"):
+                return int(title_id)
         except Exception:
             return None
 
+        return None
+
     def _build_filters(self) -> dict[str, Any]:
+        if not self._ui_alive():
+            return {}
         filters: dict[str, Any] = {}
 
         filters["department_id"] = self._selected_department_id()
         filters["title_id"] = self._selected_title_id()
 
-        search_by = self._content1.cbo_search_by.currentData()
-        search_text = str(self._content1.inp_search_text.text() or "").strip()
+        try:
+            cb = getattr(self._content1, "cbo_search_by", None)
+            inp = getattr(self._content1, "inp_search_text", None)
+            if (not _qt_alive(cb)) or (not _qt_alive(inp)):
+                return filters
+            search_by = cb.currentData()
+            search_text = str(inp.text() or "").strip()
+        except RuntimeError:
+            return filters
+        except Exception:
+            search_by = None
+            search_text = ""
 
         if search_by and search_text:
             filters["search_by"] = str(search_by)
@@ -2094,19 +2500,149 @@ class ShiftAttendanceController:
                 pass
 
     def on_refresh_clicked(self) -> None:
-        self._load_departments()
-        self._load_titles()
+        try:
+            self._clear_mc1_runtime_cache()
+        except Exception:
+            pass
+        try:
+            self._clear_mc2_runtime_cache()
+        except Exception:
+            pass
+        self._load_departments_async()
+        self._load_titles_async()
         self._reset_fields(clear_table=True)
         self.refresh()
         # Default: show ALL audit rows for current date range after refresh.
         if self._content2 is not None:
             self._audit_mode = "default"
-            self._load_audit_for_current_range(
+            self._load_audit_for_current_range_background(
                 employee_ids=None,
                 attendance_codes=None,
                 department_id=None,
                 title_id=None,
             )
+
+    def _load_departments_async(self) -> None:
+        def _fn() -> object:
+            return self._service.list_departments_dropdown() or []
+
+        def _ok(result: object) -> None:
+            if not self._ui_alive():
+                return
+            items = list(result or []) if isinstance(result, list) else []
+            cb = getattr(self._content1, "cbo_department", None)
+            if not _qt_alive(cb):
+                return
+
+            # Preserve current selection (by itemData) across async reload.
+            # If currentData is None (because items haven't loaded yet), use the
+            # desired ID captured from cached state restore.
+            try:
+                prev_selected = cb.currentData()
+            except Exception:
+                prev_selected = None
+            if prev_selected in (None, "", 0, "0"):
+                try:
+                    prev_selected = getattr(
+                        self._content1, "_desired_department_id", None
+                    )
+                except Exception:
+                    prev_selected = None
+
+            old = cb.blockSignals(True)
+            try:
+                cb.clear()
+                cb.addItem("Tất cả phòng ban", None)
+                for dept_id, dept_name in items:
+                    cb.addItem(f"{dept_id} - {dept_name}", int(dept_id))
+
+                if prev_selected not in (None, "", 0, "0"):
+                    target = prev_selected
+                    try:
+                        target = int(target)
+                    except Exception:
+                        target = prev_selected
+                    for i in range(cb.count()):
+                        if cb.itemData(i) == target:
+                            cb.setCurrentIndex(int(i))
+                            break
+            finally:
+                cb.blockSignals(old)
+
+        def _err(_msg: str) -> None:
+            if not self._ui_alive():
+                return
+            cb = getattr(self._content1, "cbo_department", None)
+            if not _qt_alive(cb):
+                return
+            old = cb.blockSignals(True)
+            try:
+                cb.clear()
+                cb.addItem("Tất cả phòng ban", None)
+            finally:
+                cb.blockSignals(old)
+
+        self._departments_runner.run(
+            fn=_fn, on_success=_ok, on_error=_err, coalesce=True
+        )
+
+    def _load_titles_async(self) -> None:
+        cb = getattr(self._content1, "cbo_title", None)
+        if cb is None:
+            return
+
+        def _fn() -> object:
+            return self._service.list_titles_dropdown() or []
+
+        def _ok(result: object) -> None:
+            if (not self._ui_alive()) or (not _qt_alive(cb)):
+                return
+            items = list(result or []) if isinstance(result, list) else []
+
+            # Preserve current selection (by itemData) across async reload.
+            # If currentData is None (because items haven't loaded yet), use the
+            # desired ID captured from cached state restore.
+            try:
+                prev_selected = cb.currentData()
+            except Exception:
+                prev_selected = None
+            if prev_selected in (None, "", 0, "0"):
+                try:
+                    prev_selected = getattr(self._content1, "_desired_title_id", None)
+                except Exception:
+                    prev_selected = None
+
+            old = cb.blockSignals(True)
+            try:
+                cb.clear()
+                cb.addItem("Tất cả chức vụ", None)
+                for title_id, title_name in items:
+                    cb.addItem(f"{title_id} - {title_name}", int(title_id))
+
+                if prev_selected not in (None, "", 0, "0"):
+                    target = prev_selected
+                    try:
+                        target = int(target)
+                    except Exception:
+                        target = prev_selected
+                    for i in range(cb.count()):
+                        if cb.itemData(i) == target:
+                            cb.setCurrentIndex(int(i))
+                            break
+            finally:
+                cb.blockSignals(old)
+
+        def _err(_msg: str) -> None:
+            if (not self._ui_alive()) or (not _qt_alive(cb)):
+                return
+            old = cb.blockSignals(True)
+            try:
+                cb.clear()
+                cb.addItem("Tất cả chức vụ", None)
+            finally:
+                cb.blockSignals(old)
+
+        self._titles_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def refresh(self) -> None:
         """Refresh employee list without freezing UI.
@@ -2122,184 +2658,120 @@ class ShiftAttendanceController:
         except Exception:
             self._refresh_async()
 
-    class _EmployeeLoadWorker(QObject):
-        # PySide6/Shiboken không hỗ trợ copy-convert dict trong typed Signal.
-        finished = Signal(object, object)  # rows, schedule_map
-        failed = Signal(str)
-
-        def __init__(
-            self,
-            service: ShiftAttendanceService,
-            *,
-            filters: dict[str, Any],
-            on_date: str | None,
-        ) -> None:
-            super().__init__()
-            self._service = service
-            self._filters = dict(filters or {})
-            self._on_date = on_date
-            self._cancelled = False
-
-        def cancel(self) -> None:
-            self._cancelled = True
-
-        def _is_cancelled(self) -> bool:
-            return bool(self._cancelled)
-
-        def run(self) -> None:
-            try:
-                if self._is_cancelled():
-                    self.finished.emit([], {})
-                    return
-
-                rows = self._service.list_employees(self._filters)
-
-                schedule_map: dict[int, str] = {}
-                if self._on_date and rows:
-                    try:
-                        emp_ids = [int(r.get("id")) for r in rows if r.get("id")]
-                        if emp_ids and (not self._is_cancelled()):
-                            schedule_map = self._service.get_employee_schedule_name_map(
-                                employee_ids=emp_ids,
-                                on_date=str(self._on_date),
-                            )
-                    except Exception:
-                        logger.exception("Không thể tải lịch làm việc của nhân viên")
-                        schedule_map = {}
-
-                if self._is_cancelled():
-                    self.finished.emit([], {})
-                    return
-
-                self.finished.emit(list(rows or []), dict(schedule_map or {}))
-            except Exception as e:
-                self.failed.emit(str(e))
-
     def _refresh_async(self) -> None:
+        if not self._ui_alive():
+            return
         # Cancel any in-flight render.
         self._cancel_employee_render()
 
-        # Cancel any in-flight loader.
+        # Cancel any in-flight background load (latest-wins).
         try:
-            if self._employee_loader_worker is not None:
-                try:
-                    getattr(self._employee_loader_worker, "cancel")()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        try:
-            if self._employee_loader_thread is not None:
-                try:
-                    self._employee_loader_thread.quit()
-                except Exception:
-                    pass
+            self._employees_runner.cancel_current()
         except Exception:
             pass
 
         from_date, _to_date = self._current_date_range()
         filters = self._build_filters()
+        if not self._ui_alive():
+            return
 
-        thread = QThread(self._parent_window)
-        worker = self._EmployeeLoadWorker(
-            self._service,
-            filters=filters,
-            on_date=from_date,
-        )
-        worker.moveToThread(thread)
+        cache_key = self._mc1_cache_key_from_ui()
 
-        class _UiBridge(QObject):
-            def __init__(self) -> None:
-                super().__init__()
-
-            @Slot(object, object)
-            def on_finished(self, rows: object, schedule_map: object) -> None:
+        def _fn() -> object:
+            rows = self._service.list_employees(filters)
+            schedule_map: dict[int, str] = {}
+            if from_date and rows:
                 try:
-                    self_parent._render_main_table_chunked(
-                        list(rows or []) if isinstance(rows, list) else [],
-                        schedule_map=(
-                            dict(schedule_map or {}) if isinstance(schedule_map, dict) else {}
-                        ),
+                    emp_ids = [int(r.get("id")) for r in rows if r.get("id")]
+                    if emp_ids:
+                        schedule_map = self._service.get_employee_schedule_name_map(
+                            employee_ids=emp_ids,
+                            on_date=str(from_date),
+                        )
+                except Exception:
+                    logger.exception("Không thể tải lịch làm việc của nhân viên")
+                    schedule_map = {}
+            return {
+                "rows": list(rows or []),
+                "schedule_map": dict(schedule_map or {}),
+                "cache_key": str(cache_key or ""),
+            }
+
+        def _ok(result: object) -> None:
+            if not self._ui_alive():
+                return
+            if not isinstance(result, dict):
+                return
+            # Only apply if still the same UI filter key.
+            try:
+                if str(result.get("cache_key") or "") != str(
+                    self._mc1_cache_key_from_ui() or ""
+                ):
+                    return
+            except Exception:
+                pass
+            rows = list(result.get("rows") or [])
+            schedule_map2 = result.get("schedule_map")
+
+            # Cache immediately so navigating away mid-render can still restore.
+            try:
+                key2 = str(result.get("cache_key") or "")
+                if key2:
+                    _SHIFT_ATTENDANCE_MC1_CACHE["key"] = key2
+                    _SHIFT_ATTENDANCE_MC1_CACHE["rows"] = list(rows)
+                    _SHIFT_ATTENDANCE_MC1_CACHE["schedule_map"] = (
+                        dict(schedule_map2 or {})
+                        if isinstance(schedule_map2, dict)
+                        else {}
                     )
-                except Exception:
-                    logger.exception("Không thể render danh sách nhân viên")
-                    try:
-                        self_parent._content1.table.setRowCount(0)
-                    except Exception:
-                        pass
-                    try:
-                        self_parent._content1.set_total(0)
-                    except Exception:
-                        pass
-
-            @Slot(str)
-            def on_failed(self, msg: str) -> None:
-                try:
-                    logger.error("Không thể tải danh sách nhân viên: %s", msg)
-                except Exception:
-                    pass
-                try:
-                    self_parent._content1.table.setRowCount(0)
-                except Exception:
-                    pass
-                try:
-                    self_parent._content1.set_total(0)
-                except Exception:
-                    pass
-
-        self_parent = self
-        bridge = _UiBridge()
-
-        # Hold strong refs.
-        self._employee_loader_thread = thread
-        self._employee_loader_worker = worker
-        self._employee_loader_bridge = bridge
-
-        worker.finished.connect(bridge.on_finished)
-        worker.failed.connect(bridge.on_failed)
-        worker.finished.connect(thread.quit)
-        worker.failed.connect(thread.quit)
-
-        def _cleanup() -> None:
-            try:
-                thread.quit()
-            except Exception:
-                pass
-            try:
-                worker.deleteLater()
-            except Exception:
-                pass
-            try:
-                bridge.deleteLater()
-            except Exception:
-                pass
-            try:
-                thread.deleteLater()
-            except Exception:
-                pass
-            try:
-                if self_parent._employee_loader_thread is thread:
-                    self_parent._employee_loader_thread = None
-                if self_parent._employee_loader_worker is worker:
-                    self_parent._employee_loader_worker = None
-                if self_parent._employee_loader_bridge is bridge:
-                    self_parent._employee_loader_bridge = None
             except Exception:
                 pass
 
-        thread.finished.connect(_cleanup)
-        thread.started.connect(worker.run)
-        thread.start()
+            self._render_main_table_chunked(
+                rows,
+                schedule_map=(
+                    dict(schedule_map2 or {}) if isinstance(schedule_map2, dict) else {}
+                ),
+                cache_key=str(result.get("cache_key") or ""),
+            )
+
+        def _err(_msg: str) -> None:
+            if not self._ui_alive():
+                return
+            try:
+                self._content1.table.setRowCount(0)
+            except Exception:
+                pass
+            try:
+                self._content1.set_total(0)
+            except Exception:
+                pass
+
+        self._employees_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _render_main_table_chunked(
         self,
         rows: list[dict[str, Any]],
         *,
         schedule_map: dict[int, str] | None = None,
+        cache_key: str | None = None,
     ) -> None:
         """Render MainContent1 table in time slices to keep UI responsive."""
 
+        if not self._ui_alive():
+            return
+
         table = self._content1.table
+
+        # Keep table visible (some layouts/styles may toggle visibility).
+        try:
+            if (
+                hasattr(self._content1, "table_frame")
+                and self._content1.table_frame is not None
+            ):
+                self._content1.table_frame.setVisible(True)
+        except Exception:
+            pass
 
         # Reset quickly.
         try:
@@ -2310,6 +2782,19 @@ class ShiftAttendanceController:
         if not rows:
             try:
                 self._content1.set_total(0)
+            except Exception:
+                pass
+            # Ensure the table can repaint even when empty.
+            try:
+                table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                table.viewport().update()
+            except Exception:
+                pass
+            try:
+                self._ensure_splitter_sane()
             except Exception:
                 pass
             return
@@ -2330,6 +2815,7 @@ class ShiftAttendanceController:
         self._employee_render_state = {
             "rows": rows,
             "schedule_map": schedule_map,
+            "cache_key": str(cache_key or ""),
             "idx": 0,
             "table": table,
         }
@@ -2343,8 +2829,15 @@ class ShiftAttendanceController:
             if not st:
                 return
 
+            if not self._ui_alive():
+                self._cancel_employee_render()
+                return
+
             _rows: list[dict[str, Any]] = st["rows"]
             _table = st["table"]
+            if not _qt_alive(_table):
+                self._cancel_employee_render()
+                return
             _schedule_map: dict[int, str] = st.get("schedule_map") or {}
             try:
                 idx = int(st.get("idx") or 0)
@@ -2355,69 +2848,83 @@ class ShiftAttendanceController:
             budget.start()
 
             # Batch: avoid repaint per-cell; repaint once per slice.
+            updates_disabled = False
             try:
                 _table.setUpdatesEnabled(False)
+                updates_disabled = True
             except Exception:
-                pass
-
-            while idx < len(_rows) and int(budget.elapsed()) < 12:
-                r = _rows[idx]
-
-                emp_id = r.get("id")
-                dept_id = r.get("department_id")
-                title_id = r.get("title_id")
-
-                mcc_code = r.get("mcc_code")
-                attendance_code = (
-                    str(mcc_code or "").strip()
-                    or str(r.get("employee_code") or "").strip()
-                )
-
-                chk = QTableWidgetItem("❌")
-                chk.setFlags(chk.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                chk.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                chk.setData(Qt.ItemDataRole.UserRole, emp_id)
-                chk.setData(Qt.ItemDataRole.UserRole + 1, attendance_code)
-                chk.setData(Qt.ItemDataRole.UserRole + 2, dept_id)
-                chk.setData(Qt.ItemDataRole.UserRole + 3, title_id)
-                _table.setItem(idx, 0, chk)
-
-                stt_val = r.get("stt")
-                if stt_val is None or str(stt_val).strip() == "":
-                    stt_val = idx + 1
-                stt_item = QTableWidgetItem(str(stt_val))
-                stt_item.setFlags(stt_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                stt_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                _table.setItem(idx, 1, stt_item)
-
-                values = [
-                    r.get("employee_code"),
-                    r.get("full_name"),
-                    r.get("mcc_code"),
-                    _schedule_map.get(int(emp_id), "") if emp_id is not None else "",
-                    r.get("title_name"),
-                    r.get("department_name"),
-                    r.get("start_date"),
-                ]
-
-                for c_idx, v in enumerate(values, start=2):
-                    item = QTableWidgetItem(str(v or ""))
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    if c_idx == 2:
-                        item.setData(Qt.ItemDataRole.UserRole, emp_id)
-                        item.setData(Qt.ItemDataRole.UserRole + 1, dept_id)
-                        item.setData(Qt.ItemDataRole.UserRole + 2, title_id)
-                    _table.setItem(idx, c_idx, item)
-
-                idx += 1
-
-            st["idx"] = idx
+                updates_disabled = False
 
             try:
-                _table.setUpdatesEnabled(True)
-                _table.viewport().update()
+                while idx < len(_rows) and int(budget.elapsed()) < 12:
+                    r = _rows[idx]
+
+                    emp_id = r.get("id")
+                    dept_id = r.get("department_id")
+                    title_id = r.get("title_id")
+
+                    mcc_code = r.get("mcc_code")
+                    attendance_code = (
+                        str(mcc_code or "").strip()
+                        or str(r.get("employee_code") or "").strip()
+                    )
+
+                    chk = QTableWidgetItem("❌")
+                    chk.setFlags(chk.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    chk.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    chk.setData(Qt.ItemDataRole.UserRole, emp_id)
+                    chk.setData(Qt.ItemDataRole.UserRole + 1, attendance_code)
+                    chk.setData(Qt.ItemDataRole.UserRole + 2, dept_id)
+                    chk.setData(Qt.ItemDataRole.UserRole + 3, title_id)
+                    _table.setItem(idx, 0, chk)
+
+                    # STT should follow the visible row order (avoid reversed STT
+                    # when the DB returns a precomputed `stt` in a different order).
+                    stt_item = QTableWidgetItem(str(idx + 1))
+                    stt_item.setFlags(stt_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    stt_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    _table.setItem(idx, 1, stt_item)
+
+                    values = [
+                        r.get("employee_code"),
+                        r.get("full_name"),
+                        r.get("mcc_code"),
+                        (
+                            _schedule_map.get(int(emp_id), "")
+                            if emp_id is not None
+                            else ""
+                        ),
+                        r.get("title_name"),
+                        r.get("department_name"),
+                        r.get("start_date"),
+                    ]
+
+                    for c_idx, v in enumerate(values, start=2):
+                        item = QTableWidgetItem(str(v or ""))
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                        if c_idx == 2:
+                            item.setData(Qt.ItemDataRole.UserRole, emp_id)
+                            item.setData(Qt.ItemDataRole.UserRole + 1, dept_id)
+                            item.setData(Qt.ItemDataRole.UserRole + 2, title_id)
+                        _table.setItem(idx, c_idx, item)
+
+                    idx += 1
             except Exception:
-                pass
+                logger.exception("Không thể render danh sách nhân viên (chunked)")
+                self._cancel_employee_render()
+                return
+            finally:
+                if updates_disabled:
+                    try:
+                        _table.setUpdatesEnabled(True)
+                    except Exception:
+                        pass
+                    try:
+                        _table.viewport().update()
+                    except Exception:
+                        pass
+
+            st["idx"] = idx
 
             if idx >= len(_rows):
                 try:
@@ -2428,6 +2935,35 @@ class ShiftAttendanceController:
                     self._content1.set_total(len(_rows))
                 except Exception:
                     pass
+
+                # Update runtime cache so reopening the view can restore quickly.
+                try:
+                    key = str(st.get("cache_key") or "")
+                    if key:
+                        _SHIFT_ATTENDANCE_MC1_CACHE["key"] = key
+                        _SHIFT_ATTENDANCE_MC1_CACHE["rows"] = list(_rows)
+                        _SHIFT_ATTENDANCE_MC1_CACHE["schedule_map"] = dict(
+                            _schedule_map or {}
+                        )
+                except Exception:
+                    pass
+                try:
+                    if (
+                        hasattr(self._content1, "table_frame")
+                        and self._content1.table_frame is not None
+                    ):
+                        self._content1.table_frame.setVisible(True)
+                except Exception:
+                    pass
+                # After finishing a render burst, re-apply splitter sizes on the
+                # next event-loop tick to avoid panes collapsing to near-zero.
+                try:
+                    QTimer.singleShot(0, self._ensure_splitter_sane)
+                except Exception:
+                    try:
+                        self._ensure_splitter_sane()
+                    except Exception:
+                        pass
                 self._cancel_employee_render()
                 return
 
@@ -2446,6 +2982,133 @@ class ShiftAttendanceController:
         self._employee_render_tick = _tick
         self._employee_render_timer.timeout.connect(_tick)
         self._employee_render_timer.start(0)
+
+    def _clear_mc1_runtime_cache(self) -> None:
+        _SHIFT_ATTENDANCE_MC1_CACHE["key"] = None
+        _SHIFT_ATTENDANCE_MC1_CACHE["rows"] = None
+        _SHIFT_ATTENDANCE_MC1_CACHE["schedule_map"] = None
+
+    def _mc1_cache_key_from_ui(self) -> str:
+        """Build a stable cache key from MainContent1 filter UI."""
+
+        def _norm(v: object | None) -> str:
+            if v is None:
+                return ""
+            s = str(v).strip()
+            return "" if s.lower() in {"none", "null"} else s
+
+        try:
+            dep = self._content1.cbo_department.currentData()
+        except Exception:
+            dep = None
+        if dep in (None, "", 0, "0"):
+            try:
+                dep = getattr(self._content1, "_desired_department_id", None)
+            except Exception:
+                dep = None
+
+        try:
+            title = self._content1.cbo_title.currentData()
+        except Exception:
+            title = None
+        if title in (None, "", 0, "0"):
+            try:
+                title = getattr(self._content1, "_desired_title_id", None)
+            except Exception:
+                title = None
+
+        try:
+            search_by = self._content1.cbo_search_by.currentData()
+        except Exception:
+            search_by = None
+        try:
+            search_text = self._content1.inp_search_text.text()
+        except Exception:
+            search_text = ""
+
+        try:
+            df = self._content1.date_from.date().toString("yyyy-MM-dd")
+        except Exception:
+            df = ""
+        try:
+            dt = self._content1.date_to.date().toString("yyyy-MM-dd")
+        except Exception:
+            dt = ""
+
+        parts = [
+            f"dep={_norm(dep)}",
+            f"title={_norm(title)}",
+            f"by={_norm(search_by)}",
+            f"q={_norm(search_text)}",
+            f"from={_norm(df)}",
+            f"to={_norm(dt)}",
+        ]
+        return "|".join(parts)
+
+    def _restore_mc1_table_from_runtime_cache(self) -> bool:
+        """Restore filtered rows into MainContent1 table if cache matches current filters."""
+
+        key = self._mc1_cache_key_from_ui()
+        if not key:
+            return False
+        if str(_SHIFT_ATTENDANCE_MC1_CACHE.get("key") or "") != str(key):
+            return False
+
+        rows = _SHIFT_ATTENDANCE_MC1_CACHE.get("rows")
+        schedule_map = _SHIFT_ATTENDANCE_MC1_CACHE.get("schedule_map")
+        if not isinstance(rows, list):
+            return False
+
+        try:
+            setattr(self._content1, "_state_restored_table", True)
+        except Exception:
+            pass
+
+        self._render_main_table_chunked(
+            list(rows),
+            schedule_map=(dict(schedule_map or {}) if isinstance(schedule_map, dict) else {}),
+            cache_key=str(key),
+        )
+        return True
+
+    def _ensure_splitter_sane(self) -> None:
+        """Prevent Shift Attendance panes from collapsing (appearing hidden)."""
+        if not self._ui_alive():
+            return
+        try:
+            splitter = self._content1.parent()
+        except Exception:
+            splitter = None
+        if not isinstance(splitter, QSplitter):
+            return
+
+        try:
+            sizes = list(splitter.sizes() or [])
+        except Exception:
+            sizes = []
+        if len(sizes) < 2:
+            return
+
+        # If any pane is collapsed to ~0..10px, re-apply a reasonable ratio.
+        try:
+            if int(sizes[0]) > 10 and int(sizes[1]) > 10:
+                return
+        except Exception:
+            pass
+
+        try:
+            h = int(splitter.size().height())
+        except Exception:
+            h = 0
+        try:
+            if h > 0:
+                top = max(220, int(h * 0.35))
+                bottom = max(220, h - top)
+                splitter.setSizes([top, bottom])
+            else:
+                splitter.setSizes([280, 520])
+        except Exception:
+            pass
 
     def _render_main_table(
         self,
@@ -2481,10 +3144,7 @@ class ShiftAttendanceController:
             chk.setData(Qt.ItemDataRole.UserRole + 3, title_id)
             table.setItem(r_idx, 0, chk)
 
-            stt_val = r.get("stt")
-            if stt_val is None or str(stt_val).strip() == "":
-                stt_val = r_idx + 1
-            stt_item = QTableWidgetItem(str(stt_val))
+            stt_item = QTableWidgetItem(str(r_idx + 1))
             stt_item.setFlags(stt_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             stt_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             table.setItem(r_idx, 1, stt_item)
@@ -2657,6 +3317,15 @@ class ShiftAttendanceController:
                 def _pair_fill(key: str) -> str:
                     if not has_shift:
                         return ""
+
+                    # Option 2: OUT-only Hành chính vẫn được áp dụng ca.
+                    # Khi service đánh dấu _allow_out_only_hc, không hiển thị KV cho IN bị thiếu.
+                    try:
+                        if bool(r.get("_allow_out_only_hc")) and key.startswith("in_"):
+                            return ""
+                    except Exception:
+                        pass
+
                     if key.startswith("in_"):
                         out_key = "out_" + key.split("_", 1)[1]
                         if _is_empty_time(r.get(key)) and (
@@ -2688,10 +3357,7 @@ class ShiftAttendanceController:
                     except Exception:
                         pass
                 elif key == "stt":
-                    stt_val = r.get("stt")
-                    if stt_val is None or str(stt_val).strip() == "":
-                        stt_val = r_idx + 1
-                    item = QTableWidgetItem(str(stt_val))
+                    item = QTableWidgetItem(str(r_idx + 1))
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 else:
                     v = r.get(key)
@@ -2786,7 +3452,9 @@ class ShiftAttendanceController:
                                 except Exception:
                                     return None
 
-                        def _is_full_work(row0: dict[str, Any], val0: object | None) -> bool:
+                        def _is_full_work(
+                            row0: dict[str, Any], val0: object | None
+                        ) -> bool:
                             # UX rule: show work symbol (C03) only when work is a full integer day (>= 1).
                             d = _work_amount(val0)
                             if d is None:
@@ -2842,7 +3510,9 @@ class ShiftAttendanceController:
                                 try:
                                     from decimal import Decimal, ROUND_DOWN
 
-                                    is_int = d0 == d0.quantize(Decimal("1"), rounding=ROUND_DOWN)
+                                    is_int = d0 == d0.quantize(
+                                        Decimal("1"), rounding=ROUND_DOWN
+                                    )
                                 except Exception:
                                     try:
                                         f0 = float(str(raw_val).strip())
@@ -2889,7 +3559,8 @@ class ShiftAttendanceController:
                                 )
                             except Exception:
                                 m = 0
-                            txt = str(max(0, m))
+                            # Không hiển thị 0: để trống khi không trễ/không sớm.
+                            txt = "" if int(m) <= 0 else str(int(m))
 
                         if key == "late" and txt:
                             try:
@@ -2921,7 +3592,11 @@ class ShiftAttendanceController:
                         txt = "" if raw_val is None else str(raw_val).strip()
                         if txt:
                             try:
-                                if float(txt) != 0 and overtime_symbol and overtime_symbol not in txt:
+                                if (
+                                    float(txt) != 0
+                                    and overtime_symbol
+                                    and overtime_symbol not in txt
+                                ):
                                     txt = f"{txt} {overtime_symbol}".strip()
                             except Exception:
                                 if overtime_symbol and overtime_symbol not in txt:
@@ -2940,6 +3615,12 @@ class ShiftAttendanceController:
         # Ensure per-column UI settings apply to created items.
         try:
             self._content2.apply_ui_settings()
+        except Exception:
+            pass
+
+        # Update runtime cache (best-effort).
+        try:
+            self._cache_mc2_runtime(rows)
         except Exception:
             pass
 
@@ -2973,13 +3654,19 @@ class ShiftAttendanceController:
 
         # Show table once we start rendering (compute already finished).
         try:
-            if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
+            if (
+                hasattr(self._content2, "table_frame")
+                and self._content2.table_frame is not None
+            ):
                 self._content2.table_frame.setVisible(True)
         except Exception:
             pass
         if not rows:
             try:
-                if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
+                if (
+                    hasattr(self._content2, "table_frame")
+                    and self._content2.table_frame is not None
+                ):
                     self._content2.table_frame.setVisible(True)
             except Exception:
                 pass
@@ -2996,7 +3683,10 @@ class ShiftAttendanceController:
         cols = [k for (k, _label) in getattr(self._content2, "_COLUMNS", [])]
         if not cols:
             try:
-                if hasattr(self._content2, "table_frame") and self._content2.table_frame is not None:
+                if (
+                    hasattr(self._content2, "table_frame")
+                    and self._content2.table_frame is not None
+                ):
                     self._content2.table_frame.setVisible(True)
             except Exception:
                 pass
@@ -3098,10 +3788,18 @@ class ShiftAttendanceController:
             if not st:
                 return
 
+            if not self._ui_alive():
+                self._cancel_audit_render()
+                return
+
             _rows: list[dict[str, Any]] = st["rows"]
             _cols: list[str] = st["cols"]
             _table = st["table"]
             _dlg = st["dlg"]
+
+            if not _qt_alive(_table):
+                self._cancel_audit_render()
+                return
 
             overtime_symbol2 = str(st.get("overtime_symbol") or "").strip()
             work_symbol2 = str(st.get("work_symbol") or "").strip()
@@ -3185,10 +3883,7 @@ class ShiftAttendanceController:
                         except Exception:
                             pass
                     elif key == "stt":
-                        stt_val = r.get("stt")
-                        if stt_val is None or str(stt_val).strip() == "":
-                            stt_val = idx + 1
-                        item = QTableWidgetItem(str(stt_val))
+                        item = QTableWidgetItem(str(idx + 1))
                         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     else:
                         v = r.get(key)
@@ -3288,14 +3983,18 @@ class ShiftAttendanceController:
                                     except Exception:
                                         return None
 
-                            def _is_full_work2(row0: dict[str, Any], val0: object | None) -> bool:
+                            def _is_full_work2(
+                                row0: dict[str, Any], val0: object | None
+                            ) -> bool:
                                 d = _work_amount2(val0)
                                 if d is None:
                                     return False
                                 try:
                                     from decimal import Decimal, ROUND_DOWN
 
-                                    int_part = d.quantize(Decimal("1"), rounding=ROUND_DOWN)
+                                    int_part = d.quantize(
+                                        Decimal("1"), rounding=ROUND_DOWN
+                                    )
                                     if d != int_part:
                                         return False
                                     return d >= Decimal("1")
@@ -3395,13 +4094,12 @@ class ShiftAttendanceController:
                                     )
                                 except Exception:
                                     m = 0
-                                txt = str(max(0, m))
+                                txt = "" if int(m) <= 0 else str(int(m))
 
                             if key == "late" and txt:
                                 try:
                                     if (
-                                        txt != "0"
-                                        and late_symbol2
+                                        late_symbol2
                                         and late_symbol2 not in txt
                                     ):
                                         txt = f"{txt} {late_symbol2}".strip()
@@ -3410,8 +4108,7 @@ class ShiftAttendanceController:
                             if key == "early" and txt:
                                 try:
                                     if (
-                                        txt != "0"
-                                        and early_symbol2
+                                        early_symbol2
                                         and early_symbol2 not in txt
                                     ):
                                         txt = f"{txt} {early_symbol2}".strip()
@@ -3427,7 +4124,11 @@ class ShiftAttendanceController:
                             txt = _norm(raw_val)
                             if txt:
                                 try:
-                                    if float(txt) != 0 and overtime_symbol2 and overtime_symbol2 not in txt:
+                                    if (
+                                        float(txt) != 0
+                                        and overtime_symbol2
+                                        and overtime_symbol2 not in txt
+                                    ):
                                         txt = f"{txt} {overtime_symbol2}".strip()
                                 except Exception:
                                     if overtime_symbol2 and overtime_symbol2 not in txt:
@@ -3464,6 +4165,10 @@ class ShiftAttendanceController:
                 except Exception:
                     pass
                 try:
+                    self._cache_mc2_runtime(list(_rows))
+                except Exception:
+                    pass
+                try:
                     t0 = float(st.get("t0") or 0)
                     dt_ms = int((time.perf_counter() - t0) * 1000) if t0 else 0
                     logger.info("Xem công: render rows=%s in %sms", len(_rows), dt_ms)
@@ -3495,3 +4200,89 @@ class ShiftAttendanceController:
         self._audit_render_tick = _tick
         self._audit_render_timer.timeout.connect(_tick)
         self._audit_render_timer.start(0)
+
+    def _clear_mc2_runtime_cache(self) -> None:
+        _SHIFT_ATTENDANCE_MC2_CACHE["from_date"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["to_date"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["rows"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["mode"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["department_id"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["title_id"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["employee_ids"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["attendance_codes"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["show_seconds"] = None
+
+    def _cache_mc2_runtime(self, rows: list[dict[str, Any]]) -> None:
+        if self._content2 is None:
+            return
+        if not isinstance(rows, list):
+            return
+
+        from_date, to_date = self._current_date_range()
+        try:
+            show_seconds = bool(getattr(self._content2, "_show_seconds", True))
+        except Exception:
+            show_seconds = True
+
+        meta = None
+        try:
+            meta = getattr(self, "_audit_last_query", None)
+        except Exception:
+            meta = None
+
+        _SHIFT_ATTENDANCE_MC2_CACHE["from_date"] = (
+            meta.get("from_date") if isinstance(meta, dict) else from_date
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["to_date"] = (
+            meta.get("to_date") if isinstance(meta, dict) else to_date
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["mode"] = (
+            meta.get("mode") if isinstance(meta, dict) else str(self._audit_mode or "")
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["department_id"] = (
+            meta.get("department_id") if isinstance(meta, dict) else None
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["title_id"] = (
+            meta.get("title_id") if isinstance(meta, dict) else None
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["employee_ids"] = (
+            meta.get("employee_ids") if isinstance(meta, dict) else None
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["attendance_codes"] = (
+            meta.get("attendance_codes") if isinstance(meta, dict) else None
+        )
+        _SHIFT_ATTENDANCE_MC2_CACHE["show_seconds"] = bool(show_seconds)
+
+        # Store rows (copy) to keep stable snapshot.
+        _SHIFT_ATTENDANCE_MC2_CACHE["rows"] = list(rows)
+
+    def _restore_mc2_table_from_runtime_cache(self) -> bool:
+        if self._content2 is None:
+            return False
+
+        rows = _SHIFT_ATTENDANCE_MC2_CACHE.get("rows")
+        if not isinstance(rows, list) or not rows:
+            return False
+
+        # Only restore when date-range matches current UI (avoid showing wrong grid).
+        cur_from, cur_to = self._current_date_range()
+        cached_from = _SHIFT_ATTENDANCE_MC2_CACHE.get("from_date")
+        cached_to = _SHIFT_ATTENDANCE_MC2_CACHE.get("to_date")
+        if str(cached_from or "") != str(cur_from or ""):
+            return False
+        if str(cached_to or "") != str(cur_to or ""):
+            return False
+
+        # Restore time display mode (HH:MM vs HH:MM:SS) before rendering.
+        try:
+            ss = _SHIFT_ATTENDANCE_MC2_CACHE.get("show_seconds")
+            if ss is not None:
+                self._content2.set_time_show_seconds(bool(ss))
+        except Exception:
+            pass
+
+        try:
+            self._render_audit_table_chunked(list(rows), None)
+            return True
+        except Exception:
+            return False

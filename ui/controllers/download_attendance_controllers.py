@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot, Qt
+from core.threads import BackgroundTaskRunner
 from PySide6.QtCore import QTimer
 
 from services.download_attendance_services import DownloadAttendanceService
@@ -130,6 +131,13 @@ class DownloadAttendanceController:
         self._search_text: str = ""
         self._show_seconds: bool = True
 
+        self._devices_runner = BackgroundTaskRunner(
+            self._parent_window, name="download_attendance_devices"
+        )
+        self._table_runner = BackgroundTaskRunner(
+            self._parent_window, name="download_attendance_table"
+        )
+
     def bind(self) -> None:
         self._title_bar2.download_clicked.connect(self.on_download)
         if hasattr(self._title_bar2, "search_changed"):
@@ -147,38 +155,54 @@ class DownloadAttendanceController:
             pass
 
     def refresh_devices(self) -> None:
-        try:
-            devices = self._service.list_devices_for_combo()
+        def _fn() -> object:
+            return list(self._service.list_devices_for_combo() or [])
+
+        def _ok(result: object) -> None:
+            devices = list(result or []) if isinstance(result, list) else []
             self._title_bar2.set_devices(devices)
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách máy")
-            self._title_bar2.set_devices([])
+            try:
+                self._title_bar2.set_devices([])
+            except Exception:
+                pass
+
+        self._devices_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def refresh_table(self) -> None:
         # Bảng tạm hiển thị dữ liệu đã tải trong phiên.
         # Yêu cầu: dữ liệu tạm chỉ xóa khi thoát app -> khi mở lại màn hình,
         # phải hiển thị lại dữ liệu tạm (không phụ thuộc date picker đang để hôm nay).
-        try:
+        def _fn() -> object:
             rows = self._service.list_download_attendance(
                 from_date=None,
                 to_date=None,
                 device_no=None,
             )
-            self._all_rows = [self._to_ui_row(r) for r in rows]
+            return [self._to_ui_row(r) for r in (rows or [])]
+
+        def _ok(result: object) -> None:
+            self._all_rows = list(result or []) if isinstance(result, list) else []
             self._apply_filters()
-        except Exception:
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể load bảng download_attendance")
             self._all_rows = []
             try:
                 self._content.set_attendance_rows([])
             except RuntimeError:
-                # view already destroyed
                 return
+            except Exception:
+                pass
             try:
                 if hasattr(self._title_bar2, "set_total"):
                     self._title_bar2.set_total(0)
             except Exception:
                 pass
+
+        self._table_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _to_ui_row(self, r) -> _UiRow:
         def fmt_date(d: date) -> str:
@@ -354,7 +378,10 @@ class DownloadAttendanceController:
 
         # Ẩn bảng trong lúc đang tải để tránh hiển thị dữ liệu cũ.
         try:
-            if hasattr(self._content, "table_frame") and self._content.table_frame is not None:
+            if (
+                hasattr(self._content, "table_frame")
+                and self._content.table_frame is not None
+            ):
                 self._content.table_frame.setVisible(False)
         except Exception:
             pass
@@ -566,7 +593,10 @@ class DownloadAttendanceController:
             self._thread = None
             # Hiển thị lại bảng (dữ liệu cũ nếu có)
             try:
-                if hasattr(self._content, "table_frame") and self._content.table_frame is not None:
+                if (
+                    hasattr(self._content, "table_frame")
+                    and self._content.table_frame is not None
+                ):
                     self._content.table_frame.setVisible(True)
             except Exception:
                 pass
@@ -575,7 +605,10 @@ class DownloadAttendanceController:
         self.refresh_table()
         # Hiển thị lại bảng sau khi tải xong
         try:
-            if hasattr(self._content, "table_frame") and self._content.table_frame is not None:
+            if (
+                hasattr(self._content, "table_frame")
+                and self._content.table_frame is not None
+            ):
                 self._content.table_frame.setVisible(True)
         except Exception:
             pass

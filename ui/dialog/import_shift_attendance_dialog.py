@@ -208,6 +208,7 @@ class ImportShiftAttendanceDialog(QDialog):
             "Tên nhân viên",
             "Ngày",
             "Thứ",
+            "Ký hiệu",
             "Vào 1",
             "Ra 1",
             "Vào 2",
@@ -235,6 +236,7 @@ class ImportShiftAttendanceDialog(QDialog):
             215,  # 200 + 15
             125,  # 110 + 15
             85,  # 70 + 15
+            85,  # Ký hiệu
             95,  # 80 + 15
             95,  # 80 + 15
             95,  # 80 + 15
@@ -330,6 +332,7 @@ class ImportShiftAttendanceDialog(QDialog):
             "full_name",
             "date",
             "weekday",
+            "in_1_symbol",
             "in_1",
             "out_1",
             "in_2",
@@ -481,6 +484,29 @@ class ImportShiftAttendanceDialog(QDialog):
             except Exception:
                 return s
 
+        def _is_punch_time(v: object | None) -> bool:
+            if v is None:
+                return False
+            try:
+                from datetime import datetime as _dt, time as _time
+
+                if isinstance(v, (_time, _dt)):
+                    return True
+            except Exception:
+                pass
+            try:
+                s = str(v).strip()
+            except Exception:
+                return False
+            # Treat only time-like strings as punches.
+            return bool(s) and (":" in s)
+
+        def _has_any_punch(row0: dict) -> bool:
+            for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
+                if _is_punch_time(row0.get(k)):
+                    return True
+            return False
+
         for r_idx, r in enumerate(self._preview_rows):
             # checkbox + stt
             it_chk = QTableWidgetItem("❌")
@@ -492,12 +518,25 @@ class ImportShiftAttendanceDialog(QDialog):
             self.table.setItem(r_idx, 1, it_stt)
 
             # data cols start at col=2
+            sym_display = _to_display(
+                r.get("in_1_symbol")
+                or r.get("symbol")
+                or r.get("ky_hieu")
+                or r.get("ký hiệu")
+            )
+            in_1_display = _to_display(r.get("in_1"))
+            # If there are no punch times but we have an imported symbol, show it
+            # in the 'Vào 1' column (matching MainContent2 arranged display).
+            if (not in_1_display) and sym_display and (not _has_any_punch(r)):
+                in_1_display = sym_display
+
             values = [
                 _to_display(r.get("employee_code")),
                 _to_display(r.get("full_name")),
-                _fmt_date_ddmmyyyy(r.get("work_date")),
+                _fmt_date_ddmmyyyy(r.get("work_date") or r.get("date")),
                 _to_display(r.get("weekday")),
-                _to_display(r.get("in_1")),
+                sym_display,
+                in_1_display,
                 _to_display(r.get("out_1")),
                 _to_display(r.get("in_2")),
                 _to_display(r.get("out_2")),

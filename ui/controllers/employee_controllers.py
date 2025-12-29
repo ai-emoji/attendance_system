@@ -11,6 +11,8 @@ import unicodedata
 
 from core.ui_settings import get_last_save_dir, set_last_save_dir
 from core.threads import BackgroundTaskRunner
+from core.db_connection_bus import db_connection_bus
+from core.database import Database
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFileDialog
@@ -35,8 +37,14 @@ class EmployeeController:
         self._content = content
         self._service = service or EmployeeService()
 
-        self._tree_runner = BackgroundTaskRunner(self._parent_window, name="employee_tree")
-        self._list_runner = BackgroundTaskRunner(self._parent_window, name="employee_list")
+        self._tree_runner = BackgroundTaskRunner(
+            self._parent_window, name="employee_tree"
+        )
+        self._list_runner = BackgroundTaskRunner(
+            self._parent_window, name="employee_list"
+        )
+
+        self._db_bus_hooked = False
 
     def bind(self) -> None:
         # Wire signals first (fast), then load data in background.
@@ -57,18 +65,43 @@ class EmployeeController:
         self._content.delete_clicked.connect(self.on_delete)
         self._content.refresh_clicked.connect(self.on_refresh_clicked)
 
+        if not self._db_bus_hooked:
+            try:
+                db_connection_bus.connect_changed_weak(self._on_db_connection_changed)
+                self._db_bus_hooked = True
+            except Exception:
+                pass
+
         # Load tree async so the view can paint first.
         try:
             QTimer.singleShot(0, self._load_tree_async)
         except Exception:
             self._load_tree_async()
 
-        if not restored:
-            # Defer refresh so UI shows immediately.
+        # When switching tables, the main window may recreate this widget.
+        # If we successfully restored cached UI + rows, do NOT refresh here
+        # (refresh would overwrite the restored table and make it look reset).
+        # The widget's restore logic already guards against stale data via
+        # db_generation; when it can't restore rows, it returns False and we refresh.
+        should_refresh = not restored
+
+        if should_refresh:
             try:
                 QTimer.singleShot(0, self.refresh)
             except Exception:
                 self.refresh()
+
+    def _on_db_connection_changed(self) -> None:
+        # DB online now -> reload tree and list (non-blocking)
+        try:
+            QTimer.singleShot(0, self._load_tree_async)
+            QTimer.singleShot(0, self.refresh)
+        except Exception:
+            try:
+                self._load_tree_async()
+                self.refresh()
+            except Exception:
+                pass
 
     def _load_tree_async(self) -> None:
         def _fn() -> object:
@@ -76,14 +109,18 @@ class EmployeeController:
             title_rows = []
             try:
                 title_models = TitleService().list_titles()
-                title_rows = [(t.id, t.department_id, t.title_name) for t in title_models]
+                title_rows = [
+                    (t.id, t.department_id, t.title_name) for t in title_models
+                ]
             except Exception:
                 title_rows = []
             return (list(dept_rows or []), list(title_rows or []))
 
         def _ok(result: object) -> None:
             try:
-                dept_rows, title_rows = result if isinstance(result, tuple) else ([], [])
+                dept_rows, title_rows = (
+                    result if isinstance(result, tuple) else ([], [])
+                )
                 d = list(dept_rows or []) if isinstance(dept_rows, list) else []
                 t = list(title_rows or []) if isinstance(title_rows, list) else []
                 self._content.department_tree.set_departments(d, titles=t)

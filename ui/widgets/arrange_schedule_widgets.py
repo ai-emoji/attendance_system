@@ -24,6 +24,8 @@ Ghi chú:
 
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import QTimer, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QIcon
 from PySide6.QtWidgets import (
@@ -73,8 +75,6 @@ from core.resource import (
     UI_FONT,
     resource_path,
 )
-
-from ui.dialog.arrange_schedule_dialog import ArrangeScheduleDialog
 
 
 ARRANGE_SCHEDULE_IN_OUT_MODE_OPTIONS: list[tuple[str, str | None]] = [
@@ -469,22 +469,139 @@ class MainLeft(QWidget):
         # Add extra option: "Chưa sắp xếp" (id=0)
         all_rows: list[tuple[int, str]] = [(0, "Chưa sắp xếp"), *list(rows or [])]
 
-        self.table.setRowCount(len(all_rows))
-        for r, (schedule_id, name) in enumerate(all_rows):
-            it_id = QTableWidgetItem(str(schedule_id))
-            it_id.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
-            self.table.setItem(r, 0, it_id)
-
-            it_name = QTableWidgetItem(str(name or ""))
-            it_name.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
-            self.table.setItem(r, 1, it_name)
-
-        self.apply_ui_settings()
+        # Large list render can freeze UI; render in time slices when needed.
+        try:
+            self.table.blockSignals(True)
+        except Exception:
+            pass
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
 
         try:
-            self._save_timer.start()
+            self.table.setRowCount(0)
+            self.table.setRowCount(len(all_rows))
         except Exception:
-            self._save_cached_state()
+            pass
+
+        # Cancel any previous render timer.
+        try:
+            tmr = getattr(self, "_render_timer", None)
+            if tmr is not None:
+                try:
+                    tmr.stop()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        def _render_range(start: int, end: int) -> None:
+            for r in range(int(start), int(end)):
+                try:
+                    schedule_id, name = all_rows[int(r)]
+                except Exception:
+                    continue
+                it_id = QTableWidgetItem(str(schedule_id))
+                it_id.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
+                self.table.setItem(int(r), 0, it_id)
+
+                it_name = QTableWidgetItem(str(name or ""))
+                it_name.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
+                self.table.setItem(int(r), 1, it_name)
+
+        # Small list: render sync.
+        if len(all_rows) <= 200:
+            _render_range(0, len(all_rows))
+            try:
+                self.table.clearSelection()
+                self.table.setCurrentCell(-1, -1)
+            except Exception:
+                pass
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+            self.apply_ui_settings()
+            try:
+                self._save_timer.start()
+            except Exception:
+                self._save_cached_state()
+            return
+
+        # Large list: render in slices (~10ms budget).
+        self._render_state = {"i": 0, "n": len(all_rows)}
+
+        timer = QTimer(self)
+        timer.setInterval(0)
+        self._render_timer = timer
+
+        def _tick() -> None:
+            st = getattr(self, "_render_state", None) or {}
+            i = int(st.get("i", 0))
+            n = int(st.get("n", 0))
+            if i >= n:
+                try:
+                    timer.stop()
+                except Exception:
+                    pass
+                try:
+                    self.table.clearSelection()
+                    self.table.setCurrentCell(-1, -1)
+                except Exception:
+                    pass
+                try:
+                    self.table.setUpdatesEnabled(True)
+                except Exception:
+                    pass
+                try:
+                    self.table.blockSignals(False)
+                except Exception:
+                    pass
+                self.apply_ui_settings()
+                try:
+                    self._save_timer.start()
+                except Exception:
+                    self._save_cached_state()
+                return
+
+            t0 = time.perf_counter()
+            # Render until budget.
+            while i < n and (time.perf_counter() - t0) * 1000.0 < 10.0:
+                end = min(n, i + 40)
+                _render_range(i, end)
+                i = end
+
+            st["i"] = i
+            self._render_state = st
+            try:
+                self.table.viewport().update()
+            except Exception:
+                pass
+            try:
+                timer.start(0)
+            except Exception:
+                QTimer.singleShot(0, _tick)
+
+        try:
+            timer.timeout.connect(_tick)
+            timer.start()
+        except Exception:
+            # Fallback: sync
+            _render_range(0, len(all_rows))
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+            self.apply_ui_settings()
 
     def get_selected_schedule_id(self) -> int | None:
         row = self.table.currentRow()
@@ -858,6 +975,8 @@ class MainRight(QWidget):
 
     def _open_arrange_dialog(self) -> None:
         self.arrange_clicked.emit()
+        from ui.dialog.arrange_schedule_dialog import ArrangeScheduleDialog
+
         dlg = ArrangeScheduleDialog(self)
         dlg.exec()
 
@@ -1033,7 +1152,10 @@ class MainRight(QWidget):
             try:
                 sid = _ARRANGE_SCHEDULE_STATE.get("right_schedule_id")
                 self.current_schedule_id = int(sid) if sid is not None else None
-                if self.current_schedule_id is not None and self.current_schedule_id <= 0:
+                if (
+                    self.current_schedule_id is not None
+                    and self.current_schedule_id <= 0
+                ):
                     self.current_schedule_id = None
             except Exception:
                 self.current_schedule_id = None

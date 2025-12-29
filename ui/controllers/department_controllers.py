@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 
+from core.threads import BackgroundTaskRunner
+
 from services.department_services import DepartmentService
 from services.title_services import TitleService
 from repository.employee_repository import EmployeeRepository
@@ -39,6 +41,10 @@ class DepartmentController:
         self._id_to_name: dict[int, str] = {}
         self._id_to_note: dict[int, str] = {}
 
+        self._runner = BackgroundTaskRunner(
+            self._parent_window, name="department_refresh"
+        )
+
     def bind(self) -> None:
         self._title_bar2.add_clicked.connect(self.on_add)
         self._title_bar2.edit_clicked.connect(self.on_edit)
@@ -46,38 +52,71 @@ class DepartmentController:
         self.refresh()
 
     def refresh(self) -> None:
-        try:
+        def _fn() -> object:
             models = self._service.list_departments()
-            self._id_to_parent = {m.id: m.parent_id for m in models}
-            self._id_to_name = {m.id: m.department_name for m in models}
-            self._id_to_note = {m.id: m.department_note for m in models}
-
-            self._models_cache = models
-
-            rows = [
+            dept_rows = [
                 (m.id, m.parent_id, m.department_name, m.department_note)
                 for m in models
             ]
 
             try:
                 title_models = TitleService().list_titles()
-                title_rows = [(t.id, t.department_id, t.title_name) for t in title_models]
+                title_rows = [
+                    (t.id, t.department_id, t.title_name) for t in title_models
+                ]
             except Exception:
                 title_rows = []
 
+            # Return both for UI thread application.
+            return (models, dept_rows, title_rows)
+
+        def _ok(result: object) -> None:
+            try:
+                models, dept_rows, title_rows = (
+                    result
+                    if isinstance(result, tuple) and len(result) == 3
+                    else ([], [], [])
+                )
+            except Exception:
+                models, dept_rows, title_rows = ([], [], [])
+
+            models = list(models or [])
+            dept_rows = list(dept_rows or [])
+            title_rows = list(title_rows or [])
+
+            try:
+                self._id_to_parent = {m.id: m.parent_id for m in models}
+                self._id_to_name = {m.id: m.department_name for m in models}
+                self._id_to_note = {m.id: m.department_note for m in models}
+            except Exception:
+                self._id_to_parent = {}
+                self._id_to_name = {}
+                self._id_to_note = {}
+
+            self._models_cache = models
             self._title_rows_cache = list(title_rows)
-            self._titles_by_department: dict[int, list[int]] = {}
+
+            self._titles_by_department = {}
             for tid, did, _tname in title_rows:
                 if did is None:
                     continue
                 self._titles_by_department.setdefault(int(did), []).append(int(tid))
 
-            self._content.set_departments(rows, titles=title_rows)
-            self._title_bar2.set_total(len(rows) + len(title_rows))
-        except Exception:
+            self._content.set_departments(dept_rows, titles=title_rows)
+            self._title_bar2.set_total(len(dept_rows) + len(title_rows))
+
+        def _err(_msg: str) -> None:
             logger.exception("Không thể tải danh sách phòng ban")
-            self._content.set_departments([])
-            self._title_bar2.set_total(0)
+            try:
+                self._content.set_departments([])
+            except Exception:
+                pass
+            try:
+                self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _build_parent_options(self) -> list[tuple[int, int | None, str]]:
         models = getattr(self, "_models_cache", None) or []
@@ -360,7 +399,9 @@ class DepartmentController:
             if ok:
                 self.refresh()
             else:
-                MessageDialog.info(self._parent_window, "Không thể xóa", msg or "Xóa thất bại.")
+                MessageDialog.info(
+                    self._parent_window, "Không thể xóa", msg or "Xóa thất bại."
+                )
             return
 
         dept_id = node_id

@@ -26,7 +26,7 @@ Ghi chú:
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, QSize, Qt, Signal
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, QTimer, QSize, Qt, Signal
 from PySide6.QtGui import QDoubleValidator, QFont, QIcon, QIntValidator
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -1076,6 +1076,41 @@ class MainContent(QWidget):
             self._save_timer.start()
         except Exception:
             self._save_cached_state()
+
+    def reset_table(self) -> None:
+        """Clear all table data and remove any current selection."""
+        try:
+            self._rows_data_count = 0
+        except Exception:
+            pass
+
+        # Clear visible content immediately.
+        try:
+            self.set_work_shifts([])
+        except Exception:
+            # Fallback: hard reset.
+            try:
+                self.table.setRowCount(1)
+                self._init_row_items(0)
+            except Exception:
+                pass
+
+        # Remove selection + current row highlight.
+        try:
+            sm = self.table.selectionModel()
+            if sm is not None:
+                sm.clearSelection()
+                sm.setCurrentIndex(QModelIndex(), QItemSelectionModel.NoUpdate)
+        except Exception:
+            pass
+        try:
+            self.table.clearSelection()
+        except Exception:
+            pass
+        try:
+            self._last_selected_row = -1
+        except Exception:
+            pass
 
     def get_selected_work_shift(self) -> tuple[int, str] | None:
         """Trả về (id, shift_code) của dòng đang chọn."""

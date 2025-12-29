@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QRect
+from PySide6.QtCore import QRect, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog
 
@@ -26,6 +26,7 @@ from core.resource import (
 )
 from services.company_services import CompanyService
 from ui.dialog.comapy_dialog import CompanyDialog
+from core.threads import BackgroundTaskRunner
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class CompanyController:
         self._parent_window = parent_window
         self._service = service or CompanyService()
         self._dialog: CompanyDialog | None = None
+        self._runner = BackgroundTaskRunner(self._parent_window, name="company_load")
 
     def show_dialog(self) -> None:
         """Hiển thị dialog ở giữa cửa sổ cha."""
@@ -47,8 +49,17 @@ class CompanyController:
         set_window_icon(self._dialog)
 
         self._bind_dialog_events(self._dialog)
-        self._load_data(self._dialog)
         self._center_dialog(self._dialog)
+
+        # Show dialog immediately; load data asynchronously.
+        try:
+            self._dialog.set_status("Đang tải...", ok=True)
+        except Exception:
+            pass
+        try:
+            QTimer.singleShot(0, lambda: self._load_data_async(self._dialog))
+        except Exception:
+            self._load_data_async(self._dialog)
 
         self._dialog.exec()
 
@@ -56,29 +67,42 @@ class CompanyController:
         dialog.btn_change_image.clicked.connect(lambda: self._on_change_image(dialog))
         dialog.btn_save_exit.clicked.connect(lambda: self._on_save(dialog))
 
-    def _load_data(self, dialog: CompanyDialog) -> None:
-        try:
-            data = self._service.load_company()
-            if data is None:
-                # Mặc định hiển thị icon app
-                dialog.set_logo_pixmap(get_app_icon().pixmap(256, 256))
+    def _load_data_async(self, dialog: CompanyDialog) -> None:
+        def _fn() -> object:
+            return self._service.load_company()
+
+        def _ok(result: object) -> None:
+            data = result
+            try:
+                if data is None:
+                    dialog.set_logo_pixmap(get_app_icon().pixmap(256, 256))
+                    dialog.set_status("", ok=True)
+                    return
+
+                dialog.set_form_values(
+                    data.company_name, data.company_address, data.company_phone
+                )
+                if getattr(data, "company_logo", None):
+                    dialog.set_logo_bytes(data.company_logo)
+                    set_app_icon_from_bytes(data.company_logo)
+                else:
+                    dialog.set_logo_pixmap(get_app_icon().pixmap(256, 256))
                 dialog.set_status("", ok=True)
-                return
+            except Exception:
+                logger.exception("Không thể apply dữ liệu công ty")
+                try:
+                    dialog.set_status("Không thể tải thông tin công ty.", ok=False)
+                except Exception:
+                    pass
 
-            dialog.set_form_values(
-                data.company_name, data.company_address, data.company_phone
-            )
-            if data.company_logo:
-                dialog.set_logo_bytes(data.company_logo)
-                # Đồng bộ icon toàn ứng dụng theo logo đã lưu
-                set_app_icon_from_bytes(data.company_logo)
-            else:
-                dialog.set_logo_pixmap(get_app_icon().pixmap(256, 256))
-
-            logger.debug("Load company thành công")
-        except Exception:
+        def _err(_msg: str) -> None:
             logger.exception("Không thể load dữ liệu công ty")
-            dialog.set_status("Không thể tải thông tin công ty.", ok=False)
+            try:
+                dialog.set_status("Không thể tải thông tin công ty.", ok=False)
+            except Exception:
+                pass
+
+        self._runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _on_change_image(self, dialog: CompanyDialog) -> None:
         file_path, _ = QFileDialog.getOpenFileName(

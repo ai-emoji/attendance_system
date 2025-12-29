@@ -1,6 +1,14 @@
-"""ui.dialog.attendance_symbol_dialog Dialog cấu hình "Ký hiệu Chấm công". Yêu cầu UI: - Hiển thị dạng bảng/cột giống dialog "Ký hiệu Vắng" - Hiển thị giữa màn hình - Không dùng QMessageBox"""
+"""ui.dialog.attendance_symbol_dialog Dialog cấu hình "Ký hiệu Chấm công".
+
+Lưu ý hiệu năng:
+- Không load DB trong __init__ (tránh treo UI khi DB chậm/không kết nối).
+- Load/Save chạy nền bằng BackgroundTaskRunner.
+"""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
@@ -41,8 +49,11 @@ from core.resource import (
     ROW_HEIGHT,
     UI_FONT,
 )
-from services.attendance_symbol_services import AttendanceSymbolService
 from core.attendance_symbol_bus import attendance_symbol_bus
+from core.threads import BackgroundTaskRunner
+
+if TYPE_CHECKING:
+    from services.attendance_symbol_services import AttendanceSymbolService
 
 
 class AttendanceSymbolDialog(QDialog):
@@ -50,10 +61,24 @@ class AttendanceSymbolDialog(QDialog):
         self, parent=None, service: AttendanceSymbolService | None = None
     ) -> None:
         super().__init__(parent)
-        self._service = service or AttendanceSymbolService()
+        self._service: AttendanceSymbolService | None = service
+        self._load_runner = BackgroundTaskRunner(self, name="attendance_symbol_load")
+        self._save_runner = BackgroundTaskRunner(self, name="attendance_symbol_save")
         self._hover_row: int | None = None
         self._init_ui()
-        self._load()
+        # Defer load so the dialog can paint immediately.
+        self.set_status("Đang tải...", ok=True)
+        try:
+            QTimer.singleShot(0, self._load_async)
+        except Exception:
+            self._load_async()
+
+    def _get_service(self) -> AttendanceSymbolService:
+        if self._service is None:
+            from services.attendance_symbol_services import AttendanceSymbolService
+
+            self._service = AttendanceSymbolService()
+        return self._service
 
     def _init_ui(self) -> None:
         self.setModal(True)
@@ -388,8 +413,7 @@ class AttendanceSymbolDialog(QDialog):
         )
         self.label_status.setText(message or "")
 
-    def _load(self) -> None:
-        rows_by_code = self._service.list_rows_by_code()
+    def _apply_loaded(self, rows_by_code: dict[str, dict]) -> None:
         for row in range(self.table.rowCount()):
             code_item = self.table.item(row, 1)
             code = (code_item.text() if code_item is not None else "").strip()
@@ -412,6 +436,25 @@ class AttendanceSymbolDialog(QDialog):
             vis_chk = vis_wrap.findChild(QCheckBox) if vis_wrap is not None else None
             if vis_chk is not None:
                 vis_chk.setChecked(bool(int(data.get("is_visible") or 0)))
+
+    def _load_async(self) -> None:
+        def _fn() -> object:
+            svc = self._get_service()
+            return svc.list_rows_by_code()
+
+        def _ok(result: object) -> None:
+            rows_by_code = result if isinstance(result, dict) else {}
+            self._apply_loaded(rows_by_code)
+            self.set_status("", ok=True)
+
+        def _err(msg: str) -> None:
+            # Không chặn UI nếu DB lỗi; chỉ thông báo.
+            self.set_status(str(msg or "Không thể tải dữ liệu"), ok=False)
+
+        try:
+            self._load_runner.run(fn=_fn, on_success=_ok, on_error=_err)
+        except Exception as e:
+            self.set_status(str(e), ok=False)
 
     def _collect_rows(self) -> list[dict]:
         items: list[dict] = []
@@ -444,10 +487,47 @@ class AttendanceSymbolDialog(QDialog):
 
     def _on_save(self) -> None:
         rows = self._collect_rows()
-        ok, msg = self._service.save_rows(rows)
-        self.set_status(msg, ok=ok)
-        if ok:
+
+        # Disable to prevent double-submit
+        try:
+            self.btn_save.setEnabled(False)
+            self.btn_cancel.setEnabled(False)
+        except Exception:
+            pass
+
+        self.set_status("Đang lưu...", ok=True)
+
+        def _fn() -> object:
+            svc = self._get_service()
+            return svc.save_rows(rows)
+
+        def _ok(result: object) -> None:
+            ok = False
+            msg = ""
+            if isinstance(result, tuple) and len(result) >= 2:
+                ok = bool(result[0])
+                msg = str(result[1] or "")
+            self.set_status(msg, ok=ok)
             try:
-                attendance_symbol_bus.changed.emit()
+                self.btn_save.setEnabled(True)
+                self.btn_cancel.setEnabled(True)
             except Exception:
                 pass
+            if ok:
+                try:
+                    attendance_symbol_bus.changed.emit()
+                except Exception:
+                    pass
+
+        def _err(msg: str) -> None:
+            self.set_status(str(msg or "Không thể lưu dữ liệu"), ok=False)
+            try:
+                self.btn_save.setEnabled(True)
+                self.btn_cancel.setEnabled(True)
+            except Exception:
+                pass
+
+        try:
+            self._save_runner.run(fn=_fn, on_success=_ok, on_error=_err)
+        except Exception as e:
+            _err(str(e))

@@ -57,9 +57,10 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtWidgets import QHeaderView
 
-import pandas as pd
+from typing import Any
 
 from core.ui_settings import get_employee_table_ui, ui_settings_bus
+from core.db_connection_bus import db_connection_bus
 
 from core.resource import (
     BG_TITLE_1_HEIGHT,
@@ -92,8 +93,10 @@ from core.resource import (
 # recreates widgets while switching tabs.
 _EMPLOYEE_VIEW_STATE: dict[str, object] = {}
 
-# Tránh treo khi chuyển tab: không cache/restore danh sách quá lớn (pandas + modelReset rất nặng).
-_STATE_ROWS_MAX = 800
+# Tránh treo khi chuyển tab: không cache/restore danh sách quá lớn.
+# Tuy nhiên để đáp ứng yêu cầu "chuyển table không reset bảng", cần đủ lớn để
+# giữ được danh sách nhân viên trong các dataset phổ biến.
+_STATE_ROWS_MAX = 3000
 
 
 class TitleBar1(QWidget):
@@ -202,9 +205,48 @@ class DepartmentTreePreview(QWidget):
         layout.addWidget(self.tree, 1)
 
         self._last_selected_id: int | None = None
+        # Desired selection context (type/id) to re-apply after the tree is rebuilt.
+        # This is important because controllers may call set_departments() which clears the tree.
+        self._desired_ctx: dict | None = None
         self.tree.currentItemChanged.connect(self._on_current_item_changed)
         self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.viewport().installEventFilter(self)
+
+    def _find_item_by_ctx(self, ctx: dict) -> QTreeWidgetItem | None:
+        try:
+            node_id = int(ctx.get("id") or 0)
+        except Exception:
+            node_id = 0
+        node_type = str(ctx.get("type") or "dept")
+        if node_id <= 0:
+            return None
+        if node_type not in ("dept", "title"):
+            node_type = "dept"
+
+        try:
+            stack: list[QTreeWidgetItem] = []
+            for i in range(self.tree.topLevelItemCount()):
+                it = self.tree.topLevelItem(i)
+                if it is not None:
+                    stack.append(it)
+            while stack:
+                it = stack.pop(0)
+                try:
+                    it_id = int(it.data(0, Qt.ItemDataRole.UserRole) or 0)
+                    it_type = str(it.data(0, Qt.ItemDataRole.UserRole + 2) or "dept")
+                except Exception:
+                    it_id, it_type = (0, "dept")
+                if it_id == node_id and it_type == node_type:
+                    return it
+                for j in range(it.childCount()):
+                    stack.append(it.child(j))
+        except Exception:
+            return None
+        return None
+
+    def set_desired_selection_ctx(self, ctx: dict | None) -> None:
+        """Remember a desired selection (type/id) to re-apply after set_departments()."""
+        self._desired_ctx = dict(ctx) if isinstance(ctx, dict) else None
 
     def _on_item_clicked(self, _item: QTreeWidgetItem, _column: int) -> None:
         # Ensure filtering triggers even when the user clicks the same item again.
@@ -215,6 +257,15 @@ class DepartmentTreePreview(QWidget):
         rows: list[tuple[int, int | None, str, str]],
         titles: list[tuple[int, int | None, str]] | None = None,
     ) -> None:
+        # Preserve current selection so we can re-apply after rebuilding the tree.
+        try:
+            current_ctx = self.get_selected_node_context()
+        except Exception:
+            current_ctx = None
+        desired_ctx = self._desired_ctx if isinstance(self._desired_ctx, dict) else None
+        if desired_ctx is None and isinstance(current_ctx, dict):
+            desired_ctx = dict(current_ctx)
+
         self.tree.clear()
         titles = titles or []
 
@@ -305,6 +356,25 @@ class DepartmentTreePreview(QWidget):
         build(None, None, [])
         self.tree.expandAll()
 
+        # Re-apply selection silently (do not trigger filtering refresh).
+        try:
+            if isinstance(desired_ctx, dict) and desired_ctx:
+                found = self._find_item_by_ctx(desired_ctx)
+                self.tree.blockSignals(True)
+                try:
+                    if found is not None:
+                        self.tree.setCurrentItem(found)
+                    else:
+                        self.tree.setCurrentItem(None)
+                        self.tree.clearSelection()
+                finally:
+                    self.tree.blockSignals(False)
+        except Exception:
+            try:
+                self.tree.blockSignals(False)
+            except Exception:
+                pass
+
     def get_selected_department(self) -> tuple[int, str] | None:
         ctx = self.get_selected_node_context()
         if not ctx or ctx.get("type") != "dept":
@@ -376,6 +446,10 @@ class DepartmentTreePreview(QWidget):
         }
 
     def clear_selection(self) -> None:
+        try:
+            self._desired_ctx = None
+        except Exception:
+            pass
         self.tree.clearSelection()
         self.tree.setCurrentItem(None)
         self.selection_changed.emit()
@@ -388,6 +462,10 @@ class DepartmentTreePreview(QWidget):
 
         if current is None:
             self._last_selected_id = None
+            try:
+                self._desired_ctx = None
+            except Exception:
+                pass
             self.selection_changed.emit()
             return
 
@@ -398,6 +476,12 @@ class DepartmentTreePreview(QWidget):
         except Exception:
             dept_id = 0
         self._last_selected_id = dept_id if dept_id > 0 else None
+        # Keep desired selection in sync so a later set_departments() rebuild doesn't reset.
+        try:
+            ctx = self.get_selected_node_context()
+            self._desired_ctx = dict(ctx) if isinstance(ctx, dict) else None
+        except Exception:
+            pass
         self.selection_changed.emit()
 
     def eventFilter(self, obj, event) -> bool:
@@ -538,9 +622,9 @@ class _EmployeeTableModel(QAbstractTableModel):
 
     def __init__(self, parent: QObject | None = None) -> None:  # type: ignore[name-defined]
         super().__init__(parent)
-        self._df: pd.DataFrame = pd.DataFrame(
-            columns=[k for k, _label, _minw in self.COLUMNS]
-        )
+        # Keep this model lightweight: avoid importing heavy libraries (e.g. pandas)
+        # just to back a QTableView.
+        self._rows: list[dict[str, Any]] = []
 
         self._date_keys: set[str] = {
             "start_date",
@@ -621,7 +705,7 @@ class _EmployeeTableModel(QAbstractTableModel):
         cols = [k for k, _label, _minw in self.COLUMNS]
         if not rows:
             self.beginResetModel()
-            self._df = pd.DataFrame(columns=cols)
+            self._rows = []
             self.endResetModel()
             return
 
@@ -643,22 +727,20 @@ class _EmployeeTableModel(QAbstractTableModel):
                 ):
                     item["contract1_term"] = str(c1_signed).strip()
 
-            stt_val = r.get("stt")
-            if stt_val is None or str(stt_val).strip() == "":
-                stt_val = r.get("sort_order")
-            item["stt"] = (
-                stt_val if stt_val is not None and str(stt_val).strip() != "" else idx
-            )
+            # STT in UI should be the visible row number (1..n).
+            # Do not rely on DB-provided `stt`/`sort_order` because it can appear
+            # reversed when the query ordering changes.
+            item["stt"] = int(idx)
             norm.append(item)
 
         self.beginResetModel()
-        self._df = pd.DataFrame(norm, columns=cols)
+        self._rows = norm
         self.endResetModel()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.isValid():
             return 0
-        return int(len(self._df))
+        return int(len(self._rows))
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         if parent.isValid():
@@ -722,11 +804,14 @@ class _EmployeeTableModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
 
-        if row >= len(self._df):
+        if row >= len(self._rows):
             return ""
 
         key = self.COLUMNS[col][0]
-        v = self._df.iloc[row].get(key)
+        try:
+            v = self._rows[int(row)].get(key)
+        except Exception:
+            v = None
         if v is None:
             return ""
         if key in self._date_keys:
@@ -786,9 +871,12 @@ class _EmployeeTableModel(QAbstractTableModel):
         return str(v)
 
     def get_row_dict(self, row: int) -> dict | None:
-        if int(row) < 0 or int(row) >= int(len(self._df)):
+        if int(row) < 0 or int(row) >= int(len(self._rows)):
             return None
-        s = self._df.iloc[int(row)]
+        try:
+            s = self._rows[int(row)]
+        except Exception:
+            return None
         return {k: s.get(k) for k, _label, _minw in self.COLUMNS}
 
 
@@ -859,19 +947,32 @@ class _FilterHeaderView(QHeaderView):
             return
 
         key = self._model.COLUMNS[int(col)][0]
-        if key not in self._model._df.columns:
-            return
-
-        series = self._model._df[key]
+        values: list[str] = []
         try:
-            raw_values = series.dropna().tolist()
+            raw_values: list[object] = []
+            for r in getattr(self._model, "_rows", []) or []:
+                if not isinstance(r, dict):
+                    continue
+                v = r.get(key)
+                if v is None:
+                    continue
+                s = str(v).strip()
+                if not s:
+                    continue
+                raw_values.append(v)
+
             if key in getattr(self._model, "_date_keys", set()):
                 values = [self._model._format_vn_date(v) for v in raw_values]
             else:
-                values = [str(v) for v in series.dropna().astype(str).unique().tolist()]
+                values = [str(v) for v in raw_values]
         except Exception:
             values = []
         values = [v.strip() for v in values if str(v).strip()]
+        # Deduplicate before sorting (keeps menu compact)
+        try:
+            values = list(dict.fromkeys(values))
+        except Exception:
+            pass
         if key in {"stt", "sort_order"}:
 
             def _to_int_or_none(s: str) -> int | None:
@@ -1276,6 +1377,14 @@ class EmployeeTable(QTableView):
                 try:
                     self.setColumnHidden(int(i), True)
                     self.setColumnWidth(int(i), 0)
+                except Exception:
+                    pass
+                continue
+
+            # Fixed column: STT should always be visible (row index 1..n).
+            if key == "stt":
+                try:
+                    self.setColumnHidden(int(i), False)
                 except Exception:
                     pass
                 continue
@@ -1716,7 +1825,7 @@ class MainContent(QWidget):
         self.department_tree.selection_changed.connect(self.search_changed.emit)
         self.btn_export.clicked.connect(self.export_clicked.emit)
         self.btn_import.clicked.connect(self.import_clicked.emit)
-        self.btn_view_list.clicked.connect(self.view_list_clicked.emit)
+        self.btn_view_list.clicked.connect(self._on_view_list_clicked)
         self.btn_add.clicked.connect(self.add_clicked.emit)
         self.btn_edit.clicked.connect(self.edit_clicked.emit)
         self.btn_delete.clicked.connect(self.delete_clicked.emit)
@@ -1749,6 +1858,18 @@ class MainContent(QWidget):
             QTimer.singleShot(0, self.restore_cached_state_if_any)
         except Exception:
             pass
+
+    def hideEvent(self, event) -> None:
+        # Ensure current filters are saved even if the main window recreates widgets
+        # immediately when switching views/tabs.
+        try:
+            self._save_state()
+        except Exception:
+            pass
+        try:
+            super().hideEvent(event)
+        except Exception:
+            return
 
     def set_total(self, total: int | str) -> None:
         self.label_total.setText(f"Tổng: {total}")
@@ -1793,6 +1914,14 @@ class MainContent(QWidget):
         # Trigger a refresh after resetting UI state
         self.refresh_clicked.emit()
 
+    def _on_view_list_clicked(self) -> None:
+        # Preserve current filters immediately before switching view/table.
+        try:
+            self._save_state()
+        except Exception:
+            pass
+        self.view_list_clicked.emit()
+
     def _schedule_save_state(self) -> None:
         try:
             if bool(getattr(self, "_restoring_state", False)):
@@ -1819,6 +1948,7 @@ class MainContent(QWidget):
             col_filters = None
 
         state = {
+            "db_generation": int(getattr(db_connection_bus, "generation", 0) or 0),
             "search_by": self.cbo_search_by.currentData(),
             "search_text": str(self.inp_search_text.text() or ""),
             "tree_ctx": ctx,
@@ -1832,6 +1962,18 @@ class MainContent(QWidget):
         state = _EMPLOYEE_VIEW_STATE.get("state")
         if not isinstance(state, dict) or not state:
             return False
+
+        # If DB connection was changed successfully since this state was saved,
+        # do not restore cached rows (they can be stale/empty from offline mode).
+        try:
+            cached_gen = int(state.get("db_generation") or 0)
+        except Exception:
+            cached_gen = 0
+        try:
+            current_gen = int(getattr(db_connection_bus, "generation", 0) or 0)
+        except Exception:
+            current_gen = 0
+        allow_restore_rows = cached_gen == current_gen
 
         self._restoring_state = True
         try:
@@ -1865,6 +2007,12 @@ class MainContent(QWidget):
             try:
                 ctx = state.get("tree_ctx")
                 if isinstance(ctx, dict):
+                    # Remember desired selection so it can be re-applied after the
+                    # controller rebuilds the tree via set_departments().
+                    try:
+                        self.department_tree.set_desired_selection_ctx(ctx)
+                    except Exception:
+                        pass
                     node_id = int(ctx.get("id") or 0)
                     node_type = str(ctx.get("type") or "dept")
                     if node_id > 0:
@@ -1911,7 +2059,11 @@ class MainContent(QWidget):
             restored_rows = False
             try:
                 rows = state.get("rows")
-                if isinstance(rows, list) and len(rows) <= int(_STATE_ROWS_MAX):
+                if (
+                    allow_restore_rows
+                    and isinstance(rows, list)
+                    and len(rows) <= int(_STATE_ROWS_MAX)
+                ):
                     self.table.set_rows(rows)
                     restored_rows = True
             except Exception:

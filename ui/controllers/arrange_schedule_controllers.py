@@ -14,8 +14,10 @@ import logging
 
 from PySide6.QtCore import Qt
 
+from core.db_connection_bus import db_connection_bus
 from services.arrange_schedule_services import ArrangeScheduleService
 from ui.dialog.title_dialog import MessageDialog
+from core.threads import BackgroundTaskRunner
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,15 @@ class ArrangeScheduleController:
         self._right = right
         self._service = service or ArrangeScheduleService()
         self._current_schedule_id: int | None = None
+
+        self._refresh_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="arrange_schedule_refresh"
+        )
+        self._load_runner = BackgroundTaskRunner(
+            parent=self._parent_window, name="arrange_schedule_load"
+        )
+
+        self._db_bus_hooked = False
 
     def bind(self) -> None:
         # Restore cached UI state (if any) BEFORE wiring signals to avoid
@@ -83,9 +94,43 @@ class ArrangeScheduleController:
         if self._left is not None:
             self._left.schedule_selected.connect(self.on_selected)
 
+        # When DB connection becomes available, re-load list/details.
+        if not self._db_bus_hooked:
+            try:
+                db_connection_bus.connect_changed_weak(self._on_db_connection_changed)
+                self._db_bus_hooked = True
+            except Exception:
+                pass
+
         # If there was cached state, do not refresh (avoid losing the view state).
         if not restored:
+            try:
+                # Let the widget paint first.
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, self.refresh)
+            except Exception:
+                self.refresh()
+
+    def _on_db_connection_changed(self) -> None:
+        """DB is configured+reachable now -> reload UI data in background."""
+        try:
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(0, self.refresh)
+        except Exception:
             self.refresh()
+
+        # If there is a selected schedule, trigger detail reload.
+        try:
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(0, self.on_selected)
+        except Exception:
+            try:
+                self.on_selected()
+            except Exception:
+                pass
 
     def on_refresh(self) -> None:
         """Reset các trường bên phải và bỏ chọn danh sách."""
@@ -105,18 +150,57 @@ class ArrangeScheduleController:
 
     def refresh(self) -> None:
         """Reload danh sách lịch trình bên trái."""
+
+        prev_sel: int | None = None
         try:
-            items = self._service.list_schedules()
             if self._left is not None:
-                self._left.set_schedules(items)
-            if self._right is not None:
-                self._right.set_total(len(items))
+                prev_sel = self._left.get_selected_schedule_id()
         except Exception:
-            logger.exception("Không thể tải danh sách lịch trình")
-            if self._left is not None:
-                self._left.set_schedules([])
-            if self._right is not None:
-                self._right.set_total(0)
+            prev_sel = None
+
+        def _fn() -> object:
+            return self._service.list_schedules()
+
+        def _ok(result: object) -> None:
+            items = list(result or []) if isinstance(result, list) else []
+            try:
+                if self._left is not None:
+                    self._left.set_schedules(items)
+                    try:
+                        if prev_sel is not None and int(prev_sel) > 0:
+                            self._left.select_schedule_id(int(prev_sel))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                if self._right is not None:
+                    self._right.set_total(len(items))
+            except Exception:
+                pass
+
+        def _err(msg: str) -> None:
+            try:
+                logger.error("Không thể tải danh sách lịch trình: %s", msg)
+            except Exception:
+                pass
+            try:
+                if self._left is not None:
+                    self._left.set_schedules([])
+            except Exception:
+                pass
+            try:
+                if self._right is not None:
+                    self._right.set_total(0)
+            except Exception:
+                pass
+
+        try:
+            self._refresh_runner.run(
+                fn=_fn, on_success=_ok, on_error=_err, coalesce=True
+            )
+        except Exception as e:
+            _err(str(e))
 
     def on_selected(self) -> None:
         schedule_id = None
@@ -138,46 +222,17 @@ class ArrangeScheduleController:
         if not schedule_id:
             return
 
-        try:
+        def _fn() -> object:
             header, details = self._service.get_schedule(int(schedule_id))
             if header is None:
-                return
-            self._current_schedule_id = int(header.id)
+                return {"header": None, "details": [], "id_to_code": {}}
 
-            try:
-                if hasattr(self._right, "set_current_schedule_id"):
-                    self._right.set_current_schedule_id(int(header.id))
-                else:
-                    setattr(self._right, "current_schedule_id", int(header.id))
-            except Exception:
-                pass
-
-            if self._right is None:
-                return
-
-            self._right.inp_schedule_name.setText(header.schedule_name)
-            self._set_in_out_mode(header.in_out_mode)
-
-            self._right.chk_ignore_sat.setChecked(bool(header.ignore_absent_sat))
-            self._right.chk_ignore_sun.setChecked(bool(header.ignore_absent_sun))
-            self._right.chk_ignore_holiday.setChecked(
-                bool(header.ignore_absent_holiday)
-            )
-            self._right.chk_holiday_as_work.setChecked(
-                bool(header.holiday_count_as_work)
-            )
-            self._right.chk_day_is_out.setChecked(bool(header.day_is_out_time))
-
-            def _norm_day(s: str) -> str:
-                return str(s or "").strip().casefold()
-
-            # Build id->shift_code map for display
             all_shift_ids: list[int] = []
-            for d in details:
+            for d in details or []:
                 for v in (
-                    d.shift1_id,
-                    d.shift2_id,
-                    d.shift3_id,
+                    getattr(d, "shift1_id", None),
+                    getattr(d, "shift2_id", None),
+                    getattr(d, "shift3_id", None),
                     getattr(d, "shift4_id", None),
                     getattr(d, "shift5_id", None),
                 ):
@@ -187,10 +242,72 @@ class ArrangeScheduleController:
                         except Exception:
                             pass
             id_to_code = self._service.get_work_shift_codes_by_ids(all_shift_ids)
+            return {
+                "header": header,
+                "details": list(details or []),
+                "id_to_code": dict(id_to_code or {}),
+            }
 
-            # Determine how many "Tên ca" columns needed (unlimited)
+        def _ok(result: object) -> None:
+            if not isinstance(result, dict):
+                return
+            header = result.get("header")
+            details = result.get("details") or []
+            id_to_code = result.get("id_to_code") or {}
+            if header is None or self._right is None:
+                return
+
+            try:
+                self._current_schedule_id = int(getattr(header, "id"))
+            except Exception:
+                self._current_schedule_id = None
+
+            try:
+                if hasattr(self._right, "set_current_schedule_id"):
+                    self._right.set_current_schedule_id(int(getattr(header, "id")))
+                else:
+                    setattr(
+                        self._right, "current_schedule_id", int(getattr(header, "id"))
+                    )
+            except Exception:
+                pass
+
+            try:
+                self._right.inp_schedule_name.setText(
+                    str(getattr(header, "schedule_name", "") or "")
+                )
+            except Exception:
+                pass
+            try:
+                self._set_in_out_mode(getattr(header, "in_out_mode", None))
+            except Exception:
+                pass
+
+            try:
+                self._right.chk_ignore_sat.setChecked(
+                    bool(getattr(header, "ignore_absent_sat", False))
+                )
+                self._right.chk_ignore_sun.setChecked(
+                    bool(getattr(header, "ignore_absent_sun", False))
+                )
+                self._right.chk_ignore_holiday.setChecked(
+                    bool(getattr(header, "ignore_absent_holiday", False))
+                )
+                self._right.chk_holiday_as_work.setChecked(
+                    bool(getattr(header, "holiday_count_as_work", False))
+                )
+                self._right.chk_day_is_out.setChecked(
+                    bool(getattr(header, "day_is_out_time", False))
+                )
+            except Exception:
+                pass
+
+            def _norm_day(s: str) -> str:
+                return str(s or "").strip().casefold()
+
+            # Determine how many "Tên ca" columns needed
             max_cols = 0
-            for d in details:
+            for d in details or []:
                 try:
                     max_cols = max(
                         max_cols, len(list(getattr(d, "shift_ids", []) or []))
@@ -198,55 +315,76 @@ class ArrangeScheduleController:
                 except Exception:
                     pass
 
-            # (Re)build table only when needed
             if hasattr(self._right, "build_table"):
                 try:
                     self._right.build_table(max_cols)
                 except Exception:
                     pass
 
-            # Fill shifts into table by day_name
-            day_name_to_detail = {_norm_day(d.day_name): d for d in details}
+            day_name_to_detail = {
+                _norm_day(getattr(d, "day_name", "")): d for d in (details or [])
+            }
             table = self._right.table
 
-            # Clear previous values
-            for r in range(table.rowCount()):
-                for c in (2, 3, 4, 5, 6):
-                    it = table.item(r, c)
-                    if it is not None:
-                        it.setText("")
-                        it.setData(Qt.ItemDataRole.UserRole, None)
+            try:
+                table.blockSignals(True)
+            except Exception:
+                pass
 
-            for r in range(table.rowCount()):
-                day_item = table.item(r, 1)
-                day_name = str(day_item.text() if day_item else "")
-                d = day_name_to_detail.get(_norm_day(day_name))
-                if not d:
-                    continue
+            try:
+                for r in range(table.rowCount()):
+                    for c in range(2, table.columnCount()):
+                        it = table.item(r, c)
+                        if it is not None:
+                            it.setText("")
+                            it.setData(Qt.ItemDataRole.UserRole, None)
 
-                shift_cols = list(range(2, table.columnCount()))
-                items = [table.item(r, c) for c in shift_cols]
+                for r in range(table.rowCount()):
+                    day_item = table.item(r, 1)
+                    day_name = str(day_item.text() if day_item else "")
+                    d = day_name_to_detail.get(_norm_day(day_name))
+                    if not d:
+                        continue
+                    shift_cols = list(range(2, table.columnCount()))
+                    items = [table.item(r, c) for c in shift_cols]
+                    values = list(getattr(d, "shift_ids", []) or [])
 
-                def _set_shift_cell(it, shift_id: int | None) -> None:
-                    if it is None:
-                        return
-                    if shift_id is None:
-                        it.setText("")
-                        it.setData(Qt.ItemDataRole.UserRole, None)
-                        return
-                    it.setData(Qt.ItemDataRole.UserRole, int(shift_id))
-                    it.setText(str(id_to_code.get(int(shift_id), "")))
+                    def _set_shift_cell(it, shift_id: int | None) -> None:
+                        if it is None:
+                            return
+                        if shift_id is None:
+                            it.setText("")
+                            it.setData(Qt.ItemDataRole.UserRole, None)
+                            return
+                        it.setData(Qt.ItemDataRole.UserRole, int(shift_id))
+                        it.setText(str((id_to_code or {}).get(int(shift_id), "")))
 
-                values = [
-                    *list(getattr(d, "shift_ids", []) or []),
-                ]
+                    for idx, it in enumerate(items):
+                        if idx >= len(values):
+                            break
+                        try:
+                            _set_shift_cell(
+                                it,
+                                int(values[idx]) if values[idx] is not None else None,
+                            )
+                        except Exception:
+                            _set_shift_cell(it, None)
+            finally:
+                try:
+                    table.blockSignals(False)
+                except Exception:
+                    pass
 
-                for idx, it in enumerate(items):
-                    if idx >= len(values):
-                        break
-                    _set_shift_cell(it, values[idx])
-        except Exception:
-            logger.exception("Không thể load lịch trình")
+        def _err(msg: str) -> None:
+            try:
+                logger.error("Không thể load lịch trình: %s", msg)
+            except Exception:
+                pass
+
+        try:
+            self._load_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
+        except Exception as e:
+            _err(str(e))
 
     def on_save(self) -> None:
         if self._right is None:

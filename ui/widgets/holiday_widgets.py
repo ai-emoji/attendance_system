@@ -352,6 +352,17 @@ class MainContent(QWidget):
     def set_holidays(self, rows: list[tuple[int, str, str]]) -> None:
         """rows: (id, date_display, info)"""
 
+        # UI requirement: show newly added records on top.
+        # We sort by id desc (best available signal here because date_display is localized text).
+        try:
+            rows = list(rows or [])
+            rows.sort(
+                key=lambda t: int(t[0]) if t and t[0] is not None else 0,
+                reverse=True,
+            )
+        except Exception:
+            pass
+
         self._rows_data_count = len(rows or [])
 
         viewport_h = self.table.viewport().height()

@@ -85,6 +85,39 @@ class ShiftAttendanceSettingsDialog(QDialog):
 
         self._ui = get_shift_attendance_table_ui()
 
+        # Toggle: show/hide Import button on Shift Attendance screen.
+        self.btn_show_import = QPushButton(group)
+        self.btn_show_import.setFont(font_normal)
+        self.btn_show_import.setCheckable(True)
+        self.btn_show_import.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_show_import.setStyleSheet(
+            "\n".join(
+                [
+                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px 10px; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton:hover {{ color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton:checked:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton:!checked {{ background: {COLOR_BUTTON_CANCEL}; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton:!checked:hover {{ background: {COLOR_BUTTON_CANCEL_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
+                ]
+            )
+        )
+
+        def _set_show_import_button(is_visible: bool) -> None:
+            self.btn_show_import.blockSignals(True)
+            try:
+                self.btn_show_import.setChecked(bool(is_visible))
+                self.btn_show_import.setText(
+                    "✅ Hiển thị" if bool(is_visible) else "❌ Ẩn"
+                )
+            finally:
+                self.btn_show_import.blockSignals(False)
+
+        self.btn_show_import.toggled.connect(
+            lambda v: _set_show_import_button(bool(v))
+        )
+        _set_show_import_button(bool(getattr(self._ui, "show_import_button", True)))
+
         self.spin_font_size = QSpinBox(group)
         self.spin_font_size.setRange(8, 24)
         self.spin_font_size.setValue(int(self._ui.font_size))
@@ -218,6 +251,7 @@ class ShiftAttendanceSettingsDialog(QDialog):
         )
         _refresh_column_defaults()
 
+        form.addRow("Hiển thị nút Import", self.btn_show_import)
         form.addRow("Kích thước chữ", self.spin_font_size)
         form.addRow("Chữ đậm/nhạt (toàn bảng)", self.cbo_table_weight)
         form.addRow("Kích thước chữ (header)", self.spin_header_font_size)
@@ -267,6 +301,7 @@ class ShiftAttendanceSettingsDialog(QDialog):
             col_weight = str(self.cbo_column_weight.currentData() or "inherit").strip()
 
             update_shift_attendance_table_ui(
+                show_import_button=bool(self.btn_show_import.isChecked()),
                 font_size=fs,
                 font_weight=fw,
                 header_font_size=hfs,
