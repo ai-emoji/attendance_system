@@ -817,6 +817,19 @@ class _EmployeeTableModel(QAbstractTableModel):
         if key in self._date_keys:
             return self._format_vn_date(v)
 
+        if key == "employment_status":
+            s = str(v or "").strip()
+            if not s:
+                return ""
+            if s == "1":
+                return "Đi làm"
+            if s == "2":
+                return "Nghỉ thai sản"
+            if s == "3":
+                return "Đã nghỉ việc"
+            # Backward compatible: show legacy text as-is.
+            return s
+
         if key == "children_count":
             # Normalize Excel-style numbers (e.g. 1.0) and hide 0.
             try:
@@ -963,6 +976,22 @@ class _FilterHeaderView(QHeaderView):
 
             if key in getattr(self._model, "_date_keys", set()):
                 values = [self._model._format_vn_date(v) for v in raw_values]
+            elif key == "employment_status":
+                # Show display labels instead of raw codes (1/2/3).
+                def _status_label(v0: object) -> str:
+                    s0 = str(v0 or "").strip()
+                    if not s0:
+                        return ""
+                    if s0 == "1":
+                        return "Đi làm"
+                    if s0 == "2":
+                        return "Nghỉ thai sản"
+                    if s0 == "3":
+                        return "Đã nghỉ việc"
+                    # Backward compatible: keep legacy text as-is.
+                    return s0
+
+                values = [_status_label(v) for v in raw_values]
             else:
                 values = [str(v) for v in raw_values]
         except Exception:

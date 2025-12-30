@@ -580,9 +580,10 @@ class EmployeeDialog(QDialog):
         # Employment status
         self.cbo_employment_status.clear()
         self.cbo_employment_status.addItem("Chưa chọn", "")
-        self.cbo_employment_status.addItem("Đi làm", "Đi làm")
-        self.cbo_employment_status.addItem("Nghỉ thai sản", "Nghỉ thai sản")
-        self.cbo_employment_status.addItem("Đã nghỉ việc", "Đã nghỉ việc")
+        # Store codes as strings to match DB storage (VARCHAR) and avoid type mismatch.
+        self.cbo_employment_status.addItem("Đi làm", "1")
+        self.cbo_employment_status.addItem("Nghỉ thai sản", "2")
+        self.cbo_employment_status.addItem("Đã nghỉ việc", "3")
         self.cbo_employment_status.setCurrentIndex(0)
 
         # Contracts
@@ -683,14 +684,41 @@ class EmployeeDialog(QDialog):
         else:
             self.cbo_id_issue_place.setCurrentIndex(0)
 
-        status = str(e.get("employment_status") or "").strip()
-        if status:
-            idx_s = self.cbo_employment_status.findData(status)
-            if idx_s >= 0:
-                self.cbo_employment_status.setCurrentIndex(idx_s)
+        status_raw = e.get("employment_status")
+        status_txt = str(status_raw or "").strip()
+        status_code: str | None = None
+        if status_txt:
+            # Accept both numeric codes and legacy Vietnamese text.
+            if status_txt in {"1", "2", "3"}:
+                status_code = status_txt
             else:
-                # Unknown/legacy value -> show as blank (unselected)
-                self.cbo_employment_status.setCurrentIndex(0)
+                s = status_txt.strip().lower()
+                if s in {"đi làm", "di lam", "đang làm", "dang lam", "working"}:
+                    status_code = "1"
+                elif s in {
+                    "nghỉ thai sản",
+                    "nghi thai san",
+                    "thai sản",
+                    "thai san",
+                    "maternity",
+                    "maternity leave",
+                    "nghỉ thai sải",
+                    "nghi thai sai",
+                }:
+                    status_code = "2"
+                elif s in {
+                    "đã nghỉ việc",
+                    "da nghi viec",
+                    "nghỉ việc",
+                    "nghi viec",
+                    "resigned",
+                    "quit",
+                }:
+                    status_code = "3"
+
+        if status_code in {"1", "2", "3"}:
+            idx_s = self.cbo_employment_status.findData(status_code)
+            self.cbo_employment_status.setCurrentIndex(idx_s if idx_s >= 0 else 0)
         else:
             self.cbo_employment_status.setCurrentIndex(0)
 
@@ -780,7 +808,7 @@ class EmployeeDialog(QDialog):
             "child_dob_3": self._date_edit_to_iso(self.input_child_dob_3),
             "child_dob_4": self._date_edit_to_iso(self.input_child_dob_4),
             "note": (self.input_note.text() or "").strip() or None,
-        } 
+        }
 
     def set_status(self, message: str, ok: bool = True) -> None:
         self.label_status.setStyleSheet(

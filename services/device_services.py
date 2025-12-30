@@ -273,8 +273,8 @@ class DeviceService:
         except Exception:
             port = self.DEFAULT_PORT
 
-        # Basic reachability hint first
-        tcp_ok = self.test_connection_tcp(ip, port)
+        # Basic reachability hint first (keep short to avoid UI feeling stuck)
+        tcp_ok = self.test_connection_tcp(ip, port, timeout=1.5)
 
         # 1) Try real connect via `zk` library if available
         if importlib.util.find_spec("zk") is not None:
@@ -289,8 +289,10 @@ class DeviceService:
 
                 attempts: list[tuple[bool, bool, int]] = []
                 # (force_udp, ommit_ping, timeout)
-                attempts.append((False, False, 8))
+                # Thực tế nhiều mạng chặn ICMP => ping fail làm connect chậm.
+                # Ưu tiên ommit_ping trước để giảm thời gian chờ.
                 attempts.append((False, True, 8))
+                attempts.append((False, False, 8))
                 # SenseFace: thường cần bỏ ping; thử UDP ở cuối
                 attempts.append((True, True, 10 if prefer_senseface else 8))
 

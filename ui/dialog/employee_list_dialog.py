@@ -64,9 +64,9 @@ class EmployeeListDialog(QDialog):
         self.cbo_employment_status = QComboBox()
         self.cbo_employment_status.setFixedHeight(32)
         self.cbo_employment_status.addItem("Hiện trạng", "")
-        self.cbo_employment_status.addItem("Đi làm", "Đi làm")
-        self.cbo_employment_status.addItem("Nghỉ thai sản", "Nghỉ thai sản")
-        self.cbo_employment_status.addItem("Đã nghỉ việc", "Đã nghỉ việc")
+        self.cbo_employment_status.addItem("Đi làm", "1")
+        self.cbo_employment_status.addItem("Nghỉ thai sản", "2")
+        self.cbo_employment_status.addItem("Đã nghỉ việc", "3")
         self.cbo_employment_status.setCurrentIndex(0)
 
         self.btn_refresh = QPushButton("Làm mới")
@@ -184,11 +184,11 @@ class EmployeeListDialog(QDialog):
             default_name = "Danh sách nhân viên.xlsx"
             initial = str(Path(get_last_save_dir()) / default_name)
             file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Xuất danh sách nhân viên",
+                self,
+                "Xuất danh sách nhân viên",
                 initial,
-            "Excel (*.xlsx)",
-        )
+                "Excel (*.xlsx)",
+            )
         if not file_path:
             return
             try:

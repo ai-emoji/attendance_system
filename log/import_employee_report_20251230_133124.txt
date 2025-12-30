@@ -1,0 +1,169 @@
+Tổng: 167 | Thành công: 167 | Thêm mới: 156 | Cập nhật: 11 | Bỏ qua: 0 | Lỗi dữ liệu: 0 | Thất bại: 0
+
+1	SUCCESS	INSERT	00163	Vương Quang Huy	Đã thêm
+2	SUCCESS	INSERT	00124	Nguyễn Đắc Kiên	Đã thêm
+3	SUCCESS	INSERT	00096	Đồng Văn Văn	Đã thêm
+4	SUCCESS	INSERT	00085	Phí Thị Duyên	Đã thêm
+5	SUCCESS	INSERT	00227	Nguyễn Bảo Toàn	Đã thêm
+6	SUCCESS	UPDATE	00106	Cấn Thị Phương	Đã cập nhật (ghi đè)
+7	SUCCESS	INSERT	00057	Hoàng Thị Mai	Đã thêm
+8	SUCCESS	INSERT	00097	Nguyễn Văn Huy	Đã thêm
+9	SUCCESS	INSERT	00116	Dương Hồng Thúy	Đã thêm
+10	SUCCESS	INSERT	00080	Hoàng Tiến Đạt	Đã thêm
+11	SUCCESS	INSERT	00084	Bùi Văn Nghĩa	Đã thêm
+12	SUCCESS	INSERT	00068	Ngô Thị Huyền	Đã thêm
+13	SUCCESS	INSERT	00024	Đỗ Năng Trang	Đã thêm
+14	SUCCESS	INSERT	00256	Lưu Thị Minh Phương	Đã thêm
+15	SUCCESS	INSERT	00028	Nguyễn Thị Hà	Đã thêm
+16	SUCCESS	INSERT	00112	Nguyễn Đạt Công	Đã thêm
+17	SUCCESS	INSERT	00099	Khuất Văn Hương	Đã thêm
+18	SUCCESS	INSERT	00016	Nguyễn Thị Thảo	Đã thêm
+19	SUCCESS	INSERT	00133	Kiều Thị Liên	Đã thêm
+20	SUCCESS	INSERT	00131	Kiều Thị Hoàn	Đã thêm
+21	SUCCESS	INSERT	00055	Đỗ Thị Nga	Đã thêm
+22	SUCCESS	INSERT	00236	Nguyễn Thị Thủy	Đã thêm
+23	SUCCESS	INSERT	00081	Bùi Tiến Vũ	Đã thêm
+24	SUCCESS	INSERT	00206	Nguyễn Thị Sâm	Đã thêm
+25	SUCCESS	INSERT	00003	Nguyễn Gia Phong	Đã thêm
+26	SUCCESS	INSERT	00123	Hoàng Quốc Việt	Đã thêm
+27	SUCCESS	INSERT	00148	Nguyễn Thị Huyền	Đã thêm
+28	SUCCESS	INSERT	00157	Nguyễn Đức Long	Đã thêm
+29	SUCCESS	INSERT	00087	Vi Thị Mơ	Đã thêm
+30	SUCCESS	INSERT	00107	Lê Thị Trang	Đã thêm
+31	SUCCESS	UPDATE	00004	Đỗ Quốc Bảo	Đã cập nhật (ghi đè)
+32	SUCCESS	INSERT	00089	Phí Thị Tú Mai	Đã thêm
+33	SUCCESS	INSERT	00151	Nguyễn Văn Dũng	Đã thêm
+34	SUCCESS	INSERT	00177	Lương Anh Tuấn	Đã thêm
+35	SUCCESS	INSERT	00017	Lê Sỹ Khải	Đã thêm
+36	SUCCESS	UPDATE	00110	Nguyễn Tài Hải Long	Đã cập nhật (ghi đè)
+37	SUCCESS	INSERT	00031	Nguyễn Thanh Trà	Đã thêm
+38	SUCCESS	UPDATE	00218	Phạm Thị Nguyệt	Đã cập nhật (ghi đè)
+39	SUCCESS	UPDATE	00171	Nguyễn Thanh Thùy	Đã cập nhật (ghi đè)
+40	SUCCESS	INSERT	00180	Đoàn Trung Kiên	Đã thêm
+41	SUCCESS	INSERT	00169	Vũ Thị Nhung	Đã thêm
+42	SUCCESS	INSERT	00022	Hoàng Văn Thành	Đã thêm
+43	SUCCESS	INSERT	00127	Vũ Văn Dương	Đã thêm
+44	SUCCESS	UPDATE	00139	Lưu Thị Diệp	Đã cập nhật (ghi đè)
+45	SUCCESS	INSERT	00079	Trần Văn Khanh	Đã thêm
+46	SUCCESS	INSERT	00189	Nguyễn Thị Châu Loan	Đã thêm
+47	SUCCESS	INSERT	00135	Dương Thị Nụ	Đã thêm
+48	SUCCESS	INSERT	00162	Kiều Thị Hà	Đã thêm
+49	SUCCESS	INSERT	00001	Phạm Văn Tuyên	Đã thêm
+50	SUCCESS	INSERT	00072	Nguyễn Đình Trịnh	Đã thêm
+51	SUCCESS	INSERT	00136	Phùng Thị Thu	Đã thêm
+52	SUCCESS	INSERT	00074	Đinh Việt Anh	Đã thêm
+53	SUCCESS	INSERT	00229	Nguyễn Đình Nguyên	Đã thêm
+54	SUCCESS	INSERT	00190	Nguyễn Văn Phương	Đã thêm
+55	SUCCESS	INSERT	00129	Trần Văn Thắng	Đã thêm
+56	SUCCESS	INSERT	00155	Kiều Thị Thanh Thúy	Đã thêm
+57	SUCCESS	INSERT	00035	Tạ Thị Thúy	Đã thêm
+58	SUCCESS	INSERT	00179	Nguyễn Quang Luyến	Đã thêm
+59	SUCCESS	INSERT	00019	Hoàng Đăng Đức Việt	Đã thêm
+60	SUCCESS	INSERT	00098	Nguyễn Duy Biên	Đã thêm
+61	SUCCESS	INSERT	00187	Nguyễn Thị Yến	Đã thêm
+62	SUCCESS	INSERT	00193	Bùi Duy Nam	Đã thêm
+63	SUCCESS	INSERT	00167	Hà Tuyết Nhung	Đã thêm
+64	SUCCESS	INSERT	00095	Hoàng Đăng Ân	Đã thêm
+65	SUCCESS	INSERT	00050	Nguyễn Duy Vinh	Đã thêm
+66	SUCCESS	INSERT	00039	Nguyễn Danh Thu	Đã thêm
+67	SUCCESS	INSERT	00117	Nguyễn Thị Thu Hiền	Đã thêm
+68	SUCCESS	INSERT	00142	Trần Thị Hồng Hạnh	Đã thêm
+69	SUCCESS	INSERT	00049	Nguyễn Thị Phượng	Đã thêm
+70	SUCCESS	INSERT	00048	Đào Thị Phương	Đã thêm
+71	SUCCESS	INSERT	00260	Kiều Thế Bảo	Đã thêm
+72	SUCCESS	INSERT	00090	Vũ Tuấn Dũng	Đã thêm
+73	SUCCESS	INSERT	00195	Nguyễn Bá Hải	Đã thêm
+74	SUCCESS	INSERT	00046	Nguyễn Thị Phượng	Đã thêm
+75	SUCCESS	INSERT	00111	Sìn Thị Huyền	Đã thêm
+76	SUCCESS	UPDATE	00185	Khuất Thị Hằng	Đã cập nhật (ghi đè)
+77	SUCCESS	INSERT	00073	Nguyễn Xuân Hiệu	Đã thêm
+78	SUCCESS	INSERT	00045	Vũ Thị Lan	Đã thêm
+79	SUCCESS	INSERT	00144	Đỗ Thị Thúy Vân	Đã thêm
+80	SUCCESS	INSERT	00164	Đỗ Thị Hải	Đã thêm
+81	SUCCESS	INSERT	00244	Phạm Thị Hằng	Đã thêm
+82	SUCCESS	INSERT	00254	Nguyễn Thành Chung	Đã thêm
+83	SUCCESS	INSERT	00070	Phạm Thị Đông	Đã thêm
+84	SUCCESS	INSERT	00262	Vũ Thị Thu Huyền	Đã thêm
+85	SUCCESS	INSERT	00245	Nguyễn Danh Thư	Đã thêm
+86	SUCCESS	INSERT	00226	Đỗ Văn Huyên	Đã thêm
+87	SUCCESS	INSERT	00269	Nguyễn Văn Nam	Đã thêm
+88	SUCCESS	INSERT	00076	Nguyễn Thị Xuân	Đã thêm
+89	SUCCESS	INSERT	00265	Tào Thị Thìn	Đã thêm
+90	SUCCESS	INSERT	00026	Nguyễn Thị Thu Hằng	Đã thêm
+91	SUCCESS	INSERT	00220	Hoàng Ngọc Quỳnh	Đã thêm
+92	SUCCESS	INSERT	00145	Chu Anh Tú	Đã thêm
+93	SUCCESS	INSERT	00086	Hà Vân Anh	Đã thêm
+94	SUCCESS	INSERT	00232	Phạm Thái Bảo Việt	Đã thêm
+95	SUCCESS	UPDATE	00239	Nguyễn Phú Thức	Đã cập nhật (ghi đè)
+96	SUCCESS	INSERT	00231	Bạch Thị Uyên	Đã thêm
+97	SUCCESS	INSERT	00268	Phùng Gia Bảo	Đã thêm
+98	SUCCESS	INSERT	00219	Phí Thị Thành	Đã thêm
+99	SUCCESS	INSERT	00119	Đỗ Thị Huyền	Đã thêm
+100	SUCCESS	INSERT	00159	Nguyễn Thị Luận	Đã thêm
+101	SUCCESS	INSERT	00053	Nguyễn Thị Trang KD	Đã thêm
+102	SUCCESS	INSERT	00270	Bùi Văn Chư	Đã thêm
+103	SUCCESS	INSERT	00273	Phan Thị Thanh Thủy	Đã thêm
+104	SUCCESS	INSERT	00277	Nguyễn Thị Nhung TB	Đã thêm
+105	SUCCESS	UPDATE	00075	Hoàng Thị Mai Thi	Đã cập nhật (ghi đè)
+106	SUCCESS	INSERT	00065	Nguyễn Duy Tú	Đã thêm
+107	SUCCESS	INSERT	00224	Nguyễn Thị Vân	Đã thêm
+108	SUCCESS	INSERT	00250	Nguyễn Gia Thái	Đã thêm
+109	SUCCESS	INSERT	00205	Nguyễn Đắc Chỉnh	Đã thêm
+110	SUCCESS	INSERT	00282	Nguyễn Tiến Hường	Đã thêm
+111	SUCCESS	INSERT	00233	Phí Đình Trung	Đã thêm
+112	SUCCESS	UPDATE	00092	Nguyễn Đình Phương	Đã cập nhật (ghi đè)
+113	SUCCESS	INSERT	00052	Bùi Thị Hiền	Đã thêm
+114	SUCCESS	INSERT	00285	Nguyễn Thị Ngọc Mai	Đã thêm
+115	SUCCESS	INSERT	00008	Đỗ Thị Lân	Đã thêm
+116	SUCCESS	INSERT	00138	Tăng Đình Hoàng	Đã thêm
+117	SUCCESS	INSERT	00297	Nguyễn Thị Thùy Linh KH	Đã thêm
+118	SUCCESS	INSERT	00038	Nguyễn Văn Quý	Đã thêm
+119	SUCCESS	INSERT	00290	Nguyễn Thành Luân	Đã thêm
+120	SUCCESS	INSERT	00289	Phạm Thị Thùy Linh	Đã thêm
+121	SUCCESS	INSERT	00184	Vũ Thị Thực	Đã thêm
+122	SUCCESS	INSERT	00192	Nguyễn Thị Mai Thư	Đã thêm
+123	SUCCESS	INSERT	00303	Nguyễn Đức Thọ	Đã thêm
+124	SUCCESS	INSERT	00247	Thân Thị Thu	Đã thêm
+125	SUCCESS	INSERT	00305	Kiều Cao Tuyến	Đã thêm
+126	SUCCESS	INSERT	00009	Nguyễn Hữu Sam	Đã thêm
+127	SUCCESS	INSERT	00308	Nguyễn Thị Huệ (dệt)	Đã thêm
+128	SUCCESS	INSERT	00199	Nguyễn Thị Oanh	Đã thêm
+129	SUCCESS	INSERT	00275	Vũ Thị Lan Phương	Đã thêm
+130	SUCCESS	INSERT	00320	Nguyễn Thị Thu Hiền KH	Đã thêm
+131	SUCCESS	INSERT	00196	Trần Văn Hưng	Đã thêm
+132	SUCCESS	INSERT	00249	Nguyễn Thị Bích Liên	Đã thêm
+133	SUCCESS	INSERT	00102	Đỗ Thị Quyên	Đã thêm
+134	SUCCESS	INSERT	00174	Nguyễn Thị Huyền 95	Đã thêm
+135	SUCCESS	INSERT	00321	Kiều Đình Việt	Đã thêm
+136	SUCCESS	INSERT	00294	Bùi Thị Lan	Đã thêm
+137	SUCCESS	INSERT	00114	Đào Ngọc Tuyên	Đã thêm
+138	SUCCESS	INSERT	00047	Ngô Thị Hà	Đã thêm
+139	SUCCESS	INSERT	00296	Tạ Thị Huyền Trang	Đã thêm
+140	SUCCESS	INSERT	00330	Vương Thành Đông	Đã thêm
+141	SUCCESS	INSERT	00132	Hà Thị Nhung	Đã thêm
+142	SUCCESS	INSERT	00272	Nguyễn Trọng Hòa	Đã thêm
+143	SUCCESS	INSERT	00143	Nguyễn Thị Lan Trang	Đã thêm
+144	SUCCESS	INSERT	00326	Bùi Đức Huy	Đã thêm
+145	SUCCESS	INSERT	00082	Bùi Văn Thông	Đã thêm
+146	SUCCESS	INSERT	00318	Phạm Hoàng Sơn	Đã thêm
+147	SUCCESS	INSERT	00341	Trần Thị Sen	Đã thêm
+148	SUCCESS	INSERT	00329	Lê Thị Xuyến	Đã thêm
+149	SUCCESS	INSERT	00309	Nguyễn Thị Tâm	Đã thêm
+150	SUCCESS	INSERT	00280	Hoàng Thị Vân Anh	Đã thêm
+151	SUCCESS	INSERT	00154	Đôn Thị Tuyết	Đã thêm
+152	SUCCESS	INSERT	00350	Nguyễn Thị Mai	Đã thêm
+153	SUCCESS	INSERT	00336	Đào Quang Minh	Đã thêm
+154	SUCCESS	INSERT	00349	Nguyễn Thị Phương	Đã thêm
+155	SUCCESS	INSERT	00101	Nguyễn Thị Nga KH	Đã thêm
+156	SUCCESS	INSERT	00335	Trần Quỳnh Trang	Đã thêm
+157	SUCCESS	INSERT	00118	Nguyễn Thị Minh	Đã thêm
+158	SUCCESS	INSERT	00109	Đinh Văn Phú	Đã thêm
+159	SUCCESS	INSERT	00339	Nguyễn Văn Chuyên	Đã thêm
+160	SUCCESS	UPDATE	00042	Dương Công Phúc	Đã cập nhật (ghi đè)
+161	SUCCESS	INSERT	00322	Dương Ngọc Hồng	Đã thêm
+162	SUCCESS	INSERT	00368	Đỗ Quang Tùng	Đã thêm
+163	SUCCESS	INSERT	00304	Nguyễn Thị Quỳnh	Đã thêm
+164	SUCCESS	INSERT	00358	Lường Văn Thắng	Đã thêm
+165	SUCCESS	INSERT	00344	Đỗ Thị Hạnh	Đã thêm
+166	SUCCESS	INSERT	00323	Kiều Thị Thực	Đã thêm
+167	SUCCESS	INSERT	00367	Trần Thị Thêu	Đã thêm

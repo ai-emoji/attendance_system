@@ -33,6 +33,9 @@ class DeviceController:
 
         self._selected_device_id: int | None = None
         self._runner = BackgroundTaskRunner(self._parent_window, name="device_refresh")
+        self._connect_runner = BackgroundTaskRunner(
+            self._parent_window, name="device_connect"
+        )
 
     def bind(self) -> None:
         self._title_bar2.refresh_clicked.connect(self.on_refresh)
@@ -161,23 +164,81 @@ class DeviceController:
         except Exception:
             port = int(self._service.DEFAULT_PORT)
 
-        ok, msg = self._service.connect_device(
-            device_type=device_type,
-            device_name=device_name,
-            ip=ip_address,
-            port=port,
-            password=password,
-        )
+        # Chạy connect ở background để không freeze UI (kết nối có thể timeout vài giây).
+        try:
+            if hasattr(self._content, "set_connection_status"):
+                self._content.set_connection_status("Đang kết nối...", ok=None)
+        except Exception:
+            pass
 
-        if hasattr(self._content, "set_connection_status"):
-            self._content.set_connection_status(
-                "Kết nối thành công" if ok else "Kết nối thất bại",
-                ok=ok,
+        try:
+            if hasattr(self._content, "btn_connect"):
+                self._content.btn_connect.setEnabled(False)
+        except Exception:
+            pass
+
+        def _fn() -> object:
+            try:
+                return self._service.connect_device(
+                    device_type=device_type,
+                    device_name=device_name,
+                    ip=ip_address,
+                    port=port,
+                    password=password,
+                )
+            except Exception as exc:
+                logger.exception("Kết nối thiết bị thất bại")
+                return False, f"Không thể kết nối: {exc}"
+
+        def _ok(result: object) -> None:
+            try:
+                ok, msg = (
+                    tuple(result) if isinstance(result, (tuple, list)) else (False, "")
+                )
+            except Exception:
+                ok, msg = False, ""
+
+            if hasattr(self._content, "set_connection_status"):
+                try:
+                    self._content.set_connection_status(
+                        "Kết nối thành công" if ok else "Kết nối thất bại",
+                        ok=bool(ok),
+                    )
+                except Exception:
+                    pass
+
+            if not ok:
+                MessageDialog.info(
+                    self._parent_window,
+                    "Không thể kết nối",
+                    str(msg or "Không thể kết nối thiết bị."),
+                )
+
+            try:
+                if hasattr(self._content, "btn_connect"):
+                    self._content.btn_connect.setEnabled(True)
+            except Exception:
+                pass
+
+        def _err(_msg: str) -> None:
+            logger.exception("Không thể chạy tác vụ kết nối thiết bị")
+            try:
+                if hasattr(self._content, "set_connection_status"):
+                    self._content.set_connection_status("Kết nối thất bại", ok=False)
+            except Exception:
+                pass
+            try:
+                if hasattr(self._content, "btn_connect"):
+                    self._content.btn_connect.setEnabled(True)
+            except Exception:
+                pass
+            MessageDialog.info(
+                self._parent_window,
+                "Không thể kết nối",
+                "Không thể kết nối thiết bị. Vui lòng thử lại.",
             )
 
-        if not ok:
-            # Hiển thị lý do (chi tiết) bằng dialog
-            MessageDialog.info(self._parent_window, "Không thể kết nối", msg)
+        self._connect_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=False)
 
     def on_delete(self) -> None:
         selected = self._content.get_selected_device()

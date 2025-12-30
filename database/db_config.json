@@ -1,6 +1,6 @@
 {
-  "host": "192.168.1.93",
-  "port": 3306,
+  "host": "192.168.1.64",
+  "port": 3307,
   "user": "duongphuc",
   "password": "duongphuc123",
   "database": "hr_attendance"

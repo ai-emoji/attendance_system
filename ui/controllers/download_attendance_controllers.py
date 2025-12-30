@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot, Qt
 from core.threads import BackgroundTaskRunner
@@ -137,6 +138,9 @@ class DownloadAttendanceController:
         self._table_runner = BackgroundTaskRunner(
             self._parent_window, name="download_attendance_table"
         )
+
+        # Context for per-download report file
+        self._download_report_ctx: dict | None = None
 
     def bind(self) -> None:
         self._title_bar2.download_clicked.connect(self.on_download)
@@ -345,6 +349,22 @@ class DownloadAttendanceController:
         # UI yêu cầu: chỉ hiển thị 3 trạng thái (kết nối / tải / lưu), không show chi tiết.
         # Vẫn giữ thanh loading nền (busy/indeterminate).
 
+        # Save context for per-download report file.
+        try:
+            self._download_report_ctx = {
+                "started_at": datetime.now(),
+                "device_id": int(device_id),
+                "device_name": (
+                    self._title_bar2.get_selected_device_name()
+                    if hasattr(self._title_bar2, "get_selected_device_name")
+                    else ""
+                ),
+                "from_date": d1,
+                "to_date": d2,
+            }
+        except Exception:
+            self._download_report_ctx = None
+
         # Loading dialog (shared UX)
         dlg = LoadingDialog(
             self._parent_window,
@@ -496,15 +516,35 @@ class DownloadAttendanceController:
                     pass
             return
 
-        # Busy-only: giữ thanh loading nền (indeterminate) và chỉ set message.
-        try:
-            dlg.set_indeterminate(True)
-        except Exception:
-            pass
-        try:
-            dlg.set_message(msg)
-        except Exception:
-            pass
+        # UI yêu cầu: chỉ hiển thị 3 trạng thái (kết nối/tải/lưu) và không show chi tiết.
+        # Tuy nhiên để tránh cảm giác "treo" khi lưu dữ liệu lớn, phase "save" dùng thanh tiến trình
+        # theo % (không hiển thị số đếm), còn connect/download vẫn là indeterminate.
+        if phase == "save" and int(total or 0) > 0:
+            try:
+                dlg.set_indeterminate(False)
+            except Exception:
+                pass
+            try:
+                p = int((max(0, int(done or 0)) / max(1, int(total))) * 100)
+            except Exception:
+                p = 0
+            try:
+                dlg.set_reported_progress(p, msg)
+            except Exception:
+                try:
+                    dlg.set_message(msg)
+                except Exception:
+                    pass
+        else:
+            # Busy-only for connect/download (device calls may block with no granular progress).
+            try:
+                dlg.set_indeterminate(True)
+            except Exception:
+                pass
+            try:
+                dlg.set_message(msg)
+            except Exception:
+                pass
 
         # Khi connect có thể bị block, vẫn giữ timer để tránh cảm giác treo;
         # timer chỉ cập nhật message (không progress chi tiết).
@@ -542,6 +582,9 @@ class DownloadAttendanceController:
             pass
 
     def _on_worker_finished_ui(self, ok: bool, msg: str, _count: int) -> None:
+        # Always write a per-download report file (best-effort)
+        self._write_download_report(best_effort_ok=bool(ok), message=str(msg or ""))
+
         if (
             self._progress_update_timer is not None
             and self._progress_update_timer.isActive()
@@ -615,3 +658,53 @@ class DownloadAttendanceController:
         # cleanup refs
         self._worker = None
         self._thread = None
+
+        # Clear report context after finishing
+        self._download_report_ctx = None
+
+    def _write_download_report(self, *, best_effort_ok: bool, message: str) -> None:
+        """Write one report file under log/ for each download attempt (best-effort)."""
+
+        ctx = self._download_report_ctx or {}
+        try:
+            log_dir = Path("log")
+            log_dir.mkdir(parents=True, exist_ok=True)
+
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_path = log_dir / f"download_attendance_report_{ts}.txt"
+
+            started_at = ctx.get("started_at")
+            if isinstance(started_at, datetime):
+                started_s = started_at.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                started_s = ""
+
+            device_id = ctx.get("device_id")
+            device_name = str(ctx.get("device_name") or "").strip()
+            from_date = ctx.get("from_date")
+            to_date = ctx.get("to_date")
+
+            with report_path.open("w", encoding="utf-8") as f:
+                f.write("DOWNLOAD ATTENDANCE REPORT\n")
+                f.write(f"created_at\t{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                if started_s:
+                    f.write(f"started_at\t{started_s}\n")
+                f.write(f"ok\t{int(1 if best_effort_ok else 0)}\n")
+                if device_id is not None:
+                    try:
+                        f.write(f"device_id\t{int(device_id)}\n")
+                    except Exception:
+                        f.write(f"device_id\t{device_id}\n")
+                if device_name:
+                    f.write(f"device_name\t{device_name}\n")
+                if from_date is not None:
+                    f.write(f"from_date\t{from_date}\n")
+                if to_date is not None:
+                    f.write(f"to_date\t{to_date}\n")
+                f.write("\n")
+                f.write("message\n")
+                f.write((message or "").strip() + "\n")
+
+            logger.info("Đã ghi báo cáo tải dữ liệu chấm công: %s", str(report_path))
+        except Exception:
+            logger.exception("Không thể ghi file báo cáo tải dữ liệu chấm công")

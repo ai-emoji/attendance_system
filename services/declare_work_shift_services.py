@@ -204,6 +204,24 @@ class DeclareWorkShiftService:
             return False, "Vui lòng chọn dòng cần xóa."
 
         try:
+            usage = self._repo.get_work_shift_usage_counts(int(shift_id))
+            total_used = 0
+            try:
+                total_used = int(sum(int(v or 0) for v in (usage or {}).values()))
+            except Exception:
+                total_used = 0
+
+            if total_used > 0:
+                return (
+                    False,
+                    f"Ca làm việc đang được sử dụng ({total_used} tham chiếu), không thể xóa.",
+                )
+        except Exception:
+            # Nếu không kiểm tra được (lỗi DB), không nên xóa để tránh mất dữ liệu.
+            logger.exception("Không thể kiểm tra ca làm việc đang được sử dụng")
+            return False, "Không thể kiểm tra ca đang được sử dụng. Vui lòng thử lại."
+
+        try:
             affected = self._repo.delete_work_shift(int(shift_id))
             if affected <= 0:
                 return False, "Không tìm thấy dòng cần xóa."

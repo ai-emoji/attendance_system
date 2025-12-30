@@ -81,6 +81,7 @@ _SHIFT_ATTENDANCE_MC2_CACHE: dict[str, Any] = {
     "title_id": None,
     "employee_ids": None,
     "attendance_codes": None,
+    "employment_status": None,
     "show_seconds": None,
 }
 
@@ -1884,17 +1885,24 @@ class ShiftAttendanceController:
         if self._content2 is None:
             return
 
+        try:
+            cb = getattr(self._content1, "cbo_employment_status", None)
+            employment_status = cb.currentData() if cb is not None else None
+        except Exception:
+            employment_status = None
+
         from_date, to_date = self._current_date_range()
         try:
             self._audit_last_query = {
                 "from_date": from_date,
                 "to_date": to_date,
                 "employee_ids": list(employee_ids or []) if employee_ids else None,
-                "attendance_codes": list(attendance_codes or [])
-                if attendance_codes
-                else None,
+                "attendance_codes": (
+                    list(attendance_codes or []) if attendance_codes else None
+                ),
                 "department_id": department_id,
                 "title_id": title_id,
+                "employment_status": employment_status,
                 "mode": str(self._audit_mode or ""),
             }
         except Exception:
@@ -1907,6 +1915,7 @@ class ShiftAttendanceController:
                 attendance_codes=attendance_codes,
                 department_id=department_id,
                 title_id=title_id,
+                employment_status=employment_status,
             )
             self._render_audit_table(rows)
         except Exception:
@@ -1934,6 +1943,12 @@ class ShiftAttendanceController:
         if self._content2 is None:
             return
 
+        try:
+            cb = getattr(self._content1, "cbo_employment_status", None)
+            employment_status = cb.currentData() if cb is not None else None
+        except Exception:
+            employment_status = None
+
         from_date, to_date = self._current_date_range()
 
         # Remember query meta for runtime cache.
@@ -1942,11 +1957,12 @@ class ShiftAttendanceController:
                 "from_date": from_date,
                 "to_date": to_date,
                 "employee_ids": list(employee_ids or []) if employee_ids else None,
-                "attendance_codes": list(attendance_codes or [])
-                if attendance_codes
-                else None,
+                "attendance_codes": (
+                    list(attendance_codes or []) if attendance_codes else None
+                ),
                 "department_id": department_id,
                 "title_id": title_id,
+                "employment_status": employment_status,
                 "mode": str(self._audit_mode or ""),
             }
         except Exception:
@@ -1996,6 +2012,7 @@ class ShiftAttendanceController:
             attendance_codes=attendance_codes,
             department_id=department_id,
             title_id=title_id,
+            employment_status=employment_status,
             enable_progress=False,
         )
         worker.moveToThread(thread)
@@ -2087,6 +2104,7 @@ class ShiftAttendanceController:
             attendance_codes: list[str] | None,
             department_id: int | None,
             title_id: int | None,
+            employment_status: str | None,
             enable_progress: bool = True,
         ) -> None:
             super().__init__()
@@ -2097,6 +2115,7 @@ class ShiftAttendanceController:
             self._attendance_codes = attendance_codes
             self._department_id = department_id
             self._title_id = title_id
+            self._employment_status = employment_status
             self._enable_progress = bool(enable_progress)
             self._cancelled = False
 
@@ -2135,6 +2154,7 @@ class ShiftAttendanceController:
                     attendance_codes=self._attendance_codes,
                     department_id=self._department_id,
                     title_id=self._title_id,
+                    employment_status=self._employment_status,
                     progress_cb=progress_cb,
                     progress_items_cb=progress_items_cb,
                     cancel_cb=self._is_cancelled,
@@ -2165,6 +2185,12 @@ class ShiftAttendanceController:
     ) -> None:
         if self._content2 is None:
             return
+
+        try:
+            cb = getattr(self._content1, "cbo_employment_status", None)
+            employment_status = cb.currentData() if cb is not None else None
+        except Exception:
+            employment_status = None
 
         from_date, to_date = self._current_date_range()
 
@@ -2239,6 +2265,7 @@ class ShiftAttendanceController:
             attendance_codes=attendance_codes,
             department_id=department_id,
             title_id=title_id,
+            employment_status=employment_status,
             enable_progress=False,
         )
         worker.moveToThread(thread)
@@ -2463,6 +2490,16 @@ class ShiftAttendanceController:
             filters["search_by"] = None
             filters["search_text"] = None
 
+        # Employment status filter (stored as string codes: '1'/'2'/'3')
+        try:
+            cb_status = getattr(self._content1, "cbo_employment_status", None)
+            if _qt_alive(cb_status):
+                v = cb_status.currentData()
+                s = str(v or "").strip()
+                filters["employment_status"] = s or None
+        except Exception:
+            pass
+
         return filters
 
     def _reset_fields(self, *, clear_table: bool) -> None:
@@ -2477,6 +2514,14 @@ class ShiftAttendanceController:
             pass
         try:
             self._content1.inp_search_text.setText("")
+        except Exception:
+            pass
+
+        # Reset employment status filter (default: Đi làm)
+        try:
+            cb_status = getattr(self._content1, "cbo_employment_status", None)
+            if _qt_alive(cb_status):
+                cb_status.setCurrentIndex(0)
         except Exception:
             pass
 
@@ -3027,6 +3072,12 @@ class ShiftAttendanceController:
             search_text = ""
 
         try:
+            cb_status = getattr(self._content1, "cbo_employment_status", None)
+            status = cb_status.currentData() if _qt_alive(cb_status) else None
+        except Exception:
+            status = None
+
+        try:
             df = self._content1.date_from.date().toString("yyyy-MM-dd")
         except Exception:
             df = ""
@@ -3040,6 +3091,7 @@ class ShiftAttendanceController:
             f"title={_norm(title)}",
             f"by={_norm(search_by)}",
             f"q={_norm(search_text)}",
+            f"status={_norm(status)}",
             f"from={_norm(df)}",
             f"to={_norm(dt)}",
         ]
@@ -3066,7 +3118,9 @@ class ShiftAttendanceController:
 
         self._render_main_table_chunked(
             list(rows),
-            schedule_map=(dict(schedule_map or {}) if isinstance(schedule_map, dict) else {}),
+            schedule_map=(
+                dict(schedule_map or {}) if isinstance(schedule_map, dict) else {}
+            ),
             cache_key=str(key),
         )
         return True
@@ -4098,19 +4152,13 @@ class ShiftAttendanceController:
 
                             if key == "late" and txt:
                                 try:
-                                    if (
-                                        late_symbol2
-                                        and late_symbol2 not in txt
-                                    ):
+                                    if late_symbol2 and late_symbol2 not in txt:
                                         txt = f"{txt} {late_symbol2}".strip()
                                 except Exception:
                                     pass
                             if key == "early" and txt:
                                 try:
-                                    if (
-                                        early_symbol2
-                                        and early_symbol2 not in txt
-                                    ):
+                                    if early_symbol2 and early_symbol2 not in txt:
                                         txt = f"{txt} {early_symbol2}".strip()
                                 except Exception:
                                     pass
@@ -4210,6 +4258,7 @@ class ShiftAttendanceController:
         _SHIFT_ATTENDANCE_MC2_CACHE["title_id"] = None
         _SHIFT_ATTENDANCE_MC2_CACHE["employee_ids"] = None
         _SHIFT_ATTENDANCE_MC2_CACHE["attendance_codes"] = None
+        _SHIFT_ATTENDANCE_MC2_CACHE["employment_status"] = None
         _SHIFT_ATTENDANCE_MC2_CACHE["show_seconds"] = None
 
     def _cache_mc2_runtime(self, rows: list[dict[str, Any]]) -> None:
@@ -4251,6 +4300,9 @@ class ShiftAttendanceController:
         _SHIFT_ATTENDANCE_MC2_CACHE["attendance_codes"] = (
             meta.get("attendance_codes") if isinstance(meta, dict) else None
         )
+        _SHIFT_ATTENDANCE_MC2_CACHE["employment_status"] = (
+            meta.get("employment_status") if isinstance(meta, dict) else None
+        )
         _SHIFT_ATTENDANCE_MC2_CACHE["show_seconds"] = bool(show_seconds)
 
         # Store rows (copy) to keep stable snapshot.
@@ -4271,6 +4323,16 @@ class ShiftAttendanceController:
         if str(cached_from or "") != str(cur_from or ""):
             return False
         if str(cached_to or "") != str(cur_to or ""):
+            return False
+
+        # Only restore when employment-status filter matches current UI.
+        try:
+            cb = getattr(self._content1, "cbo_employment_status", None)
+            cur_status = cb.currentData() if cb is not None else None
+        except Exception:
+            cur_status = None
+        cached_status = _SHIFT_ATTENDANCE_MC2_CACHE.get("employment_status")
+        if str(cached_status or "") != str(cur_status or ""):
             return False
 
         # Restore time display mode (HH:MM vs HH:MM:SS) before rendering.

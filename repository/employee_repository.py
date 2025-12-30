@@ -79,6 +79,48 @@ class EmployeeRepository:
                     EmployeeRepository._has_mcc_code = True
                     EmployeeRepository._has_name_on_mcc = True
                     EmployeeRepository._has_employment_status = True
+
+                # Best-effort migration: convert legacy text values to numeric codes.
+                if EmployeeRepository._has_employment_status:
+                    try:
+                        curm = Database.get_cursor(conn, dictionary=False)
+
+                        # Normalize blanks/placeholder to NULL
+                        curm.execute(
+                            "UPDATE employees SET employment_status = NULL "
+                            "WHERE employment_status IS NOT NULL AND TRIM(employment_status) IN (%s, %s, %s, %s, %s)",
+                            ("", "0", "Chưa chọn", "chua chon", "None"),
+                        )
+
+                        # Đi làm -> 1
+                        curm.execute(
+                            "UPDATE employees SET employment_status = '1' "
+                            "WHERE employment_status IS NOT NULL AND LOWER(TRIM(employment_status)) IN ("
+                            "'đi làm','di lam','đang làm','dang lam','working'"
+                            ")",
+                        )
+
+                        # Nghỉ thai sản -> 2
+                        curm.execute(
+                            "UPDATE employees SET employment_status = '2' "
+                            "WHERE employment_status IS NOT NULL AND LOWER(TRIM(employment_status)) IN ("
+                            "'nghỉ thai sản','nghi thai san','thai sản','thai san','maternity','maternity leave',"
+                            "'nghỉ thai sải','nghi thai sai'"
+                            ")",
+                        )
+
+                        # Đã nghỉ việc -> 3
+                        curm.execute(
+                            "UPDATE employees SET employment_status = '3' "
+                            "WHERE employment_status IS NOT NULL AND LOWER(TRIM(employment_status)) IN ("
+                            "'đã nghỉ việc','da nghi viec','nghỉ việc','nghi viec','resigned','quit'"
+                            ")",
+                        )
+
+                        conn.commit()
+                    except Exception:
+                        # Do not break the app if the DB user lacks UPDATE permission.
+                        pass
         except Exception:
             # If the DB user lacks INFORMATION_SCHEMA/ALTER permissions, keep the app usable.
             EmployeeRepository._has_contract1_term = False
@@ -1003,8 +1045,17 @@ class EmployeeRepository:
             params.append(int(sort_order))
 
         if EmployeeRepository._has_employment_status and employment_status:
-            where.append("e.employment_status = %s")
-            params.append(str(employment_status).strip())
+            st = str(employment_status).strip()
+            # Practical default: treat NULL/blank status as "Đi làm".
+            # This avoids hiding employees whose status was never set.
+            if st == "1":
+                where.append(
+                    "(e.employment_status = %s OR e.employment_status IS NULL OR TRIM(e.employment_status) = '')"
+                )
+                params.append("1")
+            else:
+                where.append("e.employment_status = %s")
+                params.append(st)
 
         if department_id:
             where.append("e.department_id = %s")

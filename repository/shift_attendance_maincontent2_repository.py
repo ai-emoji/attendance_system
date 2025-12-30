@@ -792,6 +792,7 @@ class ShiftAttendanceMainContent2Repository:
         attendance_codes: list[str] | None = None,
         department_id: int | None = None,
         title_id: int | None = None,
+        employment_status: str | None = None,
     ) -> list[dict[str, Any]]:
         where: list[str] = []
         params: list[Any] = []
@@ -858,6 +859,19 @@ class ShiftAttendanceMainContent2Repository:
         if title_id is not None:
             where.append("e.title_id = %s")
             params.append(int(title_id))
+
+        # Employment status filter (codes: '1'/'2'/'3')
+        st = str(employment_status or "").strip()
+        if st:
+            if st == "1":
+                # Practical default: treat NULL/blank (or unmatched employee join) as "Đi làm".
+                where.append(
+                    "(e.employment_status = %s OR e.employment_status IS NULL OR TRIM(e.employment_status) = '')"
+                )
+                params.append("1")
+            else:
+                where.append("e.employment_status = %s")
+                params.append(st)
 
         where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 

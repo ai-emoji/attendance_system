@@ -1669,6 +1669,7 @@ class ShiftAttendanceMainContent2Service:
         attendance_codes: list[str] | None = None,
         department_id: int | None = None,
         title_id: int | None = None,
+        employment_status: str | None = None,
         progress_cb: callable[[int, str], None] | None = None,
         progress_items_cb: callable[[int, int, str], None] | None = None,
         cancel_cb: callable[[], bool] | None = None,
@@ -1711,6 +1712,7 @@ class ShiftAttendanceMainContent2Service:
             attendance_codes=attendance_codes,
             department_id=department_id,
             title_id=title_id,
+            employment_status=employment_status,
         )
 
         _progress(12, "Đang tổng hợp dữ liệu...")
@@ -2326,7 +2328,9 @@ class ShiftAttendanceMainContent2Service:
                             code0 = ""
                             if matched0:
                                 code0 = str(matched0[0].get("shift_code") or "").strip()
-                            code_norm = self._norm_text_no_diacritics(code0).replace("_", "")
+                            code_norm = self._norm_text_no_diacritics(code0).replace(
+                                "_", ""
+                            )
                             if code_norm in {"hc", "hanhchinh"}:
                                 allow_out_only_hc = True
                                 r["_allow_out_only_hc"] = True
@@ -2625,10 +2629,18 @@ class ShiftAttendanceMainContent2Service:
                                 if int(worked_m) <= 0:
                                     in1_sec = self._time_to_seconds(row0.get("in_1"))
                                     out1_sec = self._time_to_seconds(row0.get("out_1"))
-                                    if in1_sec is None and out1_sec is not None and matched0:
+                                    if (
+                                        in1_sec is None
+                                        and out1_sec is not None
+                                        and matched0
+                                    ):
                                         sh0 = matched0[0]
-                                        sh_in = self._time_to_seconds(sh0.get("time_in"))
-                                        sh_out = self._time_to_seconds(sh0.get("time_out"))
+                                        sh_in = self._time_to_seconds(
+                                            sh0.get("time_in")
+                                        )
+                                        sh_out = self._time_to_seconds(
+                                            sh0.get("time_out")
+                                        )
                                         if sh_in is not None and sh_out is not None:
                                             start = int(sh_in)
                                             end_sched = int(sh_out)
@@ -2640,7 +2652,9 @@ class ShiftAttendanceMainContent2Service:
                                                     end_punch += 86400
                                             if end_punch < start:
                                                 end_punch = start
-                                            worked_m = max(0, int(end_punch - start) // 60)
+                                            worked_m = max(
+                                                0, int(end_punch - start) // 60
+                                            )
                             except Exception:
                                 pass
 
@@ -2689,7 +2703,9 @@ class ShiftAttendanceMainContent2Service:
                                                     b += 86400
 
                                                 # overlap helpers
-                                                def _overlap(x0: int, x1: int, y0: int, y1: int) -> bool:
+                                                def _overlap(
+                                                    x0: int, x1: int, y0: int, y1: int
+                                                ) -> bool:
                                                     return max(x0, y0) < min(x1, y1)
 
                                                 if _overlap(a, b, start, l0):
@@ -2699,7 +2715,11 @@ class ShiftAttendanceMainContent2Service:
                                                 if _overlap(a, b, l0, l1):
                                                     overlap_lunch = True
 
-                                            if has_before and has_after and overlap_lunch:
+                                            if (
+                                                has_before
+                                                and has_after
+                                                and overlap_lunch
+                                            ):
                                                 lunch_deduct = int(lunch_m)
                                         except Exception:
                                             lunch_deduct = 0
@@ -2735,7 +2755,9 @@ class ShiftAttendanceMainContent2Service:
                             r, day_shifts=shifts
                         )
                         if int(m_minutes) > 0:
-                            exp_eff = _expected_work_minutes_for_row(r, day_shifts=shifts)
+                            exp_eff = _expected_work_minutes_for_row(
+                                r, day_shifts=shifts
+                            )
                             if int(exp_eff) > 0:
                                 m_minutes = int(exp_eff)
                             late_m = _to_minutes(r.get("late"))
@@ -2964,6 +2986,7 @@ class ShiftAttendanceMainContent2Service:
                                             attendance_codes=None,
                                             department_id=None,
                                             title_id=None,
+                                            employment_status=None,
                                         )
 
                                         for pr in prev_rows_db or []:

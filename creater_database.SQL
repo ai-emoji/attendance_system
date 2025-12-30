@@ -192,7 +192,10 @@
     -- Tải dữ liệu chấm công (tạm) + lưu thô
     -- =========================
 
-    -- attendance_raw: lưu dữ liệu chấm công thô (lưu lâu dài)
+    -- attendance_raw: BẢNG TEMPLATE (không lưu lâu dài).
+    -- Dữ liệu thô thực tế sẽ được lưu theo năm:
+    --   attendance_raw_YYYY (VD: attendance_raw_2025)
+    -- Ứng dụng sẽ tự tạo bảng theo năm khi cần (nếu user có quyền CREATE).
     -- Quy ước:
     -- - attendance_code: mã chấm công (user_id trên máy)
     -- - work_date: ngày chấm công
@@ -273,7 +276,12 @@
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-    -- attendance_audit: dữ liệu chấm công theo ca đã tổng hợp (dùng cho màn "Chấm công Theo ca" - MainContent2)
+    -- attendance_audit: BẢNG TEMPLATE (không lưu lâu dài).
+    -- Dữ liệu tổng hợp thực tế sẽ được lưu theo năm:
+    --   attendance_audit_YYYY (VD: attendance_audit_2025)
+    -- Ứng dụng sẽ tự tạo bảng theo năm khi cần (nếu user có quyền CREATE).
+    --
+    -- Dùng cho màn "Chấm công Theo ca" - MainContent2
     -- Ghi chú:
     -- - Đây là bảng lưu kết quả/tổng hợp để UI gọi lại từ DB
     -- - Nếu chưa có dữ liệu, UI sẽ hiển thị rỗng
@@ -334,6 +342,137 @@
         KEY idx_attendance_audit_employee_date (employee_id, work_date),
         KEY idx_attendance_audit_employee_code_date (employee_code, work_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+    -- =========================
+    -- Tạo bảng chấm công theo năm
+    -- =========================
+    -- Tạo 2 bảng theo năm dựa trên TEMPLATE:
+    -- - attendance_raw_YYYY
+    -- - attendance_audit_YYYY
+    -- Lưu ý: cần quyền CREATE TABLE.
+
+    DROP PROCEDURE IF EXISTS hr_attendance.sp_create_attendance_year_tables;
+    DELIMITER $$
+    CREATE PROCEDURE hr_attendance.sp_create_attendance_year_tables(IN p_year INT)
+    BEGIN
+        DECLARE v_has_work_date_idx INT DEFAULT 0;
+        DECLARE v_has_employee_date_idx INT DEFAULT 0;
+        SET @y := IFNULL(p_year, YEAR(CURDATE()));
+        SET @tbl_raw := CONCAT('hr_attendance.attendance_raw_', @y);
+        SET @tbl_audit := CONCAT('hr_attendance.attendance_audit_', @y);
+        SET @tbl_audit_name := CONCAT('attendance_audit_', @y);
+
+        SET @sql_raw := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_raw, ' LIKE hr_attendance.attendance_raw');
+        PREPARE stmt_raw FROM @sql_raw; EXECUTE stmt_raw; DEALLOCATE PREPARE stmt_raw;
+
+        SET @sql_audit := CONCAT('CREATE TABLE IF NOT EXISTS ', @tbl_audit, ' LIKE hr_attendance.attendance_audit');
+        PREPARE stmt_audit FROM @sql_audit; EXECUTE stmt_audit; DEALLOCATE PREPARE stmt_audit;
+
+        -- Ensure mandatory indexes for large datasets (80K -> 1M records)
+        -- Requirement (by columns):
+        --  - (work_date)
+        --  - (employee_id, work_date)
+        -- Note: Table created via LIKE already copies indexes, but this block
+        --       protects older DBs where yearly tables were created without indexes.
+
+        -- Any index starting with work_date
+        SELECT COUNT(*) INTO v_has_work_date_idx
+        FROM (
+            SELECT s.index_name,
+                   SUM(s.seq_in_index = 1 AND s.column_name = 'work_date') AS ok
+            FROM information_schema.statistics s
+            WHERE s.table_schema = 'hr_attendance'
+              AND s.table_name = @tbl_audit_name
+              AND s.index_name <> 'PRIMARY'
+            GROUP BY s.index_name
+        ) t
+        WHERE t.ok = 1;
+
+        IF v_has_work_date_idx = 0 THEN
+            SET @sql_add_idx_work_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_work_date (work_date)');
+            PREPARE stmt_idx1 FROM @sql_add_idx_work_date; EXECUTE stmt_idx1; DEALLOCATE PREPARE stmt_idx1;
+        END IF;
+
+        -- Any index starting with (employee_id, work_date)
+        SELECT COUNT(*) INTO v_has_employee_date_idx
+        FROM (
+            SELECT s.index_name,
+                   SUM(s.seq_in_index = 1 AND s.column_name = 'employee_id') AS ok1,
+                   SUM(s.seq_in_index = 2 AND s.column_name = 'work_date') AS ok2
+            FROM information_schema.statistics s
+            WHERE s.table_schema = 'hr_attendance'
+              AND s.table_name = @tbl_audit_name
+              AND s.index_name <> 'PRIMARY'
+            GROUP BY s.index_name
+        ) t
+        WHERE t.ok1 = 1 AND t.ok2 = 1;
+
+        IF v_has_employee_date_idx = 0 THEN
+            SET @sql_add_idx_employee_date := CONCAT('ALTER TABLE ', @tbl_audit, ' ADD INDEX idx_employee_date (employee_id, work_date)');
+            PREPARE stmt_idx2 FROM @sql_add_idx_employee_date; EXECUTE stmt_idx2; DEALLOCATE PREPARE stmt_idx2;
+        END IF;
+    END$$
+    DELIMITER ;
+
+    -- KHÔNG tạo bảng theo năm trước.
+    -- Ứng dụng sẽ tự tạo attendance_raw_YYYY / attendance_audit_YYYY khi phát sinh dữ liệu năm đó.
+    -- Nếu cần tạo thủ công, chạy:
+    --   CALL hr_attendance.sp_create_attendance_year_tables(2026);
+
+
+    -- Add column total if missing (migrate for existing DB)
+    SET @col_audit_total := (
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'attendance_audit'
+          AND COLUMN_NAME = 'total'
+    );
+    SET @sql_add_audit_total := IF(
+        @col_audit_total = 0,
+        'ALTER TABLE hr_attendance.attendance_audit ADD COLUMN total DECIMAL(10,2) NULL AFTER tc3',
+        'SELECT \'attendance_audit.total already exists\''
+    );
+    PREPARE stmt_add_audit_total FROM @sql_add_audit_total;
+    EXECUTE stmt_add_audit_total;
+    DEALLOCATE PREPARE stmt_add_audit_total;
+
+
+    -- Add column shift_code if missing (migrate for existing DB)
+    SET @col_audit_shift_code := (
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'attendance_audit'
+          AND COLUMN_NAME = 'shift_code'
+    );
+    SET @sql_add_audit_shift_code := IF(
+        @col_audit_shift_code = 0,
+        'ALTER TABLE hr_attendance.attendance_audit ADD COLUMN shift_code VARCHAR(255) NULL AFTER schedule',
+        'SELECT \'attendance_audit.shift_code already exists\''
+    );
+    PREPARE stmt_add_audit_shift_code FROM @sql_add_audit_shift_code;
+    EXECUTE stmt_add_audit_shift_code;
+    DEALLOCATE PREPARE stmt_add_audit_shift_code;
+
+
+    -- Add column in_1_symbol if missing (migrate for existing DB)
+    SET @col_audit_in_1_symbol := (
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = 'hr_attendance'
+          AND TABLE_NAME = 'attendance_audit'
+          AND COLUMN_NAME = 'in_1_symbol'
+    );
+    SET @sql_add_audit_in_1_symbol := IF(
+        @col_audit_in_1_symbol = 0,
+        'ALTER TABLE hr_attendance.attendance_audit ADD COLUMN in_1_symbol VARCHAR(50) NULL AFTER weekday',
+        'SELECT \'attendance_audit.in_1_symbol already exists\''
+    );
+    PREPARE stmt_add_audit_in_1_symbol FROM @sql_add_audit_in_1_symbol;
+    EXECUTE stmt_add_audit_in_1_symbol;
+    DEALLOCATE PREPARE stmt_add_audit_in_1_symbol;
 
 
     -- Khai báo Ca làm việc

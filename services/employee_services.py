@@ -23,6 +23,36 @@ from services.title_services import TitleService
 
 class EmployeeService:
     @staticmethod
+    def _employment_status_to_label(v: Any) -> str:
+        """Convert employment_status stored as code (1/2/3) to Vietnamese label for display/export."""
+
+        if v is None:
+            return ""
+        s = str(v).strip()
+        if not s:
+            return ""
+
+        # accept numeric-like values
+        if s in {"1", "2", "3"}:
+            code = s
+        else:
+            try:
+                f = float(s.replace(",", "."))
+                code = str(int(f)) if f.is_integer() else ""
+            except Exception:
+                code = ""
+
+        if code == "1":
+            return "Đi làm"
+        if code == "2":
+            return "Nghỉ thai sản"
+        if code == "3":
+            return "Đã nghỉ việc"
+
+        # If DB still has legacy text, keep it.
+        return s
+
+    @staticmethod
     def _parse_bool(v: Any) -> bool | None:
         """Parse cell value into boolean.
 
@@ -359,7 +389,11 @@ class EmployeeService:
             w = csv.DictWriter(f, fieldnames=headers)
             w.writeheader()
             for r in rows:
-                w.writerow({k: ("" if r.get(k) is None else r.get(k)) for k in headers})
+                out_row = {k: ("" if r.get(k) is None else r.get(k)) for k in headers}
+                out_row["employment_status"] = self._employment_status_to_label(
+                    r.get("employment_status")
+                )
+                w.writerow(out_row)
 
         return True, f"Đã xuất {len(rows)} dòng: {path}"
 
@@ -451,6 +485,8 @@ class EmployeeService:
                 v = r.get(key)
                 if key in {"contract1_signed", "contract2_indefinite"}:
                     v = "1" if bool(v) else "0"
+                if key == "employment_status":
+                    v = self._employment_status_to_label(v)
                 ws.cell(
                     row=row_idx,
                     column=col_idx,
@@ -858,9 +894,18 @@ class EmployeeService:
             s = str(v or "").strip()
             if not s:
                 return None
+            if s in {"1", "2", "3"}:
+                return s
+            # Excel sometimes contains numeric-looking values like 1.0
+            try:
+                f = float(s.replace(",", "."))
+                if f.is_integer() and int(f) in {1, 2, 3}:
+                    return str(int(f))
+            except Exception:
+                pass
             s_low = s.lower()
             if s_low in {"đi làm", "di lam", "đang làm", "dang lam", "working"}:
-                return "Đi làm"
+                return "1"
             if s_low in {
                 "nghỉ thai sản",
                 "nghi thai san",
@@ -872,7 +917,7 @@ class EmployeeService:
                 "nghỉ thai sải",
                 "nghi thai sai",
             }:
-                return "Nghỉ thai sản"
+                return "2"
             if s_low in {
                 "đã nghỉ việc",
                 "da nghi viec",
@@ -881,8 +926,8 @@ class EmployeeService:
                 "resigned",
                 "quit",
             }:
-                return "Đã nghỉ việc"
-            return s
+                return "3"
+            return None
 
         def norm_payload(it: dict[str, Any]) -> dict[str, Any] | None:
             code = str(it.get("employee_code") or "").strip()

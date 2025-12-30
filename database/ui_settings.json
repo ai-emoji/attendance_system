@@ -162,7 +162,8 @@
       "search_by_data": "auto",
       "search_text": "",
       "date_from": "",
-      "date_to": ""
+      "date_to": "",
+      "employment_status": "1"
     },
     "content2": {
       "show_seconds": false

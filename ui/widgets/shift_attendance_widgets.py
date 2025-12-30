@@ -514,6 +514,14 @@ class MainContent1(QWidget):
 
         self.btn_refresh = _mk_btn_outline("Làm mới", ICON_REFRESH)
 
+        # Filter: employment status (default: Đi làm)
+        self.cbo_employment_status = _mk_combo(self)
+        self.cbo_employment_status.setMinimumWidth(160)
+        self.cbo_employment_status.addItem("Đi làm", "1")
+        self.cbo_employment_status.addItem("Nghỉ thai sản", "2")
+        self.cbo_employment_status.addItem("Đã nghỉ việc", "3")
+        self.cbo_employment_status.setCurrentIndex(0)
+
         self.btn_import = _mk_btn_outline("Import dữ liệu chấm công")
 
         self.total_icon = QLabel("")
@@ -533,6 +541,7 @@ class MainContent1(QWidget):
         h.addWidget(self.cbo_search_by)
         h.addWidget(self.inp_search_text, 1)
         h.addWidget(self.btn_refresh)
+        h.addWidget(self.cbo_employment_status)
         h.addWidget(self.btn_import)
         h.addStretch(1)
         h.addWidget(self.total_icon)
@@ -618,6 +627,7 @@ class MainContent1(QWidget):
         self.cbo_title.currentIndexChanged.connect(self._on_title_changed)
         self.cbo_search_by.currentIndexChanged.connect(self._on_search_changed)
         self.inp_search_text.textChanged.connect(self._on_search_changed)
+        self.cbo_employment_status.currentIndexChanged.connect(self._on_search_changed)
         self.date_from.dateChanged.connect(self._on_date_changed)
         self.date_to.dateChanged.connect(self._on_date_changed)
 
@@ -647,6 +657,7 @@ class MainContent1(QWidget):
                     "title_id": None,
                     "search_by_data": "auto",
                     "search_text": "",
+                    "employment_status": "1",
                     "date_from": "",
                     "date_to": "",
                 }
@@ -715,6 +726,7 @@ class MainContent1(QWidget):
                     "title_id": self.cbo_title.currentData(),
                     "search_by_data": self.cbo_search_by.currentData(),
                     "search_text": str(self.inp_search_text.text() or ""),
+                    "employment_status": self.cbo_employment_status.currentData(),
                     "date_from": str(df or ""),
                     "date_to": str(dt or ""),
                 }
@@ -755,6 +767,10 @@ class MainContent1(QWidget):
                 pass
             try:
                 self.inp_search_text.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.cbo_employment_status.blockSignals(bool(on))
             except Exception:
                 pass
             try:
@@ -824,6 +840,20 @@ class MainContent1(QWidget):
             self.inp_search_text.setText(str(state.get("search_text") or ""))
             if str(state.get("search_text") or "") != "":
                 restored_any = True
+        except Exception:
+            pass
+
+        try:
+            target = str(state.get("employment_status") or "").strip()
+            if target:
+                for i in range(self.cbo_employment_status.count()):
+                    if (
+                        str(self.cbo_employment_status.itemData(i) or "").strip()
+                        == target
+                    ):
+                        self.cbo_employment_status.setCurrentIndex(int(i))
+                        restored_any = True
+                        break
         except Exception:
             pass
         try:
