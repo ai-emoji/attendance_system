@@ -67,7 +67,7 @@ def _ensure_valid_ico(icon_path: Path) -> Path | None:
 
     if Image is None:
         print(
-            "⚠️ Icon file is PNG but named .ico, and Pillow is not available to convert it:\n"
+            "WARN: Icon file is PNG but named .ico, and Pillow is not available to convert it:\n"
             f"- {icon_path}\n"
             "Gợi ý: cài Pillow (pip install pillow) hoặc cung cấp file .ico chuẩn."
         )
@@ -82,11 +82,20 @@ def _ensure_valid_ico(icon_path: Path) -> Path | None:
         )
         return converted
     except Exception as exc:
-        print(f"⚠️ Không thể convert icon sang .ico: {exc}")
+        print(f"WARN: Không thể convert icon sang .ico: {exc}")
         return None
 
 
 def main() -> int:
+    # Avoid Windows console encoding issues (e.g. cp1252) when printing non-ASCII.
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="Build EXE bằng PyInstaller")
     parser.add_argument(
         "--onefile",
@@ -108,7 +117,7 @@ def main() -> int:
     project_root = Path(__file__).resolve().parent
     entry = project_root / "main.py"
     if not entry.exists():
-        print(f"❌ Không tìm thấy entrypoint: {entry}")
+        print(f"ERROR: Không tìm thấy entrypoint: {entry}")
         return 2
 
     def _run_pyinstaller(pyinstaller_args: list[str]) -> int:
@@ -137,8 +146,8 @@ def main() -> int:
             )
             return int(completed.returncode)
         except FileNotFoundError:
-            print("❌ Không chạy được PyInstaller.")
-            print("   Cài đặt: pip install pyinstaller")
+            print("ERROR: Không chạy được PyInstaller.")
+            print("Cài đặt: pip install pyinstaller")
             return 3
 
     assets_dir = project_root / "assets"
@@ -204,7 +213,7 @@ def main() -> int:
     # Entrypoint
     py_args += [str(entry)]
 
-    print("📦 PyInstaller args:")
+    print("PyInstaller args:")
     print(" ".join([f'"{a}"' if " " in a else a for a in py_args]))
 
     code = _run_pyinstaller(py_args)
@@ -213,9 +222,9 @@ def main() -> int:
 
     dist_dir = project_root / "dist" / args.name
     if args.onefile:
-        print(f"✅ Build xong. File exe ở: {project_root / 'dist'}")
+        print(f"OK: Build xong. File exe ở: {project_root / 'dist'}")
     else:
-        print(f"✅ Build xong. Thư mục chạy ở: {dist_dir}")
+        print(f"OK: Build xong. Thư mục chạy ở: {dist_dir}")
 
     return 0
 

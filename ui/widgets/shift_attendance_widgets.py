@@ -648,8 +648,83 @@ class MainContent1(QWidget):
             pass
 
     def _on_refresh_clicked(self) -> None:
-        # User explicitly requests refresh: clear persisted filters so the view
-        # doesn't immediately restore old values.
+        # User explicitly requests refresh: reset ALL filters to defaults.
+        # Block signals to avoid triggering multiple refreshes while resetting.
+        def _block(on: bool) -> None:
+            try:
+                self.cbo_department.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.cbo_title.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.cbo_search_by.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.inp_search_text.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.cbo_employment_status.blockSignals(bool(on))
+            except Exception:
+                pass
+            try:
+                self.date_from.blockSignals(bool(on))
+                self.date_to.blockSignals(bool(on))
+            except Exception:
+                pass
+
+        today = QDate.currentDate()
+
+        _block(True)
+        try:
+            # Comboboxes: back to "All" / default.
+            try:
+                self.cbo_department.setCurrentIndex(0)
+            except Exception:
+                pass
+            try:
+                self.cbo_title.setCurrentIndex(0)
+            except Exception:
+                pass
+            try:
+                self.cbo_search_by.setCurrentIndex(0)  # auto
+            except Exception:
+                pass
+            try:
+                self.cbo_employment_status.setCurrentIndex(0)  # "Đi làm"
+            except Exception:
+                pass
+
+            # Search text
+            try:
+                self.inp_search_text.setText("")
+            except Exception:
+                pass
+
+            # Date range: reset to today.
+            try:
+                self.date_from.setDate(today)
+                self.date_to.setDate(today)
+            except Exception:
+                pass
+
+            # Clear desired IDs so dropdown reload won't re-select old values.
+            try:
+                self._desired_department_id = None  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            try:
+                self._desired_title_id = None  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        finally:
+            _block(False)
+
+        # Persist defaults so navigation won't restore old filters.
         try:
             update_shift_attendance_state(
                 content1={
@@ -658,12 +733,13 @@ class MainContent1(QWidget):
                     "search_by_data": "auto",
                     "search_text": "",
                     "employment_status": "1",
-                    "date_from": "",
-                    "date_to": "",
+                    "date_from": today.toString("yyyy-MM-dd"),
+                    "date_to": today.toString("yyyy-MM-dd"),
                 }
             )
         except Exception:
             pass
+
         self.refresh_clicked.emit()
 
     def _on_department_changed(self, *_args) -> None:

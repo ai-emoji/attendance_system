@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('E:\\attendance_system1\\assets', 'assets'), ('E:\\attendance_system1\\database', 'database'), ('E:\\attendance_system1\\creater_database.SQL', '.')]
+datas = [('H:\\attendance_system\\assets', 'assets'), ('H:\\attendance_system\\database', 'database'), ('H:\\attendance_system\\creater_database.SQL', '.')]
 binaries = []
 hiddenimports = ['PySide6.QtSvg', 'PySide6.QtSvgWidgets', 'mysql.connector.plugins', 'mysql.connector.aio']
 datas += collect_data_files('mysql')
@@ -14,8 +14,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['E:\\attendance_system1\\main.py'],
-    pathex=['E:\\attendance_system1'],
+    ['H:\\attendance_system\\main.py'],
+    pathex=['H:\\attendance_system'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
@@ -44,7 +44,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['E:\\attendance_system1\\assets\\icons\\app_converted.ico'],
+    icon=['H:\\attendance_system\\assets\\icons\\app_converted.ico'],
     contents_directory='.',
 )
 coll = COLLECT(

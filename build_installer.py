@@ -13,12 +13,14 @@ Cách dùng:
 
 Tuỳ chọn:
   python build_installer.py --clean
-  python build_installer.py --iscc "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+    python build_installer.py --iscc "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe"
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
+import logging
 import re
 import shutil
 import subprocess
@@ -26,18 +28,70 @@ import sys
 import time
 from pathlib import Path
 
-
-from PIL import Image
+try:
+    from PIL import Image  # type: ignore
+except Exception:  # pragma: no cover
+    Image = None  # type: ignore
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ISS_PATH = PROJECT_ROOT / "installer" / "myapp.iss"
 
 
-def _run(cmd: list[str], *, cwd: Path) -> None:
-    print("▶", " ".join(cmd))
-    completed = subprocess.run(cmd, cwd=str(cwd), check=False)
-    if completed.returncode != 0:
-        raise SystemExit(completed.returncode)
+def _init_logger(project_root: Path) -> logging.Logger:
+    log_dir = project_root / "dist" / "build_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"build_installer_{ts}.log"
+
+    logger = logging.getLogger("build_installer")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+    # Avoid duplicate handlers if script is re-entered in same process.
+    if logger.handlers:
+        return logger
+
+    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(fmt)
+
+    sh = logging.StreamHandler(stream=sys.stdout)
+    sh.setLevel(logging.INFO)
+    sh.setFormatter(fmt)
+
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+
+    logger.info("Build log: %s", log_file)
+    logger.info("Project root: %s", project_root)
+    logger.info("Python: %s", sys.executable)
+    logger.info("Args: %s", " ".join(sys.argv))
+    return logger
+
+
+def _run(cmd: list[str], *, cwd: Path, logger: logging.Logger) -> None:
+    logger.info("▶ %s", " ".join(cmd))
+    # Stream stdout+stderr to both console and log file.
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        logger.info(line.rstrip("\n"))
+
+    rc = proc.wait()
+    if rc != 0:
+        logger.error("Command failed with exit code %s", rc)
+        raise SystemExit(rc)
 
 
 def _parse_iss_defines(path: Path) -> dict[str, str]:
@@ -105,32 +159,71 @@ def _try_remove(path: Path, *, attempts: int = 6, delay_sec: float = 0.5) -> Non
 
 
 def _ensure_inno_setup_icon(root: Path) -> None:
-    """Inno Setup's SetupIconFile must be a real .ico (not a renamed PNG)."""
-    # In this repo, assets/icons/app.ico is actually a PNG file.
-    src_png = root / "assets" / "icons" / "app.ico"
-    if not src_png.exists():
-        src_png = root / "assets" / "icons" / "app.png"
+    """Ensure SetupIconFile points to a real .ico (not a renamed PNG).
+
+    - Prefer using an existing assets/icons/app_converted.ico if present.
+    - Otherwise attempt to generate it from assets/icons/app.ico (which in this repo
+      may actually be a PNG file) or assets/icons/app.png.
+    """
+
     dst_ico = root / "assets" / "icons" / "app_converted.ico"
-
-    if not src_png.exists():
+    if dst_ico.exists():
         return
 
-    # Only (re)generate when needed
-    if dst_ico.exists() and dst_ico.stat().st_mtime >= src_png.stat().st_mtime:
-        return
+    src = root / "assets" / "icons" / "app.ico"
+    if not src.exists():
+        src = root / "assets" / "icons" / "app.png"
+    if not src.exists():
+        raise SystemExit(
+            "Không tìm thấy icon nguồn để tạo app_converted.ico.\n"
+            f"- Expected: {root / 'assets' / 'icons' / 'app.ico'} hoặc app.png"
+        )
+
+    if Image is None:
+        raise SystemExit(
+            "Thiếu Pillow nên không thể tạo icon .ico cho Inno Setup.\n"
+            "- Cài: pip install pillow\n"
+            f"- Hoặc tự đặt sẵn file: {dst_ico}"
+        )
 
     try:
-        img = Image.open(src_png)
+        img = Image.open(src)
         img.save(
             dst_ico,
             format="ICO",
             sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
         )
-    except Exception as e:
-        raise RuntimeError(f"Không thể tạo icon .ico cho Inno Setup: {e}")
+    except Exception as exc:
+        raise SystemExit(f"Không thể tạo icon .ico cho Inno Setup: {exc}")
+
+
+def _ensure_dist_ui_settings(project_root: Path, dist_dir: Path) -> None:
+    """Make sure ui_settings.json exists in built output.
+
+    Một số lỗi hay gặp khi đóng gói/cài đặt:
+    - Thiếu file database/ui_settings.json trong dist => app crash khi đọc/ghi.
+    Script này đảm bảo file tồn tại trước khi build installer.
+    """
+
+    src = project_root / "database" / "ui_settings.json"
+    dst = dist_dir / "database" / "ui_settings.json"
+
+    if dst.exists():
+        return
+
+    if not src.exists():
+        raise SystemExit(
+            "Không tìm thấy file cấu hình UI settings để đóng gói.\n"
+            f"- Expected: {src}"
+        )
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
 
 
 def main() -> int:
+    logger = _init_logger(PROJECT_ROOT)
+
     parser = argparse.ArgumentParser(description="Build EXE + Installer (Inno Setup)")
     parser.add_argument("--clean", action="store_true", help="Clean PyInstaller cache")
     parser.add_argument(
@@ -147,7 +240,7 @@ def main() -> int:
     cmd = [sys.executable, "build_exe.py", "--name", app_internal_name]
     if args.clean:
         cmd.append("--clean")
-    _run(cmd, cwd=PROJECT_ROOT)
+    _run(cmd, cwd=PROJECT_ROOT, logger=logger)
 
     dist_dir = PROJECT_ROOT / "dist" / app_internal_name
     exe_path = dist_dir / f"{app_internal_name}.exe"
@@ -157,6 +250,9 @@ def main() -> int:
             f"- Expected: {exe_path}\n"
             "Gợi ý: kiểm tra PyInstaller output trong dist/"
         )
+
+    # Ensure required runtime data exists in dist (avoid ui_settings missing).
+    _ensure_dist_ui_settings(PROJECT_ROOT, dist_dir)
 
     # Ensure SetupIconFile points to a valid .ico before compiling .iss
     _ensure_inno_setup_icon(PROJECT_ROOT)
@@ -175,11 +271,11 @@ def main() -> int:
     _try_remove(installer_out)
 
     iscc = _find_iscc(args.iscc)
-    _run([iscc, str(ISS_PATH)], cwd=ISS_PATH.parent)
+    _run([iscc, str(ISS_PATH)], cwd=ISS_PATH.parent, logger=logger)
 
-    print("✅ Done")
-    print(f"- EXE: {exe_path}")
-    print(f"- Installer folder: {PROJECT_ROOT / 'dist' / 'installer'}")
+    logger.info("✅ Done")
+    logger.info("- EXE: %s", exe_path)
+    logger.info("- Installer folder: %s", PROJECT_ROOT / "dist" / "installer")
     return 0
 
 

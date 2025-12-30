@@ -991,6 +991,24 @@ class ShiftAttendanceMainContent2Service:
             label = "+".join(codes_complete or codes_all)
             row["shift_code"] = label if label else None
 
+            # IMPORTANT: do not drop remaining punches.
+            # If a shift only matched OUT (common for night shifts), leftover punches may still exist
+            # (e.g. an evening punch like 22:02) and must be displayed to avoid "has punch but blank".
+            try:
+                leftovers = sorted(
+                    list(punches),
+                    key=lambda v: int(cls._time_to_seconds(v) or 0),
+                )
+            except Exception:
+                leftovers = list(punches)
+
+            if leftovers:
+                for k in keys:
+                    if not leftovers:
+                        break
+                    if row.get(k) is None:
+                        row[k] = leftovers.pop(0)
+
     @classmethod
     def _apply_mode_first_last_by_shifts(
         cls,
@@ -1420,6 +1438,23 @@ class ShiftAttendanceMainContent2Service:
 
         row["in_1"] = in_val
         row["out_1"] = out_val
+
+        # Ensure no punch is silently dropped in FIRST/LAST mode.
+        # Any remaining punches should still be displayed in remaining slots.
+        try:
+            leftovers = sorted(
+                list(punches),
+                key=lambda v: int(cls._time_to_seconds(v) or 0),
+            )
+        except Exception:
+            leftovers = list(punches)
+
+        if leftovers:
+            for k in ("in_2", "out_2", "in_3", "out_3"):
+                if not leftovers:
+                    break
+                if row.get(k) is None:
+                    row[k] = leftovers.pop(0)
 
         def _is_overnight_shift(sh: dict[str, Any]) -> bool:
             tin = cls._time_to_seconds(sh.get("time_in"))
@@ -2011,13 +2046,25 @@ class ShiftAttendanceMainContent2Service:
                     except Exception:
                         continue
 
+            # "Được xếp ca" means the schedule-day has ANY shift configured.
+            # Some installs use shift2+ only (or the unlimited shifts table), so we must
+            # not rely solely on shift1_id.
             try:
-                r["_has_shift1"] = bool(
-                    detail_for_day is not None
-                    and detail_for_day.get("shift1_id") is not None
-                )
+                has_any_shift_id = False
+                if detail_for_day is not None:
+                    for k in (
+                        "shift1_id",
+                        "shift2_id",
+                        "shift3_id",
+                        "shift4_id",
+                        "shift5_id",
+                    ):
+                        if detail_for_day.get(k) is not None:
+                            has_any_shift_id = True
+                            break
+                r["_has_shift1"] = bool(shifts) or bool(has_any_shift_id)
             except Exception:
-                r["_has_shift1"] = False
+                r["_has_shift1"] = bool(shifts)
 
             # Flags used for post-processing (e.g. overnight carryover).
             try:
@@ -2185,14 +2232,13 @@ class ShiftAttendanceMainContent2Service:
                     pass
 
                 sym_code: str | None = None
+
+                # Business rule (per yêu cầu):
+                # - Ngày Lễ mà KHÔNG chấm công => hiển thị ký hiệu Lễ.
+                # (Các cờ ignore_absent_holiday/holiday_count_as_work chỉ ảnh hưởng việc tính công,
+                #  không đổi việc phân loại OFF/V/Lễ.)
                 if bool(is_holiday):
-                    # Holiday behavior depends on ignore_absent_holiday.
-                    # - 1: show Holiday symbol (C10)
-                    # - 0: treat as a normal working day (can become V/OFF)
-                    if int(ignore_absent_holiday) == 1:
-                        sym_code = "C10"
-                    else:
-                        sym_code = None
+                    sym_code = "C10"
 
                 # Weekend ignore: if enabled, do NOT mark absent even if the day has shifts.
                 if sym_code is None:
@@ -2202,15 +2248,13 @@ class ShiftAttendanceMainContent2Service:
                         sym_code = "C09"
 
                 if sym_code is None:
-                    has_shift1 = False
+                    # OFF only when: no punches + not scheduled.
+                    # V (C07) when: normal day + scheduled + no punches.
                     try:
-                        has_shift1 = (
-                            detail_for_day is not None
-                            and detail_for_day.get("shift1_id") is not None
-                        )
+                        is_scheduled = bool(r.get("_has_shift1"))
                     except Exception:
-                        has_shift1 = False
-                    sym_code = "C07" if has_shift1 else "C09"
+                        is_scheduled = False
+                    sym_code = "C07" if bool(is_scheduled) else "C09"
 
                 sym_text = str(symbols_by_code.get(sym_code or "") or "").strip()
                 for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
@@ -2905,6 +2949,130 @@ class ShiftAttendanceMainContent2Service:
             # When viewing exactly 1 day, suppress early-morning-only orphan rows (carryover from previous night).
             SINGLE_DAY_ORPHAN_MAX_SEC = 7 * 3600
 
+            # Cache DB check for non-morning punches to avoid repeated queries during post-process.
+            non_morning_db_cache: dict[tuple[str, str, str], bool] = {}
+
+            def _db_has_non_morning_punch(row0: dict[str, Any]) -> bool:
+                """True when the same day has ANY punch >= MORNING_CUTOFF_SEC in DB.
+
+                This guards against mode/window logic temporarily dropping afternoon/evening punches.
+                We must never merge/clear such a day, otherwise the grid may show V/OFF despite DB punches.
+                """
+
+                d0 = _parse_date(row0.get("date") or row0.get("work_date"))
+                if d0 is None:
+                    return False
+
+                date_str = d0.isoformat()
+                emp_id = row0.get("employee_id")
+                att_code = (
+                    row0.get("attendance_code") or row0.get("employee_code") or ""
+                )
+                try:
+                    emp_id_int = int(emp_id) if emp_id is not None else None
+                except Exception:
+                    emp_id_int = None
+                att_code_str = str(att_code).strip() or ""
+
+                cache_key = (str(emp_id_int or ""), att_code_str, date_str)
+                if cache_key in non_morning_db_cache:
+                    return bool(non_morning_db_cache.get(cache_key))
+
+                has_non_morning = False
+                try:
+                    rows_db = self._repo.list_rows(
+                        from_date=date_str,
+                        to_date=date_str,
+                        employee_id=emp_id_int,
+                        attendance_code=att_code_str or None,
+                        employee_ids=None,
+                        attendance_codes=None,
+                        department_id=None,
+                        title_id=None,
+                        employment_status=None,
+                    )
+                    for rdb in rows_db or []:
+                        tvals = _row_time_values(rdb)
+                        secs0 = [self._time_to_seconds(v) for v in tvals]
+                        secs1 = [int(s) for s in secs0 if s is not None]
+                        if [s for s in secs1 if int(s) >= int(MORNING_CUTOFF_SEC)]:
+                            has_non_morning = True
+                            break
+                except Exception:
+                    has_non_morning = False
+
+                non_morning_db_cache[cache_key] = bool(has_non_morning)
+                return bool(has_non_morning)
+
+            def _apply_no_punch_display(row0: dict[str, Any]) -> None:
+                """After we clear punch times (e.g. overnight carryover), ensure UI shows OFF/V/Lễ.
+
+                This keeps the grid consistent: a cleared row should never look like
+                "no data" (all blank) without a symbol.
+                """
+
+                # Pick symbol code using business rules.
+                sym_code0: str | None = None
+                try:
+                    if bool(row0.get("_is_holiday")):
+                        sym_code0 = "C10"
+                except Exception:
+                    sym_code0 = None
+
+                if sym_code0 is None:
+                    try:
+                        dk0 = str(row0.get("day_key") or "").strip()
+                    except Exception:
+                        dk0 = ""
+                    try:
+                        if (
+                            dk0 == "sat"
+                            and int(row0.get("_ignore_absent_sat") or 0) == 1
+                        ):
+                            sym_code0 = "C09"
+                        elif (
+                            dk0 == "sun"
+                            and int(row0.get("_ignore_absent_sun") or 0) == 1
+                        ):
+                            sym_code0 = "C09"
+                    except Exception:
+                        pass
+
+                if sym_code0 is None:
+                    try:
+                        sym_code0 = "C07" if bool(row0.get("_has_shift1")) else "C09"
+                    except Exception:
+                        sym_code0 = "C09"
+
+                try:
+                    sym_text0 = str(symbols_by_code.get(sym_code0 or "") or "").strip()
+                except Exception:
+                    sym_text0 = ""
+
+                # Fill in_1 with the symbol text (if visible/configured).
+                if sym_text0:
+                    row0["in_1"] = sym_text0
+
+                # Default plus for V/C07 (keep consistent with main rules).
+                if (sym_code0 or "").strip() == "C07":
+                    try:
+                        if row0.get("hours_plus") is None:
+                            row0["hours_plus"] = 8
+                        if row0.get("work_plus") is None:
+                            row0["work_plus"] = 1.0
+                        if row0.get("leave_plus") is None:
+                            row0["leave_plus"] = sym_text0 or "V"
+                    except Exception:
+                        pass
+
+                # Clear computed fields.
+                row0["shift_code"] = None
+                row0["hours"] = None
+                row0["work"] = None
+                row0["late"] = ""
+                row0["early"] = ""
+                row0["_work_full"] = False
+
             def _is_single_day_view() -> bool:
                 try:
                     return bool(
@@ -2962,6 +3130,7 @@ class ShiftAttendanceMainContent2Service:
                                     except Exception:
                                         prev_day = None
                                 prev_has_evening_db = False
+                                same_day_has_non_morning_db = False
                                 if prev_day is not None:
                                     try:
                                         prev_date_str = (
@@ -3008,9 +3177,58 @@ class ShiftAttendanceMainContent2Service:
                                     except Exception:
                                         prev_has_evening_db = False
 
+                                # Extra safety: check the SAME day raw DB punches.
+                                # If the day has any non-morning punch in DB, it is NOT a carryover-only orphan.
+                                try:
+                                    if prev_day is not None:
+                                        cur_date_str = str((prev_day).isoformat())
+                                    else:
+                                        cur_date_str = str(from_date or "").strip()
+                                    if cur_date_str:
+                                        emp_id = first.get("employee_id")
+                                        att_code = (
+                                            first.get("attendance_code")
+                                            or first.get("employee_code")
+                                            or ""
+                                        )
+                                        emp_id_int = (
+                                            int(emp_id) if emp_id is not None else None
+                                        )
+                                        att_code_str = str(att_code).strip() or None
+                                        cur_rows_db = self._repo.list_rows(
+                                            from_date=cur_date_str,
+                                            to_date=cur_date_str,
+                                            employee_id=emp_id_int,
+                                            attendance_code=att_code_str,
+                                            employee_ids=None,
+                                            attendance_codes=None,
+                                            department_id=None,
+                                            title_id=None,
+                                            employment_status=None,
+                                        )
+                                        for cr in cur_rows_db or []:
+                                            cr_times = _row_time_values(cr)
+                                            cr_secs = [
+                                                self._time_to_seconds(v)
+                                                for v in cr_times
+                                            ]
+                                            cr_secs2 = [
+                                                int(s) for s in cr_secs if s is not None
+                                            ]
+                                            if [
+                                                s
+                                                for s in cr_secs2
+                                                if int(s) >= int(MORNING_CUTOFF_SEC)
+                                            ]:
+                                                same_day_has_non_morning_db = True
+                                                break
+                                except Exception:
+                                    same_day_has_non_morning_db = False
+
                                 # Hide when confirmed carryover OR schedule says there is an overnight shift.
-                                if prev_has_evening_db or bool(
-                                    first.get("_has_overnight_shift")
+                                if (not bool(same_day_has_non_morning_db)) and (
+                                    prev_has_evening_db
+                                    or bool(first.get("_has_overnight_shift"))
                                 ):
                                     for k in (
                                         "in_1",
@@ -3022,71 +3240,7 @@ class ShiftAttendanceMainContent2Service:
                                     ):
                                         first[k] = None
 
-                                    # Show OFF/V/Lễ like the normal "no-punch" rules.
-                                    sym_code: str | None = None
-                                    try:
-                                        if (
-                                            bool(first.get("_is_holiday"))
-                                            and int(
-                                                first.get("_ignore_absent_holiday") or 0
-                                            )
-                                            == 1
-                                        ):
-                                            sym_code = "C10"
-                                    except Exception:
-                                        sym_code = None
-
-                                    try:
-                                        dk = str(first.get("day_key") or "").strip()
-                                    except Exception:
-                                        dk = ""
-
-                                    if sym_code is None:
-                                        try:
-                                            if (
-                                                dk == "sat"
-                                                and int(
-                                                    first.get("_ignore_absent_sat") or 0
-                                                )
-                                                == 1
-                                            ):
-                                                sym_code = "C09"
-                                            elif (
-                                                dk == "sun"
-                                                and int(
-                                                    first.get("_ignore_absent_sun") or 0
-                                                )
-                                                == 1
-                                            ):
-                                                sym_code = "C09"
-                                        except Exception:
-                                            pass
-
-                                    if sym_code is None:
-                                        try:
-                                            sym_code = (
-                                                "C07"
-                                                if bool(first.get("_has_shift1"))
-                                                else "C09"
-                                            )
-                                        except Exception:
-                                            sym_code = "C09"
-
-                                    try:
-                                        sym_text = str(
-                                            symbols_by_code.get(sym_code or "") or ""
-                                        ).strip()
-                                    except Exception:
-                                        sym_text = ""
-                                    if sym_text:
-                                        first["in_1"] = sym_text
-
-                                    first["shift_code"] = None
-                                    first["hours"] = None
-                                    first["work"] = None
-                                    first["late"] = ""
-                                    first["early"] = ""
-                                    first["_work_full"] = False
+                                    _apply_no_punch_display(first)
                                     try:
                                         logger.info(
                                             "POST_NIGHT_ORPHAN_HIDE emp=%s date=%s max_sec=%s prev_evening=%s overnight_flag=%s",
@@ -3143,6 +3297,14 @@ class ShiftAttendanceMainContent2Service:
                     if max(secs2) >= MORNING_CUTOFF_SEC:
                         continue
 
+                    # If DB has any non-morning punch for the day, it is NOT a carryover-only row.
+                    # Do not merge/clear it, otherwise we may hide real attendance (e.g. 22:xx).
+                    try:
+                        if _db_has_non_morning_punch(cur):
+                            continue
+                    except Exception:
+                        pass
+
                     if (not is_label_night) and (not prev_has_evening):
                         continue
 
@@ -3195,6 +3357,13 @@ class ShiftAttendanceMainContent2Service:
                         for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3"):
                             cur[k] = None
                         cur["shift_code"] = None
+
+                        # Ensure the cleared row still shows a meaningful state (OFF/V/Lễ)
+                        # instead of becoming all-blank in the grid.
+                        try:
+                            _apply_no_punch_display(cur)
+                        except Exception:
+                            pass
             try:
                 if merge_count:
                     logger.info("POST_NIGHT_MERGE total=%s", int(merge_count))

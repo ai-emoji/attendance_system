@@ -11,6 +11,7 @@ Mục tiêu:
 from __future__ import annotations
 
 import json
+import logging
 from os import environ
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,9 +22,36 @@ from PySide6.QtCore import QObject, Signal
 from core.resource import resource_path
 
 
-def _settings_path() -> Path:
-    # Keep under database/ so it ships alongside app data.
+_LOGGER = logging.getLogger(__name__)
+
+
+def _packaged_settings_path() -> Path:
+    """Path to the default settings that ship with the application."""
+
+    # In PyInstaller, this points to the extracted/bundled app directory.
+    # This location can be read-only when the app is installed under Program Files.
     return Path(resource_path("database/ui_settings.json"))
+
+
+def _user_settings_path() -> Path:
+    """Writable per-user settings path.
+
+    We must not write into the installation folder (e.g. Program Files) because it
+    is typically read-only for standard users.
+    """
+
+    app_name = "attendance"
+    base = environ.get("APPDATA") or environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / app_name / "ui_settings.json"
+    # Fallback (should rarely be needed on Windows)
+    return Path.home() / "." / app_name / "ui_settings.json"
+
+
+def _settings_path() -> Path:
+    """Compatibility wrapper: always return the writable settings path."""
+
+    return _user_settings_path()
 
 
 DEFAULT_UI_SETTINGS: dict[str, Any] = {
@@ -196,25 +224,49 @@ ui_settings_bus = UISettingsBus()
 
 
 def load_ui_settings() -> dict[str, Any]:
-    p = _settings_path()
+    p = _user_settings_path()
     try:
-        if not p.exists():
-            p.parent.mkdir(parents=True, exist_ok=True)
-            save_ui_settings(DEFAULT_UI_SETTINGS)
+        if p.exists():
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
             return json.loads(json.dumps(DEFAULT_UI_SETTINGS))
 
-        data = json.loads(p.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return json.loads(json.dumps(DEFAULT_UI_SETTINGS))
-        return data
-    except Exception:
+        # First run: initialize user settings.
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+        packaged = _packaged_settings_path()
+        if packaged.exists():
+            try:
+                p.write_text(packaged.read_text(encoding="utf-8"), encoding="utf-8")
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+            except Exception as ex:
+                _LOGGER.warning(
+                    "Failed to initialize user ui_settings.json from packaged default: %s",
+                    ex,
+                )
+
+        # Fallback to defaults.
+        save_ui_settings(DEFAULT_UI_SETTINGS)
+        return json.loads(json.dumps(DEFAULT_UI_SETTINGS))
+    except Exception as ex:
+        _LOGGER.warning("Failed to load UI settings: %s", ex)
         return json.loads(json.dumps(DEFAULT_UI_SETTINGS))
 
 
 def save_ui_settings(data: dict[str, Any]) -> None:
-    p = _settings_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data or {}, ensure_ascii=False, indent=2), encoding="utf-8")
+    p = _user_settings_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            json.dumps(data or {}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as ex:
+        # Never crash the UI for a settings write failure.
+        _LOGGER.warning("Failed to save UI settings to %s: %s", p, ex)
 
 
 def _default_desktop_dir() -> str:
