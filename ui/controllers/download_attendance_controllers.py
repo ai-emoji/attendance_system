@@ -139,6 +139,17 @@ class DownloadAttendanceController:
             self._parent_window, name="download_attendance_table"
         )
 
+        # Stream rows into table while saving (poll DB and append new rows)
+        self._stream_runner = BackgroundTaskRunner(
+            self._parent_window, name="download_attendance_stream"
+        )
+        self._stream_timer: QTimer | None = None
+        self._stream_seen_keys: set[tuple[str, str, str]] = set()
+        self._stream_started: bool = False
+        self._stream_phase_active: bool = False
+        self._stream_visible_once: bool = False
+        self._stream_device_no: int | None = None
+
         # Context for per-download report file
         self._download_report_ctx: dict | None = None
 
@@ -406,6 +417,32 @@ class DownloadAttendanceController:
         except Exception:
             pass
 
+        # Prepare streaming state (append new rows as they are committed).
+        try:
+            self._stream_seen_keys = {
+                (str(r.code or ""), str(r.date_str or ""), str(r.device_name or ""))
+                for r in (self._all_rows or [])
+            }
+        except Exception:
+            self._stream_seen_keys = set()
+        self._stream_started = False
+        self._stream_phase_active = False
+        self._stream_visible_once = False
+        try:
+            self._stream_device_no = self._service.get_device_no_by_id(int(device_id))
+        except Exception:
+            self._stream_device_no = None
+        try:
+            if hasattr(self._content, "clear_attendance_rows"):
+                self._content.clear_attendance_rows()
+        except Exception:
+            pass
+        try:
+            if hasattr(self._title_bar2, "set_total"):
+                self._title_bar2.set_total(0)
+        except Exception:
+            pass
+
         # Worker thread
         # Giữ reference để tránh worker bị GC (có thể làm app crash/thoát)
         thread = QThread(self._parent_window)
@@ -469,6 +506,10 @@ class DownloadAttendanceController:
             total=int(total or 0),
             message=str(message or ""),
         )
+
+        # Start streaming when entering save phase
+        if norm == "save":
+            self._ensure_streaming_started()
 
         # Keep legacy trackers for safety (no longer drives UI range)
         self._last_progress_phase = norm
@@ -582,6 +623,9 @@ class DownloadAttendanceController:
             pass
 
     def _on_worker_finished_ui(self, ok: bool, msg: str, _count: int) -> None:
+        # Stop streaming
+        self._stop_streaming()
+
         # Always write a per-download report file (best-effort)
         self._write_download_report(best_effort_ok=bool(ok), message=str(msg or ""))
 
@@ -661,6 +705,134 @@ class DownloadAttendanceController:
 
         # Clear report context after finishing
         self._download_report_ctx = None
+
+    def _ensure_streaming_started(self) -> None:
+        if self._stream_started:
+            return
+        self._stream_started = True
+        self._stream_phase_active = True
+
+        if self._stream_timer is None:
+            self._stream_timer = QTimer(self._parent_window)
+            self._stream_timer.setInterval(350)
+            self._stream_timer.timeout.connect(self._stream_tick)
+
+        try:
+            if not self._stream_timer.isActive():
+                self._stream_timer.start()
+        except Exception:
+            pass
+
+        # Kick the first tick immediately
+        try:
+            QTimer.singleShot(0, self._stream_tick)
+        except Exception:
+            pass
+
+    def _stop_streaming(self) -> None:
+        self._stream_phase_active = False
+        try:
+            if self._stream_timer is not None and self._stream_timer.isActive():
+                self._stream_timer.stop()
+        except Exception:
+            pass
+        try:
+            self._stream_runner.cancel_current()
+        except Exception:
+            pass
+
+    def _stream_tick(self) -> None:
+        if not self._stream_phase_active:
+            return
+
+        def _fn() -> object:
+            # IMPORTANT: from_date/to_date=None to avoid "fill empty days" generation
+            # which would create a lot of synthetic rows during streaming.
+            rows = self._service.list_download_attendance(
+                from_date=None,
+                to_date=None,
+                device_no=self._stream_device_no,
+            )
+            return [self._to_ui_row(r) for r in (rows or [])]
+
+        def _ok(result: object) -> None:
+            if not self._stream_phase_active:
+                return
+            fetched = list(result or []) if isinstance(result, list) else []
+            if not fetched:
+                return
+
+            new_rows: list[_UiRow] = []
+            for r in fetched:
+                try:
+                    if not isinstance(r, _UiRow):
+                        continue
+                    k = (
+                        str(r.code or ""),
+                        str(r.date_str or ""),
+                        str(r.device_name or ""),
+                    )
+                    if k in self._stream_seen_keys:
+                        continue
+                    self._stream_seen_keys.add(k)
+                    new_rows.append(r)
+                except Exception:
+                    continue
+
+            if not new_rows:
+                return
+
+            # Show table once we have data
+            if not self._stream_visible_once:
+                self._stream_visible_once = True
+                try:
+                    if (
+                        hasattr(self._content, "table_frame")
+                        and self._content.table_frame is not None
+                    ):
+                        self._content.table_frame.setVisible(True)
+                except Exception:
+                    pass
+
+            # Append to UI
+            tuples = [
+                (
+                    u.code,
+                    u.name_on_mcc,
+                    u.date_str,
+                    self._fmt_time(u.in1),
+                    self._fmt_time(u.out1),
+                    self._fmt_time(u.in2),
+                    self._fmt_time(u.out2),
+                    self._fmt_time(u.in3),
+                    self._fmt_time(u.out3),
+                    u.device_name,
+                )
+                for u in new_rows
+            ]
+
+            try:
+                if hasattr(self._content, "append_attendance_rows"):
+                    self._content.append_attendance_rows(tuples)
+                else:
+                    # Fallback: rebuild (shouldn't happen unless old UI version)
+                    self._content.set_attendance_rows(tuples)
+            except RuntimeError:
+                return
+            except Exception:
+                pass
+
+            try:
+                if hasattr(self._title_bar2, "set_total"):
+                    self._title_bar2.set_total(len(self._stream_seen_keys))
+            except Exception:
+                pass
+
+        def _err(_msg: str) -> None:
+            # Ignore transient errors while DB is busy; next tick will retry.
+            return
+
+        self._stream_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _write_download_report(self, *, best_effort_ok: bool, message: str) -> None:
         """Write one report file under log/ for each download attempt (best-effort)."""

@@ -200,6 +200,20 @@ def get_stylesheet_path(style_file: str) -> str:
     return resource_path(f"assets/{style_file}")
 
 
+def user_data_dir(app_name: str = "pmctn") -> Path:
+    """Writable per-user data folder.
+
+    We must not write into the installation folder (e.g. Program Files) because it
+    is typically read-only for standard users.
+    """
+
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    if base:
+        return Path(base) / app_name
+    # Fallback (should rarely be needed on Windows)
+    return Path.home() / "AppData" / "Local" / app_name
+
+
 def get_database_path(db_file: str = "app.mysql") -> str:
     """
     Lấy đường dẫn database từ folder database.
@@ -240,7 +254,10 @@ ICON_ITALIC = "assets/images/italic.svg"
 ICON_UNDERLINE = "assets/images/under_line.svg"
 
 # Icon App (Main window)
-ICON_APP = "assets/icons/app.ico"
+# NOTE: In this repo, assets/icons/app.ico is actually a non-square PNG (misnamed),
+# which can cause Windows/Qt to stretch the taskbar/shortcut icon. Use the
+# generated square multi-size ICO instead.
+ICON_APP = "assets/icons/app_converted.ico"
 APP_ICO = ICON_APP
 
 # Icon Dashboard/Home

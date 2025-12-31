@@ -26,15 +26,37 @@ import shutil
 import subprocess
 import sys
 import time
+import hashlib
 from pathlib import Path
+import zipfile
 
 try:
-    from PIL import Image  # type: ignore
+    from PIL import Image, ImageOps  # type: ignore
 except Exception:  # pragma: no cover
     Image = None  # type: ignore
+    ImageOps = None  # type: ignore
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ISS_PATH = PROJECT_ROOT / "installer" / "myapp.iss"
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _zip_dir(src_dir: Path, out_zip: Path) -> None:
+    out_zip.parent.mkdir(parents=True, exist_ok=True)
+    if out_zip.exists():
+        out_zip.unlink()
+    with zipfile.ZipFile(out_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for p in sorted(src_dir.rglob("*")):
+            if p.is_dir():
+                continue
+            zf.write(p, arcname=str(p.relative_to(src_dir)))
 
 
 def _init_logger(project_root: Path) -> logging.Logger:
@@ -168,7 +190,23 @@ def _ensure_inno_setup_icon(root: Path) -> None:
 
     dst_ico = root / "assets" / "icons" / "app_converted.ico"
     if dst_ico.exists():
-        return
+        # Validate content: in this repo, some .ico files are actually PNGs.
+        try:
+            head = dst_ico.read_bytes()[:8]
+        except Exception:
+            head = b""
+
+        is_png = head.startswith(b"\x89PNG\r\n\x1a\n")
+        # ICO header starts with: 00 00 01 00
+        is_ico = len(head) >= 4 and head[:4] == b"\x00\x00\x01\x00"
+        if not is_png and is_ico:
+            return
+
+        # Existing file is not a valid ICO; regenerate below.
+        try:
+            dst_ico.unlink()
+        except Exception:
+            pass
 
     src = root / "assets" / "icons" / "app.ico"
     if not src.exists():
@@ -188,6 +226,28 @@ def _ensure_inno_setup_icon(root: Path) -> None:
 
     try:
         img = Image.open(src)
+        try:
+            if ImageOps is not None:
+                img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        try:
+            img = img.convert("RGBA")
+        except Exception:
+            pass
+
+        # Avoid distorted icons when source is not square: pad to square with transparency.
+        try:
+            w, h = img.size
+            if int(w) > 0 and int(h) > 0 and int(w) != int(h):
+                side = max(int(w), int(h))
+                canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+                canvas.paste(img, ((side - int(w)) // 2, (side - int(h)) // 2))
+                img = canvas
+        except Exception:
+            pass
+
         img.save(
             dst_ico,
             format="ICO",
@@ -221,6 +281,24 @@ def _ensure_dist_ui_settings(project_root: Path, dist_dir: Path) -> None:
     shutil.copy2(src, dst)
 
 
+def _ensure_dist_folder(project_root: Path, dist_dir: Path, folder_name: str) -> None:
+    """Ensure a whole folder exists inside dist output.
+
+    This is a safety net to avoid missing runtime data (templates/config/assets)
+    when building the installer.
+    """
+
+    src = project_root / folder_name
+    dst = dist_dir / folder_name
+
+    if dst.exists():
+        return
+    if not src.exists():
+        return
+
+    shutil.copytree(src, dst)
+
+
 def main() -> int:
     logger = _init_logger(PROJECT_ROOT)
 
@@ -231,10 +309,26 @@ def main() -> int:
         default=None,
         help="Đường dẫn ISCC.exe (nếu không có trong PATH)",
     )
+    parser.add_argument(
+        "--release",
+        action="store_true",
+        help="Đóng gói bản release vào releases/<version>/ (copy app folder + installer + checksum)",
+    )
+    parser.add_argument(
+        "--release-dir",
+        default=str(PROJECT_ROOT / "releases"),
+        help="Thư mục releases (mặc định: ./releases)",
+    )
+    parser.add_argument(
+        "--portable-zip",
+        action="store_true",
+        help="Tạo thêm file portable .zip của dist/<app> trong releases/<version>/",
+    )
     args = parser.parse_args()
 
     defines = _parse_iss_defines(ISS_PATH)
     app_internal_name = (defines.get("MyAppInternalName") or "attendance").strip()
+    app_version = (defines.get("MyAppVersion") or "0.0.0").strip()
 
     # 1) Build app exe (onedir)
     cmd = [sys.executable, "build_exe.py", "--name", app_internal_name]
@@ -253,6 +347,11 @@ def main() -> int:
 
     # Ensure required runtime data exists in dist (avoid ui_settings missing).
     _ensure_dist_ui_settings(PROJECT_ROOT, dist_dir)
+
+    # Ensure other runtime data folders exist in dist.
+    _ensure_dist_folder(PROJECT_ROOT, dist_dir, "assets")
+    _ensure_dist_folder(PROJECT_ROOT, dist_dir, "database")
+    _ensure_dist_folder(PROJECT_ROOT, dist_dir, "excel")
 
     # Ensure SetupIconFile points to a valid .ico before compiling .iss
     _ensure_inno_setup_icon(PROJECT_ROOT)
@@ -276,6 +375,48 @@ def main() -> int:
     logger.info("✅ Done")
     logger.info("- EXE: %s", exe_path)
     logger.info("- Installer folder: %s", PROJECT_ROOT / "dist" / "installer")
+
+    if args.release:
+        releases_dir = Path(args.release_dir)
+        release_root = releases_dir / app_version
+        release_app_dir = release_root / app_internal_name
+        release_installer_dir = release_root / "installer"
+        release_installer_dir.mkdir(parents=True, exist_ok=True)
+
+        # 3) Snapshot app folder for this version
+        if release_app_dir.exists():
+            shutil.rmtree(release_app_dir)
+        release_root.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(dist_dir, release_app_dir)
+
+        # 4) Copy installer
+        release_installer = release_installer_dir / installer_out.name
+        if release_installer.exists():
+            _try_remove(release_installer)
+        shutil.copy2(installer_out, release_installer)
+
+        # 5) Optional portable zip
+        portable_zip: Path | None = None
+        if args.portable_zip:
+            portable_zip = (
+                release_root / f"{app_internal_name}_portable_{app_version}.zip"
+            )
+            _zip_dir(release_app_dir, portable_zip)
+
+        # 6) Checksums
+        checksums = release_root / "checksums.sha256"
+        lines = [
+            f"{_sha256_file(release_installer)}  {release_installer.name}",
+        ]
+        if portable_zip is not None and portable_zip.exists():
+            lines.append(f"{_sha256_file(portable_zip)}  {portable_zip.name}")
+        checksums.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        logger.info("- Release: %s", release_root)
+        logger.info("- Release installer: %s", release_installer)
+        if portable_zip is not None:
+            logger.info("- Release portable zip: %s", portable_zip)
+        logger.info("- Release checksums: %s", checksums)
     return 0
 
 

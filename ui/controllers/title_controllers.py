@@ -32,9 +32,17 @@ class TitleController:
         self._title_bar2 = title_bar2
         self._content = content
         self._service = service or TitleService()
-        self._runner = BackgroundTaskRunner(self._parent_window, name="title_refresh")
+        # Guard against callbacks firing after the content widget is destroyed.
+        self._runner = BackgroundTaskRunner(
+            self._parent_window, name="title_refresh", guard=self._content
+        )
 
     def bind(self) -> None:
+        try:
+            self._content.destroyed.connect(lambda *_: self._runner.invalidate())
+        except Exception:
+            pass
+
         self._title_bar2.add_clicked.connect(self.on_add)
         self._title_bar2.edit_clicked.connect(self.on_edit)
         self._title_bar2.delete_clicked.connect(self.on_delete)

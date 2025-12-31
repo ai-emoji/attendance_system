@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_submodules
 
-datas = [('H:\\attendance_system\\assets', 'assets'), ('H:\\attendance_system\\database', 'database'), ('H:\\attendance_system\\creater_database.SQL', '.')]
+datas = [('H:\\attendance_system\\assets', 'assets'), ('H:\\attendance_system\\database', 'database'), ('H:\\attendance_system\\excel', 'excel'), ('H:\\attendance_system\\creater_database.SQL', '.')]
 hiddenimports = ['PySide6.QtSvg', 'PySide6.QtSvgWidgets', 'mysql.connector.plugins', 'mysql.connector.aio']
 datas += collect_data_files('mysql')
 datas += collect_data_files('mysql.connector')
@@ -29,7 +29,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='attendance',
+    name='pmctn',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -50,5 +50,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='attendance',
+    name='pmctn',
 )

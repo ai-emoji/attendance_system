@@ -1,18 +1,19 @@
-#define MyAppInternalName "attendance"
+#define MyAppInternalName "pmctn"
 #define MyAppDisplayName "Phần mềm chấm công Tam Niên"
 #define MyAppVersion "1.0.2"
 #define MyAppPublisher "Attendance System"
-#define MyAppExeName "attendance.exe"
+#define MyAppExeName "pmctn.exe"
 
 [Setup]
 AppId={#MyAppInternalName}
 AppName={#MyAppDisplayName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\attendance
+DefaultDirName={autopf}\pmctn
 ; NOTE: This must be a real .ico. The repo's app.ico is actually a PNG.
 SetupIconFile=..\assets\icons\app_converted.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupLogging=yes
 PrivilegesRequired=admin
 DisableDirPage=no
 DisableProgramGroupPage=yes
@@ -28,13 +29,15 @@ Source: "..\dist\{#MyAppInternalName}\*"; DestDir: "{app}"; Flags: recursesubdir
 [Dirs]
 Name: "{app}\assets"; Attribs: hidden system
 Name: "{app}\database"; Attribs: hidden system
+; Create a visible log folder inside the installation directory and allow standard users to write.
+Name: "{app}\log"; Permissions: users-modify
 
 [Tasks]
 Name: "desktopicon"; Description: "Tạo biểu tượng ngoài Desktop"; GroupDescription: "Tuỳ chọn bổ sung:"; Flags: checkedonce
 
 [Icons]
-Name: "{commonprograms}\{#MyAppDisplayName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{commondesktop}\{#MyAppDisplayName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{commonprograms}\{#MyAppDisplayName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\app_converted.ico"
+Name: "{commondesktop}\Tam Niên"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\app_converted.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Chạy {#MyAppDisplayName}"; Flags: nowait postinstall skipifsilent
@@ -89,6 +92,24 @@ begin
 	end;
 end;
 
+procedure WriteInstallSuccessLog;
+var
+	LogDir: string;
+	LogPath: string;
+	Line: string;
+begin
+	// Log next to the installed app for easy access.
+	LogDir := ExpandConstant('{app}\\log');
+	ForceDirectories(LogDir);
+	LogPath := LogDir + '\\install_success.log';
+	Line :=
+		GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':') +
+		' | OK | version={#MyAppVersion}' +
+		' | app=' + ExpandConstant('{app}') +
+		' | exe={#MyAppExeName}';
+	SaveStringToFile(LogPath, Line + #13#10, True);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
 	if CurStep = ssPostInstall then
@@ -96,5 +117,6 @@ begin
 		HideTree(ExpandConstant('{app}\\assets'));
 		HideTree(ExpandConstant('{app}\\database'));
 		SetHiddenSystem(ExpandConstant('{app}\\creater_database.SQL'));
+		WriteInstallSuccessLog;
 	end;
 end;

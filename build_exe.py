@@ -29,9 +29,10 @@ import sys
 from pathlib import Path
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except Exception:  # pragma: no cover
     Image = None  # type: ignore
+    ImageOps = None  # type: ignore
 
 
 def _add_data_arg(src: Path, dest_relative: str) -> str:
@@ -59,11 +60,28 @@ def _ensure_valid_ico(icon_path: Path) -> Path | None:
 
     is_png = head.startswith(b"\x89PNG\r\n\x1a\n")
     if not is_png:
-        return icon_path
+        # ICO header starts with: 00 00 01 00
+        if len(head) >= 4 and head[:4] == b"\x00\x00\x01\x00":
+            return icon_path
+        # Unknown/invalid: let PyInstaller proceed without an icon.
+        return None
 
     converted = icon_path.with_name("app_converted.ico")
-    if converted.exists() and converted.stat().st_mtime >= icon_path.stat().st_mtime:
-        return converted
+
+    # Always regenerate when source is PNG (prevents keeping a distorted ICO
+    # from older conversion logic).
+    if converted.exists():
+        try:
+            c_head = converted.read_bytes()[:8]
+        except Exception:
+            c_head = b""
+        is_converted_png = c_head.startswith(b"\x89PNG\r\n\x1a\n")
+        is_converted_ico = len(c_head) >= 4 and c_head[:4] == b"\x00\x00\x01\x00"
+        if is_converted_png or not is_converted_ico:
+            try:
+                converted.unlink()
+            except Exception:
+                pass
 
     if Image is None:
         print(
@@ -75,6 +93,37 @@ def _ensure_valid_ico(icon_path: Path) -> Path | None:
 
     try:
         img = Image.open(icon_path)
+        try:
+            if ImageOps is not None:
+                img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+
+        try:
+            img = img.convert("RGBA")
+        except Exception:
+            pass
+
+        # Avoid distorted icons when source is not square: pad to square with transparency.
+        try:
+            w, h = img.size
+            if int(w) > 0 and int(h) > 0 and int(w) != int(h):
+                side = max(int(w), int(h))
+                canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+                try:
+                    mask = img.split()[3]
+                except Exception:
+                    mask = None
+                if mask is not None:
+                    canvas.paste(
+                        img, ((side - int(w)) // 2, (side - int(h)) // 2), mask
+                    )
+                else:
+                    canvas.paste(img, ((side - int(w)) // 2, (side - int(h)) // 2))
+                img = canvas
+        except Exception:
+            pass
+
         img.save(
             converted,
             format="ICO",
@@ -187,6 +236,11 @@ def main() -> int:
     if database_dir.exists():
         py_args += ["--add-data", _add_data_arg(database_dir, "database")]
 
+    # Excel templates / samples shipped with the app
+    excel_dir = project_root / "excel"
+    if excel_dir.exists():
+        py_args += ["--add-data", _add_data_arg(excel_dir, "excel")]
+
     # Include SQL script if you ship it with the app
     sql_file = project_root / "creater_database.SQL"
     if sql_file.exists():
@@ -194,7 +248,10 @@ def main() -> int:
         py_args += ["--add-data", _add_data_arg(sql_file, ".")]
 
     # PySide6 + SVG support
-    py_args += ["--collect-all", "PySide6"]
+    # Note: Avoid `--collect-all PySide6` because it forces scanning optional
+    # PySide6 scripts (e.g. deploy_lib) and can emit warnings for missing optional
+    # dependencies. PyInstaller's built-in PySide6 hooks already collect the
+    # required Qt binaries/plugins for typical QWidget apps.
     py_args += ["--hidden-import", "PySide6.QtSvg"]
     py_args += ["--hidden-import", "PySide6.QtSvgWidgets"]
 

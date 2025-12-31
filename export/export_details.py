@@ -76,6 +76,15 @@ def export_shift_attendance_details_xlsx(
     for c in range(col_count):
         if int(c) == 0:
             continue
+
+        # User requirement: export should match what is shown on the table.
+        # If a column is hidden in the UI, do not export it.
+        try:
+            if bool(table.isColumnHidden(int(c))):
+                continue
+        except Exception:
+            pass
+
         try:
             hi = table.horizontalHeaderItem(int(c))
             ht = "" if hi is None else str(hi.text() or "").strip()
@@ -244,6 +253,12 @@ def export_shift_attendance_details_xlsx(
         s = _norm_symbol_text(txt)
         if not s:
             return ""
+
+        # KV/KR are meaningful attendance symbols (missing IN/OUT) and must be exported.
+        # They are not a decorative UI suffix like '+', 'Tr', 'Sm'.
+        if s.strip().lower() in {"kv", "kr"}:
+            return s
+
         h = str(header or "").strip().lower()
         if h in {
             "stt",
@@ -258,11 +273,12 @@ def export_shift_attendance_details_xlsx(
         }:
             return s
 
-        # Common attendance UI symbols
-        symbol_tokens = {"+", "tr", "sm", "x", "kr", "kv", "v", "off", "le", "lễ", "đ"}
+        # Common attendance UI symbols (suffixes) that should be removed from numeric exports.
+        # Note: KV/KR are handled above and intentionally not stripped.
+        symbol_tokens = {"+", "tr", "sm", "x", "v", "off", "le", "lễ", "đ"}
 
         parts = s.split()
-        if parts and parts[-1].strip().lower() in symbol_tokens:
+        if len(parts) >= 2 and parts[-1].strip().lower() in symbol_tokens:
             s = " ".join(parts[:-1]).strip()
             return s
 
@@ -524,6 +540,14 @@ def export_shift_attendance_details_xlsx(
             it = table.item(int(r), int(c))
             return "" if it is None else str(it.text() or "").strip()
 
+        def _is_col_visible(c: int | None) -> bool:
+            if c is None:
+                return False
+            try:
+                return not bool(table.isColumnHidden(int(c)))
+            except Exception:
+                return True
+
         def _first_number(s: str) -> str:
             # Extract first numeric token from strings like "1 X" or "2.5 +".
             import re
@@ -614,19 +638,31 @@ def export_shift_attendance_details_xlsx(
             rec["leave"] = _cell_text(int(r), col_leave)
 
         # Determine in/out lines for each employee.
-        # We respect the user's selected 2/4/6 cap via force_exclude_headers.
+        # User requirement: only export what is shown on the table.
+        # So hidden columns should not appear as extra rows in the template.
+        # We also respect the user's selected 2/4/6 cap via force_exclude_headers.
         excluded_headers = {
             str(x or "").strip() for x in (force_exclude_headers or set())
         }
+
+        excluded_headers_norm = {h.lower() for h in excluded_headers if str(h).strip()}
 
         # User-selected cap via force_exclude_headers:
         # - exclude pair2 => max_pairs=1
         # - exclude pair3 => max_pairs=2
         max_pairs = 3
-        if excluded_headers & {"Vào 2", "Ra 2"}:
+
+        # First: if columns are not present or hidden, reduce pairs.
+        if not (_is_col_visible(col_in2) or _is_col_visible(col_out2)):
             max_pairs = 1
-        elif excluded_headers & {"Vào 3", "Ra 3"}:
+        elif not (_is_col_visible(col_in3) or _is_col_visible(col_out3)):
             max_pairs = 2
+
+        # Then: explicit excludes from settings (handle common header variants).
+        if {"vào 2", "vao 2", "ra 2"} & excluded_headers_norm:
+            max_pairs = 1
+        elif {"vào 3", "vao 3", "ra 3"} & excluded_headers_norm:
+            max_pairs = min(max_pairs, 2)
 
         def _need_pair2(_emp_code: str, _key: tuple[str, str]) -> bool:
             return bool(max_pairs >= 2)
@@ -688,7 +724,9 @@ def export_shift_attendance_details_xlsx(
                     col = day_start_col + int(i)
                     rec = days.get(day, {})
 
-                    def _merge_pair_rows(in_row: int, out_row: int, in_key: str) -> None:
+                    def _merge_pair_rows(
+                        in_row: int, out_row: int, in_key: str
+                    ) -> None:
                         in_val = rec.get(in_key, "")
                         if not _is_merge_status_symbol(in_val):
                             return
@@ -708,9 +746,9 @@ def export_shift_attendance_details_xlsx(
                                 column=int(col),
                                 value=_norm_symbol_text(in_val),
                             ).alignment = grid_center
-                            ws.cell(row=int(out_row), column=int(col), value="").alignment = (
-                                grid_center
-                            )
+                            ws.cell(
+                                row=int(out_row), column=int(col), value=""
+                            ).alignment = grid_center
                         except Exception:
                             pass
 
@@ -872,15 +910,17 @@ def export_shift_attendance_details_xlsx(
 
             # Vắng KP: count days that contain absent symbol 'V'
             try:
-                ws.cell(row=cur, column=s5, value=str(int(absent_v_times))).alignment = grid_center
+                ws.cell(
+                    row=cur, column=s5, value=str(int(absent_v_times))
+                ).alignment = grid_center
             except Exception:
                 ws.cell(row=cur, column=s5, value="0").alignment = grid_center
 
             # Ngày nghỉ (Le) only
             try:
-                ws.cell(row=cur, column=s6 + 3, value=str(int(holiday_days))).alignment = (
-                    grid_center
-                )
+                ws.cell(
+                    row=cur, column=s6 + 3, value=str(int(holiday_days))
+                ).alignment = grid_center
             except Exception:
                 pass
 
@@ -909,7 +949,9 @@ def export_shift_attendance_details_xlsx(
                 row=8,
                 column=1,
                 value=(f"Phòng ban: {dept_txt}" if dept_txt else "Phòng ban:"),
-            ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            ).alignment = Alignment(
+                horizontal="left", vertical="center", wrap_text=True
+            )
             ws.row_dimensions[8].height = max(30, int(ws.row_dimensions[8].height or 0))
         except Exception:
             pass
@@ -920,19 +962,28 @@ def export_shift_attendance_details_xlsx(
                 row=9,
                 column=1,
                 value=(f"Chức vụ: {title_txt}" if title_txt else "Chức vụ:"),
-            ).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+            ).alignment = Alignment(
+                horizontal="left", vertical="center", wrap_text=True
+            )
             ws.row_dimensions[9].height = max(30, int(ws.row_dimensions[9].height or 0))
         except Exception:
             pass
 
         # Data starts at row 10 to keep row 8/9 reserved for meta.
         start_row = 10
-        excel_col_by_table_col = {int(tc): int(ec) for ec, tc in enumerate(cols, start=1)}
+        excel_col_by_table_col = {
+            int(tc): int(ec) for ec, tc in enumerate(cols, start=1)
+        }
 
-        def _try_merge_pair_cols(excel_row: int, in_table_col: int | None, out_table_col: int | None) -> None:
+        def _try_merge_pair_cols(
+            excel_row: int, in_table_col: int | None, out_table_col: int | None
+        ) -> None:
             if in_table_col is None or out_table_col is None:
                 return
-            if int(in_table_col) not in excel_col_by_table_col or int(out_table_col) not in excel_col_by_table_col:
+            if (
+                int(in_table_col) not in excel_col_by_table_col
+                or int(out_table_col) not in excel_col_by_table_col
+            ):
                 return
             in_excel_col = int(excel_col_by_table_col[int(in_table_col)])
             out_excel_col = int(excel_col_by_table_col[int(out_table_col)])
@@ -946,12 +997,23 @@ def export_shift_attendance_details_xlsx(
             if not _is_merge_status_symbol(in_txt):
                 return
             # Ensure left-to-right merge
-            c1, c2 = (in_excel_col, out_excel_col) if in_excel_col < out_excel_col else (out_excel_col, in_excel_col)
+            c1, c2 = (
+                (in_excel_col, out_excel_col)
+                if in_excel_col < out_excel_col
+                else (out_excel_col, in_excel_col)
+            )
             try:
                 # Clear the OUT cell (or the other side) to avoid duplicate text.
                 ws.cell(row=int(excel_row), column=int(c2), value="")
-                ws.merge_cells(start_row=int(excel_row), start_column=int(c1), end_row=int(excel_row), end_column=int(c2))
-                ws.cell(row=int(excel_row), column=int(c1), value=in_txt).alignment = left
+                ws.merge_cells(
+                    start_row=int(excel_row),
+                    start_column=int(c1),
+                    end_row=int(excel_row),
+                    end_column=int(c2),
+                )
+                ws.cell(row=int(excel_row), column=int(c1), value=in_txt).alignment = (
+                    left
+                )
             except Exception:
                 pass
 

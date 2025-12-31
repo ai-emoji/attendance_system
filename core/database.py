@@ -9,6 +9,8 @@ Cung cấp:
 
 import json
 import logging
+import time
+import hashlib
 from pathlib import Path
 from datetime import date, datetime
 from typing import Optional
@@ -31,11 +33,15 @@ def _mysql_connector_module():
     return _MYSQL_CONNECTOR
 
 
-from core.resource import DB_CONNECTION_TIMEOUT, resource_path
+from core.resource import DB_CONNECTION_TIMEOUT, resource_path, user_data_dir
 
 
 # Cấu hình logging
 logger = logging.getLogger(__name__)
+
+# Connection-log throttling (avoid spamming logs when many short DB ops run).
+_LAST_CONNECT_LOG_KEY: str | None = None
+_LAST_CONNECT_LOG_TS: float = 0.0
 
 
 class Database:
@@ -343,11 +349,15 @@ class Database:
         Mặc định: database/db_config.json (qua resource_path).
         """
 
-        path = (
-            Path(config_file)
-            if config_file
-            else Path(resource_path("database/db_config.json"))
-        )
+        if config_file:
+            path = Path(config_file)
+        else:
+            user_path = user_data_dir("pmctn") / "database" / "db_config.json"
+            path = (
+                user_path
+                if user_path.exists()
+                else Path(resource_path("database/db_config.json"))
+            )
         try:
             if not path.exists() or not path.is_file():
                 return
@@ -424,6 +434,23 @@ class Database:
 
         try:
             connect_kwargs = dict(Database.CONFIG)
+
+            # Enable mysql-connector connection pooling to reduce overhead.
+            # NOTE: Closing a pooled connection returns it to the pool.
+            try:
+                host_p = str(connect_kwargs.get("host") or "").strip().lower()
+                user_p = str(connect_kwargs.get("user") or "").strip().lower()
+                db_p = str(connect_kwargs.get("database") or "").strip().lower()
+                port_p = int(connect_kwargs.get("port") or 3306)
+                pool_sig = f"{host_p}:{port_p}/{db_p}@{user_p}".encode("utf-8")
+                pool_hash = hashlib.sha1(pool_sig).hexdigest()[:12]
+                connect_kwargs.setdefault("pool_name", f"pmctn_{pool_hash}")
+                connect_kwargs.setdefault("pool_size", 5)
+                connect_kwargs.setdefault("pool_reset_session", True)
+            except Exception:
+                # Best-effort: if pooling args fail for any reason, continue without pooling.
+                pass
+
             try:
                 timeout = connect_kwargs.get("connection_timeout")
                 timeout_int = (
@@ -434,7 +461,27 @@ class Database:
             connect_kwargs["connection_timeout"] = max(1, int(timeout_int))
 
             conn = mc.connect(**connect_kwargs)
-            logger.info("✅ Kết nối MySQL thành công")
+
+            # Log success only when meaningful (first connect, config changed, or after a quiet period).
+            try:
+                host_l = str(connect_kwargs.get("host") or "").strip().lower()
+                user_l = str(connect_kwargs.get("user") or "").strip().lower()
+                db_l = str(connect_kwargs.get("database") or "").strip().lower()
+                port_l = int(connect_kwargs.get("port") or 3306)
+                key = f"{host_l}:{port_l}/{db_l}@{user_l}"
+            except Exception:
+                key = ""
+
+            global _LAST_CONNECT_LOG_KEY, _LAST_CONNECT_LOG_TS
+            now = time.monotonic()
+            if key and (
+                key != _LAST_CONNECT_LOG_KEY or (now - _LAST_CONNECT_LOG_TS) > 60
+            ):
+                logger.info("✅ Kết nối MySQL thành công")
+                _LAST_CONNECT_LOG_KEY = key
+                _LAST_CONNECT_LOG_TS = now
+            else:
+                logger.debug("✅ Kết nối MySQL thành công")
 
             # Best-effort schema checks (once per process)
             if ensure_schema:

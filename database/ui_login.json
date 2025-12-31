@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "username": "tamnien",
+      "salt": "17441f21ef3e1f0cb5a10300205f5842",
+      "hash": "22aef64e3b6469dab93e508318ca51869a32b0bb74e8fdda2b58473cb289f263",
+      "iterations": 200000,
+      "password_enc": "JBGecA=="
+    }
+  ],
+  "last_username": "tamnien",
+  "logged_in": false,
+  "recovery_question": "duongphuc1510"
+}

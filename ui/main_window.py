@@ -421,8 +421,47 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.container, 1)
         main_layout.addWidget(self.footer)
 
-        # Căn giữa cửa sổ trên màn hình
-        self._center_window()
+        # Apply startup window state after first event-loop tick.
+        # If the screen can't satisfy the declared size, open maximized.
+        try:
+            QTimer.singleShot(0, self._apply_startup_window_state)
+        except Exception:
+            self._apply_startup_window_state()
+
+    def _apply_startup_window_state(self) -> None:
+        try:
+            screen = self.screen()
+            if screen is None:
+                self._center_window()
+                return
+
+            available = screen.availableGeometry()
+            aw = int(available.width())
+            ah = int(available.height())
+            if aw < int(MIN_MAINWINDOW_WIDTH) or ah < int(MIN_MAINWINDOW_HEIGHT):
+                # Screen is smaller than the declared minimum.
+                # Use maximize (NOT fullscreen) so the window manager fits the *frame*
+                # into the available area and does not cover the taskbar.
+                try:
+                    # Lower the minimum so maximize can actually fit.
+                    self.setMinimumSize(1, 1)
+                except Exception:
+                    pass
+                try:
+                    self.showMaximized()
+                except Exception:
+                    pass
+                return
+
+            # Default: keep the declared startup size and center.
+            self.resize(MIN_MAINWINDOW_WIDTH, MIN_MAINWINDOW_HEIGHT)
+            self._center_window()
+        except Exception:
+            # Best-effort fallback
+            try:
+                self._center_window()
+            except Exception:
+                pass
 
     def _reset_shift_attendance_filters_on_exit(self) -> None:
         try:
@@ -479,6 +518,13 @@ class MainWindow(QMainWindow):
 
         if action_text == "Thông tin\nNhân viên":
             self.container.show_employee_view()
+            return
+
+        if action_text == "Đổi\nMật khẩu":
+            from ui.dialog.login_dialog import LoginDialog
+
+            dlg = LoginDialog(self, mode="change_password")
+            dlg.exec()
             return
 
         if action_text == "Khai báo\nCa làm việc":
@@ -570,7 +616,15 @@ class MainWindow(QMainWindow):
 
     def _center_window(self) -> None:
         """Căn giữa cửa sổ trên màn hình."""
-        screen_geometry = self.screen().geometry()
+        try:
+            screen = self.screen()
+            screen_geometry = (
+                screen.availableGeometry()
+                if screen is not None
+                else self.screen().geometry()
+            )
+        except Exception:
+            screen_geometry = self.screen().geometry()
         window_geometry = self.frameGeometry()
         center_point = screen_geometry.center()
         window_geometry.moveCenter(center_point)

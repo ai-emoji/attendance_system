@@ -19,7 +19,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Signal
 
-from core.resource import resource_path
+from core.resource import resource_path, user_data_dir
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,12 +40,23 @@ def _user_settings_path() -> Path:
     is typically read-only for standard users.
     """
 
-    app_name = "attendance"
-    base = environ.get("APPDATA") or environ.get("LOCALAPPDATA")
-    if base:
-        return Path(base) / app_name / "ui_settings.json"
-    # Fallback (should rarely be needed on Windows)
-    return Path.home() / "." / app_name / "ui_settings.json"
+    app_name = "pmctn"
+    new_path = user_data_dir(app_name) / "ui_settings.json"
+
+    # Best-effort migration from older app name.
+    try:
+        base = environ.get("LOCALAPPDATA") or environ.get("APPDATA")
+        if base:
+            old_path = Path(base) / "attendance" / "ui_settings.json"
+            if not new_path.exists() and old_path.exists():
+                new_path.parent.mkdir(parents=True, exist_ok=True)
+                new_path.write_text(
+                    old_path.read_text(encoding="utf-8"), encoding="utf-8"
+                )
+    except Exception:
+        pass
+
+    return new_path
 
 
 def _settings_path() -> Path:

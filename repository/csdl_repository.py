@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from core.resource import resource_path
+from core.resource import resource_path, user_data_dir
 
 
 @dataclass(frozen=True)
@@ -28,15 +28,26 @@ class CSDLConfig:
 
 class CSDLRepository:
     def __init__(self, config_file: str | None = None) -> None:
-        # Mặc định lưu ở: database/db_config.json
-        self._path = (
-            Path(config_file)
-            if config_file
-            else Path(resource_path("database/db_config.json"))
-        )
+        # Mặc định lưu ở per-user AppData (writable), không lưu trong Program Files.
+        if config_file:
+            self._path = Path(config_file)
+        else:
+            self._path = user_data_dir("pmctn") / "database" / "db_config.json"
 
     def load(self) -> CSDLConfig | None:
         try:
+            # Initialize user config from packaged default (best-effort).
+            if not self._path.exists():
+                try:
+                    packaged = Path(resource_path("database/db_config.json"))
+                    if packaged.exists():
+                        self._path.parent.mkdir(parents=True, exist_ok=True)
+                        self._path.write_text(
+                            packaged.read_text(encoding="utf-8"), encoding="utf-8"
+                        )
+                except Exception:
+                    pass
+
             if not self._path.exists():
                 return None
 

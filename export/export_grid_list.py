@@ -211,6 +211,11 @@ def export_shift_attendance_grid_xlsx(
         s = s.strip()
         if not s:
             return ""
+
+        # KV/KR are meaningful attendance symbols (missing IN/OUT) and must be exported.
+        if s.strip().lower() in {"kv", "kr"}:
+            return s
+
         h = str(header or "").strip().lower()
         if h in {
             "stt",
@@ -225,9 +230,9 @@ def export_shift_attendance_grid_xlsx(
         }:
             return s
 
-        symbol_tokens = {"+", "tr", "sm", "x", "kr", "kv", "v", "off", "le", "lễ", "đ"}
+        symbol_tokens = {"+", "tr", "sm", "x", "v", "off", "le", "lễ", "đ"}
         parts = s.split()
-        if parts and parts[-1].strip().lower() in symbol_tokens:
+        if len(parts) >= 2 and parts[-1].strip().lower() in symbol_tokens:
             return " ".join(parts[:-1]).strip()
 
         try:

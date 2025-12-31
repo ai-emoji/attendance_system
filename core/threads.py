@@ -20,6 +20,13 @@ from collections.abc import Callable
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
+try:
+    from shiboken6 import isValid as _is_valid  # type: ignore
+except Exception:  # pragma: no cover
+
+    def _is_valid(_obj: object) -> bool:  # type: ignore
+        return True
+
 
 logger = logging.getLogger(__name__)
 
@@ -122,14 +129,34 @@ class BackgroundTaskRunner(QObject):
     """
 
     def __init__(
-        self, parent: QObject | None = None, *, name: str | None = None
+        self,
+        parent: QObject | None = None,
+        *,
+        name: str | None = None,
+        guard: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._name = str(name or "task")
+        self._guard = guard
         self._generation = 0
         self._thread: QThread | None = None
         self._worker: _FnWorker | None = None
         self._bridge: QObject | None = None
+
+    def invalidate(self) -> None:
+        """Invalidate any pending callbacks for this runner.
+
+        Useful when the UI owning the callbacks is being destroyed.
+        """
+
+        self._generation += 1
+        self.cancel_current()
+
+    def _guard_alive(self) -> bool:
+        try:
+            return self._guard is None or bool(_is_valid(self._guard))
+        except Exception:
+            return True
 
     def cancel_current(self) -> None:
         """Best-effort cancel the current task."""
@@ -175,6 +202,8 @@ class BackgroundTaskRunner(QObject):
         class _Bridge(QObject):
             @Slot(int, str, int)
             def on_progress(self, pct: int, msg: str, generation: int) -> None:
+                if not runner_self._guard_alive():
+                    return
                 if int(generation) != int(runner_self._generation):
                     return
                 if on_progress is None:
@@ -188,6 +217,8 @@ class BackgroundTaskRunner(QObject):
             def on_progress_items(
                 self, done: int, total: int, msg: str, generation: int
             ) -> None:
+                if not runner_self._guard_alive():
+                    return
                 if int(generation) != int(runner_self._generation):
                     return
                 if on_progress_items is None:
@@ -199,6 +230,8 @@ class BackgroundTaskRunner(QObject):
 
             @Slot(object, int)
             def on_finished(self, result: object, generation: int) -> None:
+                if not runner_self._guard_alive():
+                    return
                 if int(generation) != int(runner_self._generation):
                     return
                 if result is _CANCELLED:
@@ -212,6 +245,8 @@ class BackgroundTaskRunner(QObject):
 
             @Slot(str, int)
             def on_failed(self, msg: str, generation: int) -> None:
+                if not runner_self._guard_alive():
+                    return
                 if int(generation) != int(runner_self._generation):
                     return
                 if on_error is None:

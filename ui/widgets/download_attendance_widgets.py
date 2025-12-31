@@ -838,6 +838,44 @@ class MainContent(QWidget):
             # QTableWidget already deleted (view switched/closed)
             return
 
+    def clear_attendance_rows(self) -> None:
+        """Xóa dữ liệu (giữ lại placeholder rows theo viewport)."""
+
+        try:
+            self._rows_data_count = 0
+            self._ensure_rows_fit_viewport()
+            # Clear text in all visible rows
+            for r in range(self.table.rowCount()):
+                self._set_row_data(r, "", "", "", "", "", "", "", "", "", "")
+        except RuntimeError:
+            return
+
+    def append_attendance_rows(
+        self,
+        rows: list[tuple[str, str, str, str, str, str, str, str, str, str]],
+    ) -> None:
+        """Append dữ liệu vào cuối bảng (dùng cho trường hợp streaming)."""
+
+        if not rows:
+            return
+
+        try:
+            start = int(getattr(self, "_rows_data_count", 0) or 0)
+            add = len(rows)
+            self._rows_data_count = start + add
+
+            # Ensure enough rows for data + viewport
+            viewport_h = self.table.viewport().height()
+            desired = max(1, int(viewport_h // ROW_HEIGHT)) if viewport_h > 0 else 1
+            needed = max(desired, self._rows_data_count, 1)
+            self._ensure_row_count(needed)
+
+            for i, row in enumerate(rows):
+                r = start + i
+                self._set_row_data(r, *row)
+        except RuntimeError:
+            return
+
     def _set_row_data(
         self,
         row: int,

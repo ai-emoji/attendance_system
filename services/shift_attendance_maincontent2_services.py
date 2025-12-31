@@ -1439,6 +1439,46 @@ class ShiftAttendanceMainContent2Service:
         row["in_1"] = in_val
         row["out_1"] = out_val
 
+        # Drop unrealistically-close punches near the first IN when there is a later punch.
+        # Otherwise, FIRST/LAST mode would keep them as "leftovers" and they show up as
+        # an extra IN (e.g. 06:55 IN, 06:57 OUT, 18:02 IN -> 06:57 becomes in_2).
+        try:
+            threshold_seconds = 5 * 60
+            s_in0 = cls._time_to_seconds(in_val)
+            if s_in0 is not None and punches:
+                # Determine whether there is any punch later than a candidate.
+                sec_candidates: list[int] = []
+                try:
+                    if out_val is not None:
+                        so = cls._time_to_seconds(out_val)
+                        if so is not None:
+                            sec_candidates.append(int(so))
+                except Exception:
+                    pass
+                for pv in list(punches):
+                    sp = cls._time_to_seconds(pv)
+                    if sp is not None:
+                        sec_candidates.append(int(sp))
+                max_sec = max(sec_candidates) if sec_candidates else None
+
+                if max_sec is not None:
+                    filtered: list[object] = []
+                    for pv in punches:
+                        sp = cls._time_to_seconds(pv)
+                        if sp is None:
+                            filtered.append(pv)
+                            continue
+                        delta = int(sp) - int(s_in0)
+                        # Only drop when there exists a later punch to preserve.
+                        if 0 <= int(delta) <= int(threshold_seconds) and int(
+                            max_sec
+                        ) > int(sp):
+                            continue
+                        filtered.append(pv)
+                    punches[:] = filtered
+        except Exception:
+            pass
+
         # Ensure no punch is silently dropped in FIRST/LAST mode.
         # Any remaining punches should still be displayed in remaining slots.
         try:
@@ -1935,6 +1975,51 @@ class ShiftAttendanceMainContent2Service:
             # This is applied defensively for all modes; especially important for
             # device mode (where we otherwise keep DB values as-is).
             try:
+
+                def _drop_short_out_pairs_inplace(
+                    row0: dict[str, Any], *, threshold_seconds: int
+                ) -> bool:
+                    """Drop OUT punches that are unrealistically close to IN.
+
+                    Rule: if in_N and out_N exist and (out_N - in_N) <= threshold
+                    AND there is at least one later punch in the same day,
+                    clear out_N. This avoids 'Vào rồi Ra trong vài phút'.
+                    """
+
+                    changed0 = False
+                    keys_seq = ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
+
+                    def _has_later(idx: int) -> bool:
+                        for k in keys_seq[idx + 1 :]:
+                            if row0.get(k) is not None:
+                                return True
+                        return False
+
+                    for pair in (1, 2, 3):
+                        kin = f"in_{pair}"
+                        kout = f"out_{pair}"
+                        inv = row0.get(kin)
+                        outv = row0.get(kout)
+                        if inv is None or outv is None:
+                            continue
+                        # only drop if we have any later punch to preserve
+                        if not _has_later((pair - 1) * 2 + 1):
+                            continue
+
+                        s_in = self._time_to_seconds(inv)
+                        s_out = self._time_to_seconds(outv)
+                        if s_in is None or s_out is None:
+                            continue
+                        try:
+                            delta = int(s_out) - int(s_in)
+                        except Exception:
+                            continue
+                        if 0 <= int(delta) <= int(threshold_seconds):
+                            row0[kout] = None
+                            changed0 = True
+
+                    return changed0
+
                 orig_vals = self._collect_sorted_times(r)
                 cleaned_vals = self._dedupe_close_times(
                     orig_vals,
@@ -1945,6 +2030,17 @@ class ShiftAttendanceMainContent2Service:
                     keys0 = ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
                     for i0, k0 in enumerate(keys0):
                         r[k0] = cleaned_vals[i0] if i0 < len(cleaned_vals) else None
+
+                if mode_norm == "device":
+                    changed = _drop_short_out_pairs_inplace(
+                        r,
+                        threshold_seconds=5 * 60,
+                    )
+                    if changed:
+                        repack = self._collect_sorted_times(r)
+                        keys0 = ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
+                        for i0, k0 in enumerate(keys0):
+                            r[k0] = repack[i0] if i0 < len(repack) else None
             except Exception:
                 pass
 
