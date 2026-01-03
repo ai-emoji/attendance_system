@@ -110,7 +110,7 @@ class HeaderController:
                 HeaderAction("Kết nối\nCSDL SQL", "login.svg"),
                 HeaderAction("Sao lưu\nDữ liệu", "backup.svg"),
                 HeaderAction("Khôi phục\nDữ liệu", "absence_restore.svg"),
-                # HeaderAction("Cài đặt", ICON_SETTINGS),
+                HeaderAction("Cài đặt", ICON_SETTINGS),
             ]
 
         # Fallback: coi như "Khai báo"

@@ -24,6 +24,7 @@ from PySide6.QtCore import (
     QCoreApplication,
     QEvent,
     QObject,
+    QItemSelectionModel,
     QModelIndex,
     QPoint,
     QRect,
@@ -1173,8 +1174,10 @@ class _FilterHeaderView(QHeaderView):
 class EmployeeTable(QTableView):
     """Unified table (single QTableView).
 
+    Applied from table.md (Grid behavior):
     - Column ID is hidden.
-    - No frozen columns.
+    - Read-only, select-by-row, zebra rows, grid lines.
+    - Freeze 3 columns on the left (STT, MÃ NV, HỌ VÀ TÊN).
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -1182,6 +1185,12 @@ class EmployeeTable(QTableView):
 
         self._always_hidden_keys: set[str] = {"id", "mcc_code", "name_on_mcc"}
         self._saved_column_widths: dict[str, int] = {}
+
+        # Freeze 3 columns on the left (similar to wx.Grid.FreezeTo(0, 3)).
+        # Note: We intentionally skip the hidden technical ID column.
+        self._frozen_keys: tuple[str, ...] = ("stt", "employee_code", "full_name")
+        self._frozen_view: QTableView | None = None
+        self._syncing_scroll = False
 
         self._model = _EmployeeTableModel(self)
         self._proxy = _EmployeeFilterProxy(self)
@@ -1197,12 +1206,20 @@ class EmployeeTable(QTableView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setAlternatingRowColors(True)
         self.setWordWrap(False)
+        self.setShowGrid(True)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setModel(self._proxy)
+
+        # Share a single selection model between the main view and frozen view.
+        try:
+            sm = QItemSelectionModel(self._proxy)
+            self.setSelectionModel(sm)
+        except Exception:
+            pass
 
         # Table font (data rows)
         body_font = QFont(UI_FONT, int(CONTENT_FONT) + 1)
@@ -1220,6 +1237,10 @@ class EmployeeTable(QTableView):
         self.setHorizontalHeader(main_header)
         self.horizontalHeader().setVisible(True)
         self.horizontalHeader().setFixedHeight(ROW_HEIGHT)
+        try:
+            self.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
         self._enforcing_min_width = False
         try:
             self.horizontalHeader().sectionResized.connect(self._on_section_resized)
@@ -1234,6 +1255,9 @@ class EmployeeTable(QTableView):
         # Unified style (single table)
         self._apply_table_style_main()
 
+        # Frozen view (left pinned columns)
+        self._setup_frozen_view(header_font)
+
         self._configure_columns()
 
         # Apply UI settings and live-update when changed.
@@ -1243,12 +1267,210 @@ class EmployeeTable(QTableView):
         except Exception:
             pass
 
+        # Final geometry sync after all column widths/visibility have been applied.
+        self._sync_frozen_view()
+
     def _col_index(self, key: str) -> int:
         k = str(key or "").strip()
         for i, (col_key, _label, _minw) in enumerate(self._model.COLUMNS):
             if col_key == k:
                 return int(i)
         return -1
+
+    def _frozen_cols(self) -> list[int]:
+        cols: list[int] = []
+        for k in self._frozen_keys:
+            idx = self._col_index(k)
+            if idx >= 0:
+                cols.append(int(idx))
+        return cols
+
+    def _setup_frozen_view(self, header_font: QFont) -> None:
+        cols = self._frozen_cols()
+        if not cols:
+            self._frozen_view = None
+            return
+
+        frozen = QTableView(self)
+        frozen.setFrameShape(QFrame.Shape.NoFrame)
+        frozen.setLineWidth(0)
+        frozen.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        frozen.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        frozen.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        frozen.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        frozen.setAlternatingRowColors(True)
+        frozen.setWordWrap(False)
+        frozen.setShowGrid(True)
+        frozen.verticalHeader().setVisible(False)
+        frozen.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        frozen.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        frozen.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        frozen.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        frozen.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        frozen.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        frozen.setModel(self._proxy)
+        try:
+            sm = self.selectionModel()
+            if sm is not None:
+                frozen.setSelectionModel(sm)
+        except Exception:
+            pass
+
+        # Same fonts and delegate
+        try:
+            frozen.setFont(self.font())
+        except Exception:
+            pass
+        frozen.setItemDelegate(
+            _LeftPaddingDelegate(0, selected_weight=QFont.Weight.Medium, parent=frozen)
+        )
+
+        # Header with dropdown filter icon (same as main header)
+        frozen_header = _FilterHeaderView(self._proxy, self._model, frozen)
+        frozen_header.setFont(header_font)
+        frozen.setHorizontalHeader(frozen_header)
+        frozen.horizontalHeader().setVisible(True)
+        frozen.horizontalHeader().setFixedHeight(ROW_HEIGHT)
+        try:
+            frozen.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        except Exception:
+            pass
+
+        # Match styling
+        try:
+            frozen.setStyleSheet(self.styleSheet())
+        except Exception:
+            pass
+
+        # Keep vertical scrolling in sync.
+        try:
+            self.verticalScrollBar().valueChanged.connect(self._on_main_vscroll)
+            frozen.verticalScrollBar().valueChanged.connect(self._on_frozen_vscroll)
+        except Exception:
+            pass
+
+        # Keep column resizing in sync (frozen header can resize frozen cols).
+        try:
+            frozen.horizontalHeader().sectionResized.connect(
+                self._on_frozen_section_resized
+            )
+        except Exception:
+            pass
+
+        self._frozen_view = frozen
+        self._sync_frozen_view()
+
+    def _on_main_vscroll(self, value: int) -> None:
+        if self._syncing_scroll:
+            return
+        if self._frozen_view is None:
+            return
+        try:
+            self._syncing_scroll = True
+            self._frozen_view.verticalScrollBar().setValue(int(value))
+        finally:
+            self._syncing_scroll = False
+
+    def _on_frozen_vscroll(self, value: int) -> None:
+        if self._syncing_scroll:
+            return
+        try:
+            frozen = self._frozen_view
+            if frozen is None:
+                return
+            self._syncing_scroll = True
+            self.verticalScrollBar().setValue(int(value))
+        finally:
+            self._syncing_scroll = False
+
+    def _on_frozen_section_resized(
+        self, logicalIndex: int, oldSize: int, newSize: int
+    ) -> None:
+        # Enforce min-width rules using the same logic as the main header.
+        self._on_section_resized(int(logicalIndex), int(oldSize), int(newSize))
+        if self._frozen_view is None:
+            return
+        try:
+            # Mirror width to the main view for consistent state (even if covered by overlay).
+            self.setColumnWidth(
+                int(logicalIndex), int(self._frozen_view.columnWidth(int(logicalIndex)))
+            )
+        except Exception:
+            pass
+        self._sync_frozen_view()
+
+    def _sync_frozen_view(self) -> None:
+        frozen = self._frozen_view
+        if frozen is None:
+            return
+
+        frozen_cols = set(self._frozen_cols())
+
+        # Ensure hidden technical columns stay hidden in frozen view.
+        for k in self._always_hidden_keys:
+            idx = self._col_index(k)
+            if idx >= 0:
+                try:
+                    frozen.setColumnHidden(int(idx), True)
+                    frozen.setColumnWidth(int(idx), 0)
+                except Exception:
+                    pass
+
+        # Show only frozen cols in the frozen overlay.
+        any_visible = False
+        for i, (k, _label, _minw) in enumerate(self._model.COLUMNS):
+            key = str(k or "").strip()
+            if not key:
+                continue
+            if key in self._always_hidden_keys:
+                continue
+            is_frozen_col = int(i) in frozen_cols
+            try:
+                # Respect main visibility settings for frozen columns.
+                if is_frozen_col and not self.isColumnHidden(int(i)):
+                    frozen.setColumnHidden(int(i), False)
+                    any_visible = True
+                    # Keep widths identical.
+                    frozen.setColumnWidth(int(i), int(self.columnWidth(int(i))))
+                else:
+                    frozen.setColumnHidden(int(i), True)
+                    frozen.setColumnWidth(int(i), 0)
+            except Exception:
+                pass
+
+        frozen.setVisible(bool(any_visible))
+        self._update_frozen_geometry()
+
+    def _update_frozen_geometry(self) -> None:
+        frozen = self._frozen_view
+        if frozen is None:
+            return
+        if not frozen.isVisible():
+            return
+
+        w = 0
+        for c in self._frozen_cols():
+            try:
+                if self.isColumnHidden(int(c)):
+                    continue
+                w += int(self.columnWidth(int(c)))
+            except Exception:
+                continue
+        if w <= 0:
+            frozen.setVisible(False)
+            return
+
+        # Overlay on top-left of the main table, including the header.
+        frozen.setGeometry(0, 0, int(w) + 2, int(self.height()))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._update_frozen_geometry()
+
+    def updateGeometries(self) -> None:  # noqa: N802
+        super().updateGeometries()
+        self._update_frozen_geometry()
 
     def show_all_columns(self) -> None:
         """Show all visible columns (keep some technical columns hidden)."""
@@ -1291,6 +1513,8 @@ class EmployeeTable(QTableView):
                 self.setColumnWidth(col, int(min_w))
             finally:
                 self._enforcing_min_width = False
+        # Keep frozen overlay width up-to-date.
+        self._sync_frozen_view()
 
     def _apply_table_style_main(self) -> None:
         self.setStyleSheet(
@@ -1334,6 +1558,7 @@ class EmployeeTable(QTableView):
         self.setColumnWidth(self._col_index("note"), 260)
 
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._sync_frozen_view()
 
     def apply_ui_settings(self) -> None:
         ui = get_employee_table_ui()
@@ -1360,6 +1585,20 @@ class EmployeeTable(QTableView):
             self.horizontalHeader().setStyleSheet(
                 f"QHeaderView::section {{ font-size: {int(ui.header_font_size)}px; font-weight: {int(w)}; }}"
             )
+        except Exception:
+            pass
+
+        # Keep frozen header font in sync.
+        try:
+            if (
+                self._frozen_view is not None
+                and self._frozen_view.horizontalHeader() is not None
+            ):
+                self._frozen_view.horizontalHeader().setFont(header_font)
+                w = 600 if ui.header_font_weight == "bold" else 400
+                self._frozen_view.horizontalHeader().setStyleSheet(
+                    f"QHeaderView::section {{ font-size: {int(ui.header_font_size)}px; font-weight: {int(w)}; }}"
+                )
         except Exception:
             pass
 
@@ -1478,6 +1717,8 @@ class EmployeeTable(QTableView):
                 self._model.dataChanged.emit(top_left, bottom_right)
         except Exception:
             pass
+
+        self._sync_frozen_view()
 
     def clear(self) -> None:
         self._model.set_rows([])

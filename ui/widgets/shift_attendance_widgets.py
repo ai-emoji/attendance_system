@@ -23,7 +23,16 @@ from __future__ import annotations
 import datetime as _dt
 import time as _time
 
-from PySide6.QtCore import QDate, QLocale, QSize, Qt, Signal, QTimer
+from PySide6.QtCore import (
+    QDate,
+    QLocale,
+    QSize,
+    Qt,
+    Signal,
+    QTimer,
+    QItemSelectionModel,
+    QEvent,
+)
 from PySide6.QtGui import QColor, QFont, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -40,6 +49,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QToolButton,
     QSizePolicy,
+    QTableView,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -1340,6 +1350,20 @@ class MainContent2(QWidget):
         except Exception:
             pass
 
+        # Center header text (align similar to table.md).
+        try:
+            self.table.horizontalHeader().setDefaultAlignment(
+                Qt.AlignmentFlag.AlignCenter
+            )
+        except Exception:
+            pass
+
+        # Freeze first 3 columns (checkbox, STT, Mã nv) like a Grid's FreezeTo(0, 3).
+        self._frozen_cols: tuple[int, ...] = (0, 1, 2, 3)
+        self._frozen_view: QTableView | None = None
+        self._syncing_scroll = False
+        self._setup_frozen_view()
+
         # Cột "Tổng" yêu cầu Min W=60
         try:
             total_col = self._col_index("total")
@@ -1387,6 +1411,196 @@ class MainContent2(QWidget):
             QTimer.singleShot(0, self._restore_view_state)
         except Exception:
             pass
+
+    def _setup_frozen_view(self) -> None:
+        # Use an overlay QTableView to freeze left columns for a QTableWidget.
+        if not self._frozen_cols:
+            return
+
+        try:
+            model = self.table.model()
+        except Exception:
+            model = None
+        if model is None:
+            return
+
+        frozen = QTableView(self.table)
+        frozen.setFrameShape(QFrame.Shape.NoFrame)
+        frozen.setLineWidth(0)
+        frozen.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        frozen.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        frozen.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        frozen.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        frozen.setAlternatingRowColors(True)
+        frozen.setWordWrap(False)
+        frozen.setShowGrid(True)
+        frozen.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        frozen.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        frozen.verticalHeader().setVisible(False)
+        frozen.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        frozen.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        try:
+            frozen.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+            frozen.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        except Exception:
+            pass
+
+        frozen.setModel(model)
+
+        # Keep base fonts consistent with the main table.
+        try:
+            frozen.setFont(self.table.font())
+        except Exception:
+            pass
+
+        # Share selection model so selection looks identical.
+        try:
+            sm = self.table.selectionModel()
+            if sm is not None:
+                frozen.setSelectionModel(sm)
+            else:
+                self.table.setSelectionModel(QItemSelectionModel(model))
+                frozen.setSelectionModel(self.table.selectionModel())
+        except Exception:
+            pass
+
+        # Styling: reuse QTableWidget stylesheet, adapted for QTableView.
+        try:
+            qss = str(self.table.styleSheet() or "")
+            qss = qss.replace("QTableWidget", "QTableView")
+            frozen.setStyleSheet(qss)
+        except Exception:
+            pass
+
+        # Header mirrors
+        try:
+            frozen.horizontalHeader().setFont(self.table.horizontalHeader().font())
+            frozen.horizontalHeader().setFixedHeight(
+                self.table.horizontalHeader().height()
+            )
+            frozen.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Mirror header stylesheet (font-size/font-weight) when present.
+            hs = str(self.table.horizontalHeader().styleSheet() or "").strip()
+            if hs:
+                frozen.horizontalHeader().setStyleSheet(hs)
+        except Exception:
+            pass
+
+        # Make it purely visual: allow click/scroll events to pass through.
+        try:
+            frozen.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        except Exception:
+            pass
+
+        # Sync vertical scrolling.
+        try:
+            self.table.verticalScrollBar().valueChanged.connect(self._on_main_vscroll)
+        except Exception:
+            pass
+
+        # Sync widths when user resizes columns in the main header.
+        try:
+            self.table.horizontalHeader().sectionResized.connect(
+                lambda *_args: self._sync_frozen_view()
+            )
+        except Exception:
+            pass
+
+        # Keep geometry in sync.
+        try:
+            self.table.installEventFilter(self)
+        except Exception:
+            pass
+
+        self._frozen_view = frozen
+        self._sync_frozen_view()
+
+    def _sync_frozen_fonts(self, *, body_font: QFont, header_font: QFont) -> None:
+        fv = self._frozen_view
+        if fv is None:
+            return
+        try:
+            fv.setFont(QFont(body_font))
+        except Exception:
+            pass
+        try:
+            hh = fv.horizontalHeader()
+            if hh is not None:
+                hh.setFont(QFont(header_font))
+                hs = str(self.table.horizontalHeader().styleSheet() or "").strip()
+                if hs:
+                    hh.setStyleSheet(hs)
+                try:
+                    hh.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _on_main_vscroll(self, value: int) -> None:
+        if self._syncing_scroll:
+            return
+        fv = self._frozen_view
+        if fv is None:
+            return
+        try:
+            self._syncing_scroll = True
+            fv.verticalScrollBar().setValue(int(value))
+        finally:
+            self._syncing_scroll = False
+
+    def _sync_frozen_view(self) -> None:
+        fv = self._frozen_view
+        if fv is None:
+            return
+
+        w = 0
+        any_visible = False
+        col_count = int(self.table.columnCount())
+
+        for c in range(col_count):
+            is_frozen = int(c) in set(int(x) for x in self._frozen_cols)
+            try:
+                hidden = bool(self.table.isColumnHidden(int(c)))
+            except Exception:
+                hidden = False
+
+            if is_frozen and not hidden:
+                any_visible = True
+                try:
+                    fv.setColumnHidden(int(c), False)
+                    cw = int(self.table.columnWidth(int(c)))
+                    fv.setColumnWidth(int(c), cw)
+                    w += cw
+                except Exception:
+                    pass
+            else:
+                try:
+                    fv.setColumnHidden(int(c), True)
+                    fv.setColumnWidth(int(c), 0)
+                except Exception:
+                    pass
+
+        fv.setVisible(bool(any_visible and w > 0))
+        if not fv.isVisible():
+            return
+
+        # Overlay on the left including header.
+        try:
+            fv.setGeometry(0, 0, int(w) + 2, int(self.table.height()))
+            fv.raise_()
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event) -> bool:
+        # Keep frozen overlay geometry synced with table size.
+        try:
+            if obj is self.table and event is not None:
+                if event.type() in {QEvent.Type.Resize, QEvent.Type.Show}:
+                    self._sync_frozen_view()
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
 
     def restore_cached_state_if_any(self) -> bool:
         """Không restore bảng từ cache; luôn để controller reload dữ liệu."""
@@ -1591,6 +1805,9 @@ class MainContent2(QWidget):
         except Exception:
             pass
 
+        # Keep frozen overlay fonts in sync with UI settings.
+        self._sync_frozen_fonts(body_font=body_font, header_font=header_font)
+
         # Column visibility
         for idx in range(ncols):
             k, _label = self._COLUMNS[int(idx)]
@@ -1687,6 +1904,9 @@ class MainContent2(QWidget):
                         pass
 
         self.columns_changed.emit()
+
+        # Keep frozen overlay in sync with current visibility/width.
+        self._sync_frozen_view()
 
 
 # Keep in sync with ShiftAttendanceSettingsDialog
