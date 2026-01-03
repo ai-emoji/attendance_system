@@ -633,17 +633,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         """Khi đóng phần mềm.
 
-        - Tự động xóa dữ liệu tải tạm trong download_attendance.
+        - (Deprecated) Trước đây xóa dữ liệu tải tạm trong download_attendance.
+          Hiện tại luồng tải ghi trực tiếp vào attendance_audit_YYYY.
         - Reset filter tìm kiếm của màn Chấm công Theo ca cho lần mở sau.
         """
-
-        try:
-            from services.download_attendance_services import DownloadAttendanceService
-
-            DownloadAttendanceService().clear_download_attendance()
-        except Exception:
-            # Best-effort: không chặn app đóng nếu xóa thất bại
-            pass
 
         # Để tránh trường hợp các widget con (ShiftAttendance) persist state trong hideEvent
         # khi app đang đóng, reset state sau khi window đã close.

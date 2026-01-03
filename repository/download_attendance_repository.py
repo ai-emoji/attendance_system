@@ -50,7 +50,7 @@ class DownloadAttendanceRepository:
         query = (
             "SELECT "
             "t.attendance_code, "
-            "COALESCE(t.name_on_mcc, e.name_on_mcc, e.full_name, '') AS name_on_mcc, "
+            "COALESCE(NULLIF(t.name_on_mcc,''), NULLIF(e.name_on_mcc,''), '') AS name_on_mcc, "
             "t.work_date, t.time_in_1, t.time_out_1, t.time_in_2, t.time_out_2, t.time_in_3, t.time_out_3, "
             "t.device_name "
             f"FROM {self._TABLE_TEMP} t "

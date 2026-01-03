@@ -2479,8 +2479,29 @@ class ShiftAttendanceMainContent2Service:
                 except Exception:
                     allow_out_only_hc = False
                 for slot in (1, 2, 3):
+                    # Explicit tokens from UI/import: KV = thiếu giờ vào, KR = thiếu giờ ra.
+                    # These should always prevent work/hour calculation (even if day_is_out_time=1
+                    # or HC OUT-only would otherwise allow missing IN).
+                    try:
+                        in_raw = str(r.get(f"in_{slot}") or "").strip().upper()
+                    except Exception:
+                        in_raw = ""
+                    try:
+                        out_raw = str(r.get(f"out_{slot}") or "").strip().upper()
+                    except Exception:
+                        out_raw = ""
+
+                    if in_raw == "KV" or out_raw == "KR":
+                        incomplete_pair = True
+                        break
+
                     in_sec = self._time_to_seconds(r.get(f"in_{slot}"))
                     out_sec = self._time_to_seconds(r.get(f"out_{slot}"))
+
+                    # Missing IN but has OUT => UI will display KV. This must not count shift/hours/work.
+                    if (in_sec is None) and (out_sec is not None):
+                        incomplete_pair = True
+                        break
 
                     # day_is_out_time: cho phép thiếu IN nhưng có OUT.
                     if int(day_is_out_time) == 1:

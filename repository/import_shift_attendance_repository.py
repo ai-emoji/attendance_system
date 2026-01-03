@@ -409,44 +409,30 @@ class ImportShiftAttendanceRepository:
             updates: list[str] = [
                 # Protect rows that were imported from Excel (import_locked=1)
                 # from being overwritten/unlocked by other sources (import_locked=0).
-                # Also: do NOT clear existing values when Excel provides NULL/empty.
-                "device_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_id, COALESCE(VALUES(device_id), device_id))",
-                "device_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_name, COALESCE(NULLIF(VALUES(device_name), ''), device_name))",
-                "employee_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_id, COALESCE(VALUES(employee_id), employee_id))",
-                "employee_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_code, COALESCE(NULLIF(VALUES(employee_code), ''), employee_code))",
-                "full_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, full_name, COALESCE(NULLIF(VALUES(full_name), ''), full_name))",
-                "weekday = IF(import_locked = 1 AND VALUES(import_locked) = 0, weekday, COALESCE(NULLIF(VALUES(weekday), ''), weekday))",
-                "schedule = IF(import_locked = 1 AND VALUES(import_locked) = 0, schedule, COALESCE(NULLIF(VALUES(schedule), ''), schedule))",
+                # Excel import (VALUES(import_locked)=1) should overwrite as-is,
+                # including clearing existing values when the Excel cell is empty/NULL.
+                "device_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_id, IF(VALUES(import_locked) = 1, VALUES(device_id), COALESCE(VALUES(device_id), device_id)))",
+                "device_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, device_name, IF(VALUES(import_locked) = 1, NULLIF(VALUES(device_name), ''), COALESCE(NULLIF(VALUES(device_name), ''), device_name)))",
+                "employee_id = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_id, IF(VALUES(import_locked) = 1, VALUES(employee_id), COALESCE(VALUES(employee_id), employee_id)))",
+                "employee_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, employee_code, IF(VALUES(import_locked) = 1, NULLIF(VALUES(employee_code), ''), COALESCE(NULLIF(VALUES(employee_code), ''), employee_code)))",
+                "full_name = IF(import_locked = 1 AND VALUES(import_locked) = 0, full_name, IF(VALUES(import_locked) = 1, NULLIF(VALUES(full_name), ''), COALESCE(NULLIF(VALUES(full_name), ''), full_name)))",
+                "weekday = IF(import_locked = 1 AND VALUES(import_locked) = 0, weekday, IF(VALUES(import_locked) = 1, NULLIF(VALUES(weekday), ''), COALESCE(NULLIF(VALUES(weekday), ''), weekday)))",
+                "schedule = IF(import_locked = 1 AND VALUES(import_locked) = 0, schedule, IF(VALUES(import_locked) = 1, NULLIF(VALUES(schedule), ''), COALESCE(NULLIF(VALUES(schedule), ''), schedule)))",
             ]
 
             def _time_update_expr(col: str) -> str:
-                # Default behavior: don't clear existing TIME values when import provides NULL.
-                # Special case for Excel import: if an explicit in_1_symbol is provided,
-                # allow clearing punch columns to NULL (ONLY when the imported row provides
-                # no punch times at all) so UI can display the symbol in in_1.
-                if include_in_1_symbol:
-                    allow_clear = (
-                        "(VALUES(import_locked) = 1 "
-                        "AND NULLIF(VALUES(in_1_symbol), '') IS NOT NULL "
-                        "AND VALUES(in_1) IS NULL AND VALUES(out_1) IS NULL "
-                        "AND VALUES(in_2) IS NULL AND VALUES(out_2) IS NULL "
-                        "AND VALUES(in_3) IS NULL AND VALUES(out_3) IS NULL)"
-                    )
-                    return (
-                        f"{col} = IF(import_locked = 1 AND VALUES(import_locked) = 0, {col}, "
-                        f"IF({allow_clear}, VALUES({col}), COALESCE(VALUES({col}), {col})))"
-                    )
                 return (
-                    f"{col} = IF(import_locked = 1 AND VALUES(import_locked) = 0, {col}, COALESCE(VALUES({col}), {col}))"
+                    f"{col} = IF(import_locked = 1 AND VALUES(import_locked) = 0, {col}, "
+                    f"IF(VALUES(import_locked) = 1, VALUES({col}), COALESCE(VALUES({col}), {col})))"
                 )
 
             if include_shift_code:
                 updates.append(
-                    "shift_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, shift_code, COALESCE(NULLIF(VALUES(shift_code), ''), shift_code))"
+                    "shift_code = IF(import_locked = 1 AND VALUES(import_locked) = 0, shift_code, IF(VALUES(import_locked) = 1, NULLIF(VALUES(shift_code), ''), COALESCE(NULLIF(VALUES(shift_code), ''), shift_code)))"
                 )
             if include_in_1_symbol:
                 updates.append(
-                    "in_1_symbol = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_1_symbol, COALESCE(NULLIF(VALUES(in_1_symbol), ''), in_1_symbol))"
+                    "in_1_symbol = IF(import_locked = 1 AND VALUES(import_locked) = 0, in_1_symbol, IF(VALUES(import_locked) = 1, NULLIF(VALUES(in_1_symbol), ''), COALESCE(NULLIF(VALUES(in_1_symbol), ''), in_1_symbol)))"
                 )
             updates.extend(
                 [
@@ -456,17 +442,17 @@ class ImportShiftAttendanceRepository:
                     _time_update_expr("out_2"),
                     _time_update_expr("in_3"),
                     _time_update_expr("out_3"),
-                    "late = IF(import_locked = 1 AND VALUES(import_locked) = 0, late, COALESCE(NULLIF(VALUES(late), ''), late))",
-                    "early = IF(import_locked = 1 AND VALUES(import_locked) = 0, early, COALESCE(NULLIF(VALUES(early), ''), early))",
-                    "hours = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours, COALESCE(VALUES(hours), hours))",
-                    "work = IF(import_locked = 1 AND VALUES(import_locked) = 0, work, COALESCE(VALUES(work), work))",
-                    "`leave` = IF(import_locked = 1 AND VALUES(import_locked) = 0, `leave`, COALESCE(VALUES(`leave`), `leave`))",
-                    "hours_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours_plus, COALESCE(VALUES(hours_plus), hours_plus))",
-                    "work_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, work_plus, COALESCE(VALUES(work_plus), work_plus))",
-                    "leave_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, leave_plus, COALESCE(VALUES(leave_plus), leave_plus))",
-                    "tc1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc1, COALESCE(NULLIF(VALUES(tc1), ''), tc1))",
-                    "tc2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc2, COALESCE(NULLIF(VALUES(tc2), ''), tc2))",
-                    "tc3 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc3, COALESCE(NULLIF(VALUES(tc3), ''), tc3))",
+                    "late = IF(import_locked = 1 AND VALUES(import_locked) = 0, late, IF(VALUES(import_locked) = 1, NULLIF(VALUES(late), ''), COALESCE(NULLIF(VALUES(late), ''), late)))",
+                    "early = IF(import_locked = 1 AND VALUES(import_locked) = 0, early, IF(VALUES(import_locked) = 1, NULLIF(VALUES(early), ''), COALESCE(NULLIF(VALUES(early), ''), early)))",
+                    "hours = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours, IF(VALUES(import_locked) = 1, VALUES(hours), COALESCE(VALUES(hours), hours)))",
+                    "work = IF(import_locked = 1 AND VALUES(import_locked) = 0, work, IF(VALUES(import_locked) = 1, VALUES(work), COALESCE(VALUES(work), work)))",
+                    "`leave` = IF(import_locked = 1 AND VALUES(import_locked) = 0, `leave`, IF(VALUES(import_locked) = 1, VALUES(`leave`), COALESCE(VALUES(`leave`), `leave`)))",
+                    "hours_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, hours_plus, IF(VALUES(import_locked) = 1, VALUES(hours_plus), COALESCE(VALUES(hours_plus), hours_plus)))",
+                    "work_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, work_plus, IF(VALUES(import_locked) = 1, VALUES(work_plus), COALESCE(VALUES(work_plus), work_plus)))",
+                    "leave_plus = IF(import_locked = 1 AND VALUES(import_locked) = 0, leave_plus, IF(VALUES(import_locked) = 1, VALUES(leave_plus), COALESCE(VALUES(leave_plus), leave_plus)))",
+                    "tc1 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc1, IF(VALUES(import_locked) = 1, NULLIF(VALUES(tc1), ''), COALESCE(NULLIF(VALUES(tc1), ''), tc1)))",
+                    "tc2 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc2, IF(VALUES(import_locked) = 1, NULLIF(VALUES(tc2), ''), COALESCE(NULLIF(VALUES(tc2), ''), tc2)))",
+                    "tc3 = IF(import_locked = 1 AND VALUES(import_locked) = 0, tc3, IF(VALUES(import_locked) = 1, NULLIF(VALUES(tc3), ''), COALESCE(NULLIF(VALUES(tc3), ''), tc3)))",
                     "import_locked = IF(import_locked = 1, 1, VALUES(import_locked))",
                 ]
             )

@@ -92,8 +92,8 @@ class HeaderController:
             return [
                 HeaderAction("Thêm Máy \nchấm công", "device.svg"),
                 HeaderAction("Tải dữ liệu\nMáy chấm công", "download_attendance.svg"),
-                HeaderAction("Tải DS NV\nTừ máy", "download_staff.svg"),
-                HeaderAction("Tải DS NV\nLên máy", "upload_staff.svg"),
+                # HeaderAction("Tải DS NV\nTừ máy", "download_staff.svg"),
+                # HeaderAction("Tải DS NV\nLên máy", "upload_staff.svg"),
             ]
 
         if tab_key == self.TAB_CHAM_CONG:
@@ -110,7 +110,7 @@ class HeaderController:
                 HeaderAction("Kết nối\nCSDL SQL", "login.svg"),
                 HeaderAction("Sao lưu\nDữ liệu", "backup.svg"),
                 HeaderAction("Khôi phục\nDữ liệu", "absence_restore.svg"),
-                HeaderAction("Cài đặt", ICON_SETTINGS),
+                # HeaderAction("Cài đặt", ICON_SETTINGS),
             ]
 
         # Fallback: coi như "Khai báo"

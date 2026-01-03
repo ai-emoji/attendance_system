@@ -248,6 +248,10 @@ class Database:
                         ("total", "ADD COLUMN total DECIMAL(10,2) NULL"),
                         ("shift_code", "ADD COLUMN shift_code VARCHAR(255) NULL"),
                         ("in_1_symbol", "ADD COLUMN in_1_symbol VARCHAR(50) NULL"),
+                        (
+                            "import_locked",
+                            "ADD COLUMN import_locked TINYINT(1) NOT NULL DEFAULT 0",
+                        ),
                     ],
                     log_prefix=f"{bt}_{y}",
                 )

@@ -1,0 +1,11 @@
+DOWNLOAD ATTENDANCE REPORT
+created_at	2026-01-03 16:46:31
+started_at	2026-01-03 16:46:04
+ok	1
+device_id	1
+device_name	Ronald Jack X629ID
+from_date	2025-12-01
+to_date	2026-01-03
+
+message
+Tải dữ liệu chấm công thành công. Đã tải: 10911 lượt; Đã ghi: 7208 dòng (chấm công: 5671, không chấm công: 1537).

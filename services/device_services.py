@@ -13,12 +13,14 @@ Ghi chú về kết nối:
 
 from __future__ import annotations
 
-import importlib.util
 import logging
-import socket
 from dataclasses import dataclass
 
 from repository.device_repository import DeviceRepository
+from services.device_connectors.senseface_a4_connector import (
+    connect as connect_senseface_a4,
+)
+from services.device_connectors.x629id_connector import connect as connect_x629id
 
 
 logger = logging.getLogger(__name__)
@@ -213,25 +215,15 @@ class DeviceService:
     # -----------------
     # Device connection helpers
     # -----------------
-    def test_connection_tcp(self, ip: str, port: int, timeout: float = 3.0) -> bool:
-        try:
-            with socket.create_connection((ip, int(port)), timeout=timeout):
-                return True
-        except Exception:
-            return False
-
     def connect_ronald_jack_x629id(
         self, ip: str, port: int = DEFAULT_PORT, password: str = ""
     ) -> tuple[bool, str]:
-        return self._connect_zkteco(ip=ip, port=port, password=password)
+        return connect_x629id(ip=ip, port=port, password=password)
 
     def connect_senseface_a4(
         self, ip: str, port: int = DEFAULT_PORT, password: str = ""
     ) -> tuple[bool, str]:
-        # SenseFace/Face dòng mới đôi khi cần ommit_ping hoặc force_udp
-        return self._connect_zkteco(
-            ip=ip, port=port, password=password, prefer_senseface=True
-        )
+        return connect_senseface_a4(ip=ip, port=port, password=password)
 
     def connect_device(
         self,
@@ -255,121 +247,8 @@ class DeviceService:
         if dt == self.DEVICE_TYPE_SENSEFACE_A4:
             return self.connect_senseface_a4(ip=ip, port=port, password=password)
 
+        # Fallback theo tên nếu device_type trống/khác chuẩn
         name = (device_name or "").strip().lower()
         if "senseface" in name or "a4" in name:
             return self.connect_senseface_a4(ip=ip, port=port, password=password)
         return self.connect_ronald_jack_x629id(ip=ip, port=port, password=password)
-
-    def _connect_zkteco(
-        self,
-        ip: str,
-        port: int,
-        password: str,
-        prefer_senseface: bool = False,
-    ) -> tuple[bool, str]:
-        ip = (ip or "").strip()
-        try:
-            port = int(port)
-        except Exception:
-            port = self.DEFAULT_PORT
-
-        # Basic reachability hint first (keep short to avoid UI feeling stuck)
-        tcp_ok = self.test_connection_tcp(ip, port, timeout=1.5)
-
-        # 1) Try real connect via `zk` library if available
-        if importlib.util.find_spec("zk") is not None:
-            try:
-                # `zk` (pyzk) convention: from zk import ZK
-                from zk import ZK  # type: ignore
-
-                try:
-                    pwd = int(password or 0)
-                except Exception:
-                    pwd = 0
-
-                attempts: list[tuple[bool, bool, int]] = []
-                # (force_udp, ommit_ping, timeout)
-                # Thực tế nhiều mạng chặn ICMP => ping fail làm connect chậm.
-                # Ưu tiên ommit_ping trước để giảm thời gian chờ.
-                attempts.append((False, True, 8))
-                attempts.append((False, False, 8))
-                # SenseFace: thường cần bỏ ping; thử UDP ở cuối
-                attempts.append((True, True, 10 if prefer_senseface else 8))
-
-                last_exc: Exception | None = None
-                for force_udp, ommit_ping, timeout in attempts:
-                    try:
-                        zk = ZK(
-                            ip,
-                            port=port,
-                            timeout=int(timeout),
-                            password=pwd,
-                            force_udp=bool(force_udp),
-                            ommit_ping=bool(ommit_ping),
-                        )
-                        conn = zk.connect()
-                        try:
-                            self._zk_probe_best_effort(conn)
-                        finally:
-                            try:
-                                conn.disconnect()
-                            except Exception:
-                                pass
-
-                        mode = []
-                        mode.append("UDP" if force_udp else "TCP")
-                        if ommit_ping:
-                            mode.append("ommit_ping")
-                        return True, f"Kết nối thiết bị thành công ({', '.join(mode)})."
-                    except Exception as exc:
-                        last_exc = exc
-                        logger.warning(
-                            "Kết nối ZK thất bại (%s:%s) force_udp=%s ommit_ping=%s: %s",
-                            ip,
-                            port,
-                            force_udp,
-                            ommit_ping,
-                            exc,
-                        )
-
-                if last_exc is not None:
-                    hint = "TCP OK" if tcp_ok else "TCP FAIL"
-                    return (
-                        False,
-                        "Kết nối thất bại. "
-                        f"Trạng thái port {port}: {hint}. "
-                        f"Lỗi: {last_exc}",
-                    )
-            except Exception as exc:
-                logger.warning("Kết nối ZK thất bại (%s:%s): %s", ip, port, exc)
-                # fallback to tcp below
-
-        # 2) Fallback: TCP reachability
-        if tcp_ok:
-            return (
-                True,
-                "Thiết bị có phản hồi TCP. (Không handshake ZKTeco đầy đủ)",
-            )
-
-        return (
-            False,
-            "Không kết nối được thiết bị. "
-            "Vui lòng kiểm tra: đúng IP, đúng port (thường 4370), cùng mạng LAN, firewall/router không chặn port.",
-        )
-
-    def _zk_probe_best_effort(self, conn) -> None:
-        """Probe nhẹ để xác nhận giao tiếp, không bắt buộc thiết bị phải hỗ trợ đầy đủ."""
-
-        for method_name, args in (
-            ("get_time", ()),
-            ("get_device_name", ()),
-            ("get_serialnumber", ()),
-            ("get_firmware_version", ()),
-        ):
-            method = getattr(conn, method_name, None)
-            if callable(method):
-                try:
-                    method(*args)
-                except Exception:
-                    # Bỏ qua lỗi probe; miễn là connect() thành công.
-                    pass

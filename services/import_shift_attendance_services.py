@@ -434,6 +434,8 @@ class ImportShiftAttendanceService:
                 key = header_to_key_norm.get(norm_header_key(h))
             col_keys.append(key)
 
+        present_keys = {k for k in col_keys if k}
+
         unknown_headers = [
             headers[i]
             for i, k in enumerate(col_keys)
@@ -506,11 +508,44 @@ class ImportShiftAttendanceService:
                 except Exception:
                     pass
 
+            # Auto symbol when there is no punch data provided.
+            # Requirement: if in_1 has no attendance data -> weekdays set 'V', Sunday set 'OFF'.
+            try:
+                cur_sym = str(item.get("in_1_symbol") or "").strip()
+                has_any_punch = any(
+                    item.get(k) is not None
+                    for k in ("in_1", "out_1", "in_2", "out_2", "in_3", "out_3")
+                )
+                if (not cur_sym) and (not has_any_punch) and wd:
+                    d2 = date.fromisoformat(wd)
+                    item["in_1_symbol"] = "OFF" if int(d2.weekday()) == 6 else "V"
+            except Exception:
+                pass
+
             out.append(item)
 
         msg = f"Đọc thành công {len(out)} dòng."
         if unknown_headers:
             msg += f" (Bỏ qua cột lạ: {', '.join(unknown_headers[:6])}{'...' if len(unknown_headers) > 6 else ''})"
+
+        # Helpful warning: missing columns won't be updated (DB values are kept).
+        # This avoids confusion when users re-upload a file exported from a grid
+        # that only contains Vào 1 / Ra 1.
+        missing_optional: list[str] = []
+        for label, k in (
+            ("Vào 2", "in_2"),
+            ("Ra 2", "out_2"),
+            ("Vào 3", "in_3"),
+            ("Ra 3", "out_3"),
+        ):
+            if k not in present_keys:
+                missing_optional.append(label)
+        if missing_optional:
+            msg += (
+                " (Lưu ý: thiếu cột "
+                + ", ".join(missing_optional)
+                + " => khi import các cột này sẽ được cập nhập rỗng (NULL) theo file Excel)"
+            )
 
         # Normalize employee_code: if the sheet contains zero-padded numeric codes
         # (e.g. '00010'), pad numeric codes like 4 -> '00004' to the same width.
@@ -1258,7 +1293,7 @@ class ImportShiftAttendanceService:
                 # Include missing-day placeholders in recompute persistence.
                 try:
                     if missing_pairs:
-                        for (ec2, wd2) in missing_pairs:
+                        for ec2, wd2 in missing_pairs:
                             _add_key(ec2, wd2)
                 except Exception:
                     pass

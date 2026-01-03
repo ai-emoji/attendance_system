@@ -149,6 +149,8 @@ class DownloadAttendanceController:
         self._stream_phase_active: bool = False
         self._stream_visible_once: bool = False
         self._stream_device_no: int | None = None
+        self._stream_from: date | None = None
+        self._stream_to: date | None = None
 
         # Context for per-download report file
         self._download_report_ctx: dict | None = None
@@ -187,37 +189,20 @@ class DownloadAttendanceController:
         self._devices_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def refresh_table(self) -> None:
-        # Bảng tạm hiển thị dữ liệu đã tải trong phiên.
-        # Yêu cầu: dữ liệu tạm chỉ xóa khi thoát app -> khi mở lại màn hình,
-        # phải hiển thị lại dữ liệu tạm (không phụ thuộc date picker đang để hôm nay).
-        def _fn() -> object:
-            rows = self._service.list_download_attendance(
-                from_date=None,
-                to_date=None,
-                device_no=None,
-            )
-            return [self._to_ui_row(r) for r in (rows or [])]
-
-        def _ok(result: object) -> None:
-            self._all_rows = list(result or []) if isinstance(result, list) else []
-            self._apply_filters()
-
-        def _err(_msg: str) -> None:
-            logger.exception("Không thể load bảng download_attendance")
-            self._all_rows = []
-            try:
-                self._content.set_attendance_rows([])
-            except RuntimeError:
-                return
-            except Exception:
-                pass
-            try:
-                if hasattr(self._title_bar2, "set_total"):
-                    self._title_bar2.set_total(0)
-            except Exception:
-                pass
-
-        self._table_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
+        # Requirement: do not show previous data when reopening the app.
+        # This screen starts empty; data is shown after the user clicks Download.
+        self._all_rows = []
+        try:
+            self._content.set_attendance_rows([])
+        except RuntimeError:
+            return
+        except Exception:
+            pass
+        try:
+            if hasattr(self._title_bar2, "set_total"):
+                self._title_bar2.set_total(0)
+        except Exception:
+            pass
 
     def _to_ui_row(self, r) -> _UiRow:
         def fmt_date(d: date) -> str:
@@ -341,6 +326,9 @@ class DownloadAttendanceController:
             )
             return
 
+        # NOTE: Do not skip device download even if audit already has data.
+        # User expects "Tải dữ liệu" to always connect to the device and refresh.
+
         # Preflight: nếu thiếu thư viện/điều kiện thì báo ngay, không bật progress/thread
         try:
             if (
@@ -432,6 +420,8 @@ class DownloadAttendanceController:
             self._stream_device_no = self._service.get_device_no_by_id(int(device_id))
         except Exception:
             self._stream_device_no = None
+        self._stream_from = d1
+        self._stream_to = d2
         try:
             if hasattr(self._content, "clear_attendance_rows"):
                 self._content.clear_attendance_rows()
@@ -689,7 +679,7 @@ class DownloadAttendanceController:
                 pass
             return
 
-        self.refresh_table()
+        self._reload_from_audit_for_current_range()
         # Hiển thị lại bảng sau khi tải xong
         try:
             if (
@@ -705,6 +695,44 @@ class DownloadAttendanceController:
 
         # Clear report context after finishing
         self._download_report_ctx = None
+
+    def _reload_from_audit_for_current_range(self) -> None:
+        d1 = self._stream_from
+        d2 = self._stream_to
+        dev = self._stream_device_no
+
+        if d1 is None or d2 is None or dev is None:
+            self.refresh_table()
+            return
+
+        def _fn() -> object:
+            rows = self._service.list_download_attendance(
+                from_date=d1,
+                to_date=d2,
+                device_no=dev,
+            )
+            return [self._to_ui_row(r) for r in (rows or [])]
+
+        def _ok(result: object) -> None:
+            self._all_rows = list(result or []) if isinstance(result, list) else []
+            self._apply_filters()
+
+        def _err(_msg: str) -> None:
+            logger.exception("Không thể load bảng từ attendance_audit")
+            self._all_rows = []
+            try:
+                self._content.set_attendance_rows([])
+            except RuntimeError:
+                return
+            except Exception:
+                pass
+            try:
+                if hasattr(self._title_bar2, "set_total"):
+                    self._title_bar2.set_total(0)
+            except Exception:
+                pass
+
+        self._table_runner.run(fn=_fn, on_success=_ok, on_error=_err, coalesce=True)
 
     def _ensure_streaming_started(self) -> None:
         if self._stream_started:
@@ -746,11 +774,10 @@ class DownloadAttendanceController:
             return
 
         def _fn() -> object:
-            # IMPORTANT: from_date/to_date=None to avoid "fill empty days" generation
-            # which would create a lot of synthetic rows during streaming.
+            # Stream rows from attendance_audit_YYYY for the selected range.
             rows = self._service.list_download_attendance(
-                from_date=None,
-                to_date=None,
+                from_date=self._stream_from,
+                to_date=self._stream_to,
                 device_no=self._stream_device_no,
             )
             return [self._to_ui_row(r) for r in (rows or [])]
