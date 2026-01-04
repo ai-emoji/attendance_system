@@ -243,10 +243,10 @@ class MainContent(QWidget):
             f"QTextEdit {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 6px 8px; background: transparent; }}"
         )
         self.text_guide.setPlainText(
-            "📌 Ví dụ bạn có thể trả lời:\n\n"
-            "\u201cHướng dẫn sử dụng XAMPP để truy cập phpMyAdmin qua LAN\u201d\n\n"
-            "\u201cHướng dẫn sử dụng phần mềm chấm công (UI PySide6)\u201d\n\n"
-            "\u201cHướng dẫn sử dụng bảng chấm công trong MySQL\u201d"
+            "📌 Hướng dẫn sử dụng:\n\n"
+            # "\u201cHướng dẫn sử dụng XAMPP để truy cập phpMyAdmin qua LAN\u201d\n\n"
+            # "\u201cHướng dẫn sử dụng phần mềm chấm công (UI PySide6)\u201d\n\n"
+            # "\u201cHướng dẫn sử dụng bảng chấm công trong MySQL\u201d"
         )
         right_layout.addWidget(self.text_guide, 1)
 
