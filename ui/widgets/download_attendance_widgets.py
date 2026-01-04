@@ -238,7 +238,7 @@ class TitleBar2(QWidget):
                 "\n".join(
                     [
                         # Chừa chỗ bên phải cho nút dropdown (calendarPopup)
-                        f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-right: 30px; border-radius: 6px; }}",
+                        f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-right: 30px; border-radius: 0px; }}",
                         f"QDateEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
                         # Hiển thị rõ nút dropdown để click mở lịch
                         f"QDateEdit::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 26px; border-left: 1px solid {COLOR_BORDER}; background: #FFFFFF; }}",
@@ -255,7 +255,7 @@ class TitleBar2(QWidget):
                 "\n".join(
                     [
                         # Chừa chỗ bên phải cho nút dropdown
-                        f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-right: 30px; border-radius: 6px; }}",
+                        f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-right: 30px; border-radius: 0px; }}",
                         f"QComboBox:focus {{ border: 1px solid {COLOR_BORDER}; }}",
                         f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 26px; border-left: 1px solid {COLOR_BORDER}; background: #FFFFFF; }}",
                         f'QComboBox::down-arrow {{ image: url("{dropdown_icon_url}"); width: 10px; height: 10px; }}',
@@ -270,7 +270,7 @@ class TitleBar2(QWidget):
             le.setStyleSheet(
                 "\n".join(
                     [
-                        f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 6px; }}",
+                        f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 0px; }}",
                         f"QLineEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
                     ]
                 )
@@ -324,7 +324,7 @@ class TitleBar2(QWidget):
         self.btn_download.setStyleSheet(
             "\n".join(
                 [
-                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 6px; }}",
+                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 0px; }}",
                     "QPushButton::icon { margin-right: 10px; }",
                     f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
                 ]
@@ -341,7 +341,7 @@ class TitleBar2(QWidget):
             b.setStyleSheet(
                 "\n".join(
                     [
-                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
                         f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; }}",
                     ]

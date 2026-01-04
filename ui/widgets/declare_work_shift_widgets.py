@@ -178,7 +178,7 @@ class TitleBar2(QWidget):
             btn.setStyleSheet(
                 "\n".join(
                     [
-                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                         "QPushButton::icon { margin-right: 10px; }",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: #FFFFFF; }}",
                         f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: #FFFFFF; }}",
@@ -446,7 +446,7 @@ class MainContent(QWidget):
             inp.setStyleSheet(
                 "\n".join(
                     [
-                        f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                        f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                         f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                     ]
                 )

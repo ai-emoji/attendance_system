@@ -140,7 +140,7 @@ class TitleBar2(QWidget):
             btn.setStyleSheet(
                 "\n".join(
                     [
-                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                         # Tăng khoảng cách giữa icon và nội dung
                         "QPushButton::icon { margin-right: 10px; }",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: #FFFFFF; }}",

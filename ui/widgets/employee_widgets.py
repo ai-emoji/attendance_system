@@ -85,6 +85,10 @@ from core.resource import (
     ICON_LIST,
     ICON_IMPORT,
     ICON_DROPDOWN,
+    ICON_FILTER,
+    ICON_SEARCH,
+    ICON_SMALL_TO_LARGE,
+    ICON_BIG_TO_SMALL,
     COLOR_TEXT_LIGHT,
     resource_path,
 )
@@ -502,7 +506,12 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
 
     def __init__(self, parent: QObject | None = None) -> None:  # type: ignore[name-defined]
         super().__init__(parent)
-        self._column_filters: dict[int, str | None] = {}
+        # Per-column filter values:
+        # - missing key / None: no filter for that column
+        # - empty set: filter out all rows (same as Excel when unchecking everything)
+        # - non-empty set: allow rows whose (normalized) display value is in the set
+        self._column_filters: dict[int, set[str] | None] = {}
+        self._column_filters_norm: dict[int, set[str]] = {}
 
     @staticmethod
     def _norm_text(s: str) -> str:
@@ -514,26 +523,40 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
         )
 
     def set_column_filter(self, column: int, value: str | None) -> None:
-        self._column_filters[int(column)] = str(value) if value is not None else None
+        if value is None:
+            self.set_column_filter_values(int(column), None)
+            return
+        self.set_column_filter_values(int(column), {str(value)})
+
+    def set_column_filter_values(self, column: int, values: set[str] | None) -> None:
+        col = int(column)
+        if values is None:
+            self._column_filters.pop(col, None)
+            self._column_filters_norm.pop(col, None)
+        else:
+            cleaned = {str(v).strip() for v in (values or set()) if str(v).strip()}
+            self._column_filters[col] = cleaned
+            self._column_filters_norm[col] = {self._norm_text(v) for v in cleaned}
         self.invalidateFilter()
         try:
             self.filters_changed.emit()
         except Exception:
             pass
 
+    def get_column_filter_values(self, column: int) -> set[str] | None:
+        v = self._column_filters.get(int(column))
+        if v is None:
+            return None
+        return set(v)
+
     def clear_column_filter(self, column: int) -> None:
-        if int(column) in self._column_filters:
-            self._column_filters.pop(int(column), None)
-            self.invalidateFilter()
-        try:
-            self.filters_changed.emit()
-        except Exception:
-            pass
+        self.set_column_filter_values(int(column), None)
 
     def clear_all_filters(self) -> None:
         if not self._column_filters:
             return
         self._column_filters.clear()
+        self._column_filters_norm.clear()
         self.invalidateFilter()
         try:
             self.filters_changed.emit()
@@ -545,14 +568,341 @@ class _EmployeeFilterProxy(QSortFilterProxyModel):
         if model is None:
             return True
 
-        for col, wanted in self._column_filters.items():
-            if not wanted:
-                continue
-            idx = model.index(source_row, int(col), source_parent)
+        for col, allowed_norm in self._column_filters_norm.items():
+            # Empty selection means 0 rows (Excel-like)
+            if not allowed_norm:
+                return False
+            idx = model.index(int(source_row), int(col), source_parent)
             got = str(model.data(idx, Qt.ItemDataRole.DisplayRole) or "").strip()
-            if self._norm_text(got) != self._norm_text(str(wanted)):
+            if self._norm_text(got) not in allowed_norm:
                 return False
         return True
+
+    def data(
+        self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole
+    ):  # noqa: N802
+        # Ensure the STT column always reflects the visible row order
+        # after sorting/filtering.
+        try:
+            if (
+                role == Qt.ItemDataRole.DisplayRole
+                and index.isValid()
+                and int(index.column()) == 1
+            ):
+                return str(int(index.row()) + 1)
+        except Exception:
+            pass
+        return super().data(index, role)
+
+
+class _ColumnFilterPopup(QFrame):
+    def __init__(
+        self,
+        *,
+        proxy: _EmployeeFilterProxy,
+        model: _EmployeeTableModel,
+        col: int,
+        parent: QWidget | None = None,
+    ) -> None:
+        # Top-level popup (Excel-like)
+        super().__init__(None)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+        self._proxy = proxy
+        self._model = model
+        self._col = int(col)
+        self._busy = False
+
+        self.setStyleSheet(
+            "\n".join(
+                [
+                    f"QFrame {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
+                    f"QLineEdit {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; padding: 6px 10px; }}",
+                    f"QTreeWidget {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
+                    f"QTreeWidget::item {{ padding: 4px 10px; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                    f"QPushButton {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; padding: 6px 10px; }}",
+                    f"QPushButton:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                ]
+            )
+        )
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
+
+        row_sort = QHBoxLayout()
+        row_sort.setContentsMargins(0, 0, 0, 0)
+        row_sort.setSpacing(8)
+        self._btn_sort_asc = QPushButton("Sắp xếp tăng dần")
+        self._btn_sort_desc = QPushButton("Sắp xếp giảm dần")
+        try:
+            self._btn_sort_asc.setIcon(QIcon(resource_path(ICON_SMALL_TO_LARGE)))
+            self._btn_sort_desc.setIcon(QIcon(resource_path(ICON_BIG_TO_SMALL)))
+            self._btn_sort_asc.setIconSize(QSize(16, 16))
+            self._btn_sort_desc.setIconSize(QSize(16, 16))
+        except Exception:
+            pass
+        row_sort.addWidget(self._btn_sort_asc, 1)
+        row_sort.addWidget(self._btn_sort_desc, 1)
+        root.addLayout(row_sort)
+
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Tìm kiếm...")
+        try:
+            # Embed a leading icon inside the line edit
+            self._search.addAction(
+                QIcon(resource_path(ICON_SEARCH)),
+                QLineEdit.ActionPosition.LeadingPosition,
+            )
+        except Exception:
+            pass
+        root.addWidget(self._search)
+
+        self._tree = QTreeWidget()
+        self._tree.setHeaderHidden(True)
+        self._tree.setRootIsDecorated(False)
+        self._tree.setIndentation(0)
+        self._tree.setUniformRowHeights(True)
+        self._tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        root.addWidget(self._tree, 1)
+
+        row_btn = QHBoxLayout()
+        row_btn.setContentsMargins(0, 0, 0, 0)
+        row_btn.setSpacing(8)
+        self._btn_clear = QPushButton("Xoá bộ lọc")
+        self._btn_ok = QPushButton("Đồng ý")
+        self._btn_cancel = QPushButton("Hủy")
+        row_btn.addWidget(self._btn_clear)
+        row_btn.addStretch(1)
+        row_btn.addWidget(self._btn_ok)
+        row_btn.addWidget(self._btn_cancel)
+        root.addLayout(row_btn)
+
+        self._values_all: list[str] = []
+        self._value_items: dict[str, QTreeWidgetItem] = {}
+        self._item_all: QTreeWidgetItem | None = None
+        self._selected_values: set[str] | None = None
+
+        self._build_values()
+        self._wire()
+
+        # Size: keep it compact but scrollable
+        self.setMinimumWidth(300)
+        self.resize(300, 520)
+
+    def _wire(self) -> None:
+        self._btn_sort_asc.clicked.connect(self._on_sort_asc)
+        self._btn_sort_desc.clicked.connect(self._on_sort_desc)
+        self._btn_clear.clicked.connect(self._on_clear)
+        self._btn_ok.clicked.connect(self._on_ok)
+        self._btn_cancel.clicked.connect(self.close)
+        self._search.textChanged.connect(self._on_search)
+        self._tree.itemClicked.connect(self._on_item_clicked)
+
+    @staticmethod
+    def _label_for(value: str, checked: bool) -> str:
+        # Use symbols instead of checkbox UI
+        return f"{'✅' if checked else '❌'} {value}"
+
+    @staticmethod
+    def _set_checked(it: QTreeWidgetItem, checked: bool, raw_value: str) -> None:
+        it.setData(0, Qt.ItemDataRole.UserRole, str(raw_value))
+        it.setData(0, Qt.ItemDataRole.UserRole + 1, 1 if checked else 0)
+        it.setText(0, _ColumnFilterPopup._label_for(str(raw_value), bool(checked)))
+
+    @staticmethod
+    def _is_checked(it: QTreeWidgetItem) -> bool:
+        try:
+            return int(it.data(0, Qt.ItemDataRole.UserRole + 1) or 0) == 1
+        except Exception:
+            return False
+
+    def _gather_values(self) -> list[str]:
+        out: list[str] = []
+        try:
+            rc = int(self._model.rowCount())
+        except Exception:
+            rc = 0
+        for r in range(rc):
+            try:
+                idx = self._model.index(int(r), int(self._col))
+                s = str(
+                    self._model.data(idx, Qt.ItemDataRole.DisplayRole) or ""
+                ).strip()
+            except Exception:
+                s = ""
+            if not s:
+                continue
+            out.append(s)
+        # Deduplicate
+        try:
+            out = list(dict.fromkeys(out))
+        except Exception:
+            pass
+
+        key = ""
+        try:
+            key = str(self._model.COLUMNS[int(self._col)][0] or "")
+        except Exception:
+            key = ""
+
+        if key in {"stt", "sort_order"}:
+
+            def _to_int_or_none(s: str) -> int | None:
+                try:
+                    return int(float(str(s).strip()))
+                except Exception:
+                    return None
+
+            nums: list[tuple[int, str]] = []
+            others: list[str] = []
+            for s in out:
+                n = _to_int_or_none(s)
+                if n is None:
+                    others.append(s)
+                else:
+                    nums.append((n, str(n)))
+            nums.sort(key=lambda t: t[0])
+            others.sort()
+            return [t[1] for t in nums] + others
+
+        out.sort()
+        return out
+
+    def _build_values(self) -> None:
+        self._tree.clear()
+        self._value_items.clear()
+
+        values = self._gather_values()
+        self._values_all = list(values)
+
+        current = self._proxy.get_column_filter_values(self._col)
+        # None = no filter (all selected)
+        if current is None:
+            self._selected_values = set(values)
+        else:
+            self._selected_values = set(current)
+
+        self._busy = True
+        try:
+            it_all = QTreeWidgetItem(self._tree, [""])
+            it_all.setFlags(
+                it_all.flags()
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+            )
+            # If no filter -> treat as all selected
+            _ColumnFilterPopup._set_checked(
+                it_all, bool(current is None), "(Chọn tất cả)"
+            )
+            self._item_all = it_all
+
+            for v in values:
+                it = QTreeWidgetItem(self._tree, [""])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemFlag.ItemIsEnabled
+                    | Qt.ItemFlag.ItemIsSelectable
+                )
+                checked = v in (self._selected_values or set())
+                _ColumnFilterPopup._set_checked(it, bool(checked), str(v))
+                self._value_items[v] = it
+        finally:
+            self._busy = False
+
+    def _on_search(self, text: str) -> None:
+        q = _EmployeeFilterProxy._norm_text(str(text or ""))
+        for v, it in self._value_items.items():
+            it.setHidden(q not in _EmployeeFilterProxy._norm_text(v))
+
+    def _sync_select_all_indicator(self) -> None:
+        it_all = self._item_all
+        if it_all is None:
+            return
+        all_checked = True
+        for it in self._value_items.values():
+            if not _ColumnFilterPopup._is_checked(it):
+                all_checked = False
+                break
+        self._busy = True
+        try:
+            _ColumnFilterPopup._set_checked(it_all, bool(all_checked), "(Chọn tất cả)")
+        finally:
+            self._busy = False
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
+        if self._busy:
+            return
+
+        raw = str(item.data(0, Qt.ItemDataRole.UserRole) or "")
+        if raw == "(Chọn tất cả)":
+            # Toggle all
+            # If currently all checked -> uncheck all; else check all
+            want_check = not _ColumnFilterPopup._is_checked(item)
+            self._busy = True
+            try:
+                _ColumnFilterPopup._set_checked(item, bool(want_check), "(Chọn tất cả)")
+                for v, it in self._value_items.items():
+                    _ColumnFilterPopup._set_checked(it, bool(want_check), str(v))
+            finally:
+                self._busy = False
+            return
+
+        # Toggle a single value
+        try:
+            v = str(item.data(0, Qt.ItemDataRole.UserRole) or "").strip()
+        except Exception:
+            v = ""
+        if not v:
+            return
+        next_state = not _ColumnFilterPopup._is_checked(item)
+        self._busy = True
+        try:
+            _ColumnFilterPopup._set_checked(item, bool(next_state), v)
+        finally:
+            self._busy = False
+        self._sync_select_all_indicator()
+
+    def _collect_selected(self) -> set[str]:
+        selected: set[str] = set()
+        for v, it in self._value_items.items():
+            if _ColumnFilterPopup._is_checked(it):
+                selected.add(str(v).strip())
+        return {v for v in selected if v}
+
+    def _on_ok(self) -> None:
+        selected = self._collect_selected()
+        all_values = {
+            str(v).strip() for v in (self._values_all or []) if str(v).strip()
+        }
+
+        # If all are selected => treat as no filter
+        if selected == all_values:
+            self._proxy.clear_column_filter(self._col)
+            self.close()
+            return
+
+        # Empty selection => 0 rows (Excel-like)
+        self._proxy.set_column_filter_values(self._col, set(selected))
+        self.close()
+
+    def _on_clear(self) -> None:
+        self._proxy.clear_column_filter(self._col)
+        self.close()
+
+    def _on_sort_asc(self) -> None:
+        try:
+            self._proxy.sort(int(self._col), Qt.SortOrder.AscendingOrder)
+        except Exception:
+            pass
+
+    def _on_sort_desc(self) -> None:
+        try:
+            self._proxy.sort(int(self._col), Qt.SortOrder.DescendingOrder)
+        except Exception:
+            pass
 
 
 class _LeftPaddingDelegate(QStyledItemDelegate):
@@ -902,13 +1252,44 @@ class _FilterHeaderView(QHeaderView):
         self._proxy = proxy
         self._model = model
         self._dropdown_icon = QIcon(resource_path(ICON_DROPDOWN))
+        self._filter_icon = QIcon(resource_path(ICON_FILTER))
         self._dropdown_icon_size = 14
         self._dropdown_icon_pad = 6
         self._resize_handle_margin = 4
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setMouseTracking(True)
-        # Only open filter menu when clicking the dropdown icon.
-        # (Do not open menu when clicking the header text.)
+        self._active_popup: _ColumnFilterPopup | None = None
+        try:
+            self._proxy.filters_changed.connect(lambda: self.viewport().update())
+        except Exception:
+            pass
+
+    def _is_column_filtered(self, col: int) -> bool:
+        # None means no filter; empty set / non-empty set means filter is active.
+        try:
+            return self._proxy.get_column_filter_values(int(col)) is not None
+        except Exception:
+            return False
+
+    def _dropdown_rect_for_section(self, section_rect: QRect) -> QRect:
+        size = int(self._dropdown_icon_size)
+        pad = int(self._dropdown_icon_pad)
+        x = int(section_rect.right() - pad - size)
+        y = int(section_rect.center().y() - (size // 2))
+        return QRect(x, y, size, size)
+
+    def _is_over_dropdown_icon(self, pos: QPoint) -> bool:
+        try:
+            col = int(self.logicalIndexAt(pos))
+        except Exception:
+            return False
+        if col <= 0:
+            return False
+        x = int(self.sectionViewportPosition(int(col)))
+        w = int(self.sectionSize(int(col)))
+        sec_rect = QRect(x, 0, w, int(self.height()))
+        icon_rect = self._dropdown_rect_for_section(sec_rect)
+        return icon_rect.contains(pos)
 
     def _is_over_resize_handle(self, pos: QPoint) -> bool:
         # When we override cursor, we must preserve the resize-handle cursor.
@@ -935,193 +1316,73 @@ class _FilterHeaderView(QHeaderView):
             return True
         return False
 
-    def _is_over_dropdown_icon(self, pos: QPoint) -> bool:
-        try:
-            col = int(self.logicalIndexAt(pos))
-        except Exception:
-            return False
-        if col <= 0:
-            return False
-        x = int(self.sectionViewportPosition(int(col)))
-        w = int(self.sectionSize(int(col)))
-        sec_rect = QRect(x, 0, w, int(self.height()))
-        icon_rect = self._dropdown_rect_for_section(sec_rect)
-        return icon_rect.contains(pos)
-
-    def _dropdown_rect_for_section(self, section_rect: QRect) -> QRect:
-        size = int(self._dropdown_icon_size)
-        pad = int(self._dropdown_icon_pad)
-        x = int(section_rect.right() - pad - size)
-        y = int(section_rect.center().y() - (size // 2))
-        return QRect(x, y, size, size)
-
-    def _exec_filter_menu(self, col: int, global_pos: QPoint | None = None) -> None:
-        # Ignore ID column
+    def _show_filter_popup(self, col: int, global_pos: QPoint) -> None:
         if int(col) == 0:
             return
-
-        key = self._model.COLUMNS[int(col)][0]
-        values: list[str] = []
         try:
-            raw_values: list[object] = []
-            for r in getattr(self._model, "_rows", []) or []:
-                if not isinstance(r, dict):
-                    continue
-                v = r.get(key)
-                if v is None:
-                    continue
-                s = str(v).strip()
-                if not s:
-                    continue
-                raw_values.append(v)
-
-            if key in getattr(self._model, "_date_keys", set()):
-                values = [self._model._format_vn_date(v) for v in raw_values]
-            elif key == "employment_status":
-                # Show display labels instead of raw codes (1/2/3).
-                def _status_label(v0: object) -> str:
-                    s0 = str(v0 or "").strip()
-                    if not s0:
-                        return ""
-                    if s0 == "1":
-                        return "Đi làm"
-                    if s0 == "2":
-                        return "Nghỉ thai sản"
-                    if s0 == "3":
-                        return "Đã nghỉ việc"
-                    # Backward compatible: keep legacy text as-is.
-                    return s0
-
-                values = [_status_label(v) for v in raw_values]
-            else:
-                values = [str(v) for v in raw_values]
-        except Exception:
-            values = []
-        values = [v.strip() for v in values if str(v).strip()]
-        # Deduplicate before sorting (keeps menu compact)
-        try:
-            values = list(dict.fromkeys(values))
+            if self._active_popup is not None:
+                self._active_popup.close()
         except Exception:
             pass
-        if key in {"stt", "sort_order"}:
 
-            def _to_int_or_none(s: str) -> int | None:
-                try:
-                    return int(float(str(s).strip()))
-                except Exception:
-                    return None
+        popup = _ColumnFilterPopup(proxy=self._proxy, model=self._model, col=int(col))
+        self._active_popup = popup
 
-            nums: list[tuple[int, str]] = []
-            others: list[str] = []
-            for s in values:
-                n = _to_int_or_none(s)
-                if n is None:
-                    others.append(s)
-                else:
-                    nums.append((n, str(n)))
-            nums.sort(key=lambda t: t[0])
-            others.sort()
-            values = [t[1] for t in nums] + others
-        else:
-            values.sort()
-
-        current_filter = self._proxy._column_filters.get(int(col))  # type: ignore[attr-defined]
-
-        menu = QMenu(self)
-        # Set menu height to 90% of the screen height and center vertically
+        # Keep popup within the current screen
         screen = (
             self.window().windowHandle().screen()
             if self.window() and self.window().windowHandle()
             else None
         )
         if screen:
-            screen_height = screen.geometry().height()
-            menu.setFixedHeight(int(screen_height * 0.9))
-            # Move menu to vertical center of the screen
-            if global_pos is None:
-                # Calculate center Y position
-                menu_height = int(screen_height * 0.9)
-                screen_geom = screen.geometry()
-                center_y = screen_geom.top() + (screen_height - menu_height) // 2
-                x = int(self.sectionViewportPosition(int(col)))
-                w = int(self.sectionSize(int(col)))
-                sec_rect = QRect(x, 0, w, int(self.height()))
-                icon_rect = self._dropdown_rect_for_section(sec_rect)
-                global_pos = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
-                # Adjust Y to center
-                global_pos.setY(center_y)
-        menu.setStyleSheet(
-            "\n".join(
-                [
-                    f"QMenu {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
-                    f"QMenu::item {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; padding: 6px 12px; border-bottom: 0px; }}",
-                    f"QMenu::item:selected {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
-                    f"QMenu::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; color: {COLOR_TEXT_PRIMARY}; }}",
-                    f"QMenu::separator {{ height: 1px; background: {COLOR_BORDER}; margin: 4px 8px; }}",
-                ]
-            )
-        )
+            sg = screen.availableGeometry()
+            p = QPoint(int(global_pos.x()), int(global_pos.y()))
+            # default shows below the header
+            x = p.x()
+            y = p.y()
+            if x + popup.width() > sg.right():
+                x = max(int(sg.left()), int(sg.right() - popup.width()))
+            if y + popup.height() > sg.bottom():
+                y = max(int(sg.top()), int(sg.bottom() - popup.height()))
+            popup.move(QPoint(x, y))
+        else:
+            popup.move(global_pos)
 
-        group = QActionGroup(menu)
-        group.setExclusive(True)
-
-        act_all = menu.addAction("(Tất cả)")
-        act_all.setCheckable(True)
-        act_all.setChecked(current_filter is None)
-        group.addAction(act_all)
-        menu.addSeparator()
-
-        for v in values:
-            act = menu.addAction(v)
-            act.setCheckable(True)
-            act.setChecked(str(current_filter or "").strip() == str(v).strip())
-            group.addAction(act)
-
-        if global_pos is None:
-            x = int(self.sectionViewportPosition(int(col)))
-            w = int(self.sectionSize(int(col)))
-            sec_rect = QRect(x, 0, w, int(self.height()))
-            icon_rect = self._dropdown_rect_for_section(sec_rect)
-            global_pos = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
-        chosen = menu.exec(global_pos)
-        if chosen is None:
-            return
-        if chosen == act_all:
-            self._proxy.clear_column_filter(int(col))
-            return
-        self._proxy.set_column_filter(int(col), chosen.text())
+        popup.show()
 
     def paintSection(
         self, painter, rect: QRect, logicalIndex: int
     ) -> None:  # noqa: N802
         super().paintSection(painter, rect, logicalIndex)
-        if int(logicalIndex) == 0:
+        if int(logicalIndex) <= 0:
             return
         if rect.width() < (self._dropdown_icon_size + self._dropdown_icon_pad * 2):
             return
         icon_rect = self._dropdown_rect_for_section(rect)
-        pix = self._dropdown_icon.pixmap(
-            QSize(self._dropdown_icon_size, self._dropdown_icon_size)
+        icon = (
+            self._filter_icon
+            if self._is_column_filtered(int(logicalIndex))
+            else self._dropdown_icon
         )
+        pix = icon.pixmap(QSize(self._dropdown_icon_size, self._dropdown_icon_size))
         painter.drawPixmap(icon_rect, pix)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         try:
-            col = int(self.logicalIndexAt(event.pos()))
+            if event.button() == Qt.MouseButton.LeftButton:
+                col = int(self.logicalIndexAt(event.pos()))
+                if int(col) > 0 and not self._is_over_resize_handle(event.pos()):
+                    x = int(self.sectionViewportPosition(int(col)))
+                    w = int(self.sectionSize(int(col)))
+                    sec_rect = QRect(x, 0, w, int(self.height()))
+                    icon_rect = self._dropdown_rect_for_section(sec_rect)
+                    if icon_rect.contains(event.pos()):
+                        gp = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+                        self._show_filter_popup(int(col), gp)
+                        event.accept()
+                        return
         except Exception:
-            col = -1
-
-        if col > 0:
-            x = int(self.sectionViewportPosition(int(col)))
-            w = int(self.sectionSize(int(col)))
-            sec_rect = QRect(x, 0, w, int(self.height()))
-            icon_rect = self._dropdown_rect_for_section(sec_rect)
-            if icon_rect.contains(event.pos()):
-                gp = self.mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
-                self._exec_filter_menu(col, gp)
-                event.accept()
-                return
-
+            pass
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
@@ -1849,13 +2110,18 @@ class EmployeeTable(QTableView):
         except Exception:
             pass
 
-    def get_column_filters_payload(self) -> dict[str, str] | None:
-        """Return active column filters as mapping: column_key -> filter_value."""
+    def get_column_filters_payload(self) -> dict[str, object] | None:
+        """Return active column filters as mapping: column_key -> filter_value(s).
+
+        Payload values can be:
+        - str: single selected value
+        - list[str]: multiple selected values
+        """
         try:
             raw = getattr(self._proxy, "_column_filters", None)
             if not isinstance(raw, dict):
                 return None
-            out: dict[str, str] = {}
+            out: dict[str, object] = {}
             for col, wanted in raw.items():
                 try:
                     c = int(col)
@@ -1863,7 +2129,7 @@ class EmployeeTable(QTableView):
                     continue
                 if c <= 0:
                     continue
-                if wanted is None or str(wanted).strip() == "":
+                if wanted is None:
                     continue
                 try:
                     key = str(self._model.COLUMNS[int(c)][0] or "").strip()
@@ -1871,7 +2137,21 @@ class EmployeeTable(QTableView):
                     key = ""
                 if not key:
                     continue
-                out[key] = str(wanted).strip()
+                if isinstance(wanted, set):
+                    vals = [str(v).strip() for v in wanted if str(v).strip()]
+                    if not vals:
+                        continue
+                    vals.sort()
+                    if len(vals) == 1:
+                        out[key] = vals[0]
+                    else:
+                        out[key] = vals
+                    continue
+
+                # Backward compatibility: older code stored a single string.
+                s = str(wanted).strip()
+                if s:
+                    out[key] = s
             return out
         except Exception:
             return None
@@ -1885,7 +2165,7 @@ class EmployeeTable(QTableView):
             pass
 
         for key, wanted in payload.items():
-            if wanted is None or str(wanted).strip() == "":
+            if wanted is None:
                 continue
             try:
                 col = self._col_index(str(key))
@@ -1894,7 +2174,16 @@ class EmployeeTable(QTableView):
             if col <= 0:
                 continue
             try:
-                self._proxy.set_column_filter(int(col), str(wanted).strip())
+                if isinstance(wanted, (list, tuple, set)):
+                    vals = {str(v).strip() for v in wanted if str(v).strip()}
+                    # Selecting all values is equivalent to no filter; we don't know the universe
+                    # here, so just store the selection set.
+                    self._proxy.set_column_filter_values(int(col), set(vals))
+                else:
+                    s = str(wanted).strip()
+                    if not s:
+                        continue
+                    self._proxy.set_column_filter(int(col), s)
             except Exception:
                 continue
 
@@ -1978,7 +2267,7 @@ class MainContent(QWidget):
         self.btn_export.setStyleSheet(
             "\n".join(
                 [
-                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                     "QPushButton::icon { margin-right: 10px; }",
                     f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: {COLOR_TEXT_LIGHT}; }}",
                 ]

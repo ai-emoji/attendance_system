@@ -16,9 +16,20 @@ from __future__ import annotations
 from collections import defaultdict
 import datetime as _dt
 import time
+import unicodedata
 
-from PySide6.QtCore import QDate, QEvent, QLocale, QSize, Qt, Signal, QTimer
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtCore import (
+    QDate,
+    QEvent,
+    QLocale,
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    Signal,
+    QTimer,
+)
+from PySide6.QtGui import QFont, QIcon, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCalendarWidget,
@@ -51,12 +62,17 @@ from core.resource import (
     EVEN_ROW_BG_COLOR,
     GRID_LINES_COLOR,
     HOVER_ROW_BG_COLOR,
+    ICON_BIG_TO_SMALL,
     ODD_ROW_BG_COLOR,
     ROW_HEIGHT,
     FONT_WEIGHT_NORMAL,
     FONT_WEIGHT_SEMIBOLD,
+    ICON_DROPDOWN,
+    ICON_FILTER,
     ICON_DELETE,
     ICON_REFRESH,
+    ICON_SEARCH,
+    ICON_SMALL_TO_LARGE,
     ICON_TOTAL,
     INPUT_COLOR_BG,
     MAIN_CONTENT_BG_COLOR,
@@ -78,6 +94,507 @@ _SCHEDULE_WORK_STATE: dict[str, object] = {}
 
 # Tránh lag khi view bị recreate: không lưu/restore bảng quá lớn.
 _STATE_TABLE_MAX_ROWS = 3000
+
+
+def _strip_diacritics(text: str) -> str:
+    try:
+        decomposed = unicodedata.normalize("NFKD", text)
+        return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    except Exception:
+        return text
+
+
+def _norm_text(v: object) -> str:
+    s = str(v or "")
+    s = " ".join(s.strip().split())
+    s = _strip_diacritics(s)
+    return s.casefold()
+
+
+class _TableWidgetFilterHeaderView(QHeaderView):
+    """HeaderView that draws a dropdown icon and emits a signal when it is clicked."""
+
+    filter_icon_clicked = Signal(int)
+
+    def __init__(
+        self,
+        *,
+        filterable_columns: set[int] | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        try:
+            self.setSectionsClickable(True)
+        except Exception:
+            pass
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setMouseTracking(True)
+        try:
+            self.setHighlightSections(False)
+        except Exception:
+            pass
+        self._filterable_columns: set[int] = set(filterable_columns or set())
+        self._dropdown_icon = QIcon(resource_path(ICON_DROPDOWN))
+        self._filter_icon = QIcon(resource_path(ICON_FILTER))
+        self._dropdown_icon_size = 14
+        self._dropdown_icon_pad = 6
+        self._resize_handle_margin = 4
+        self._active_filtered_columns: set[int] = set()
+
+    def set_active_filtered_columns(self, cols: set[int]) -> None:
+        self._active_filtered_columns = set(int(c) for c in (cols or set()))
+        try:
+            self.viewport().update()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _event_pos_to_point(event) -> object:
+        # PySide6/Qt6: QMouseEvent.position() -> QPointF
+        try:
+            return event.position().toPoint()
+        except Exception:
+            pass
+        # Older bindings: pos()
+        try:
+            return event.pos()
+        except Exception:
+            pass
+        return None
+
+    def set_filterable_columns(self, cols: set[int]) -> None:
+        self._filterable_columns = set(cols or set())
+        try:
+            self.viewport().update()
+        except Exception:
+            pass
+
+    def _dropdown_rect_for_section(self, section_rect: QRect) -> QRect:
+        size = int(self._dropdown_icon_size)
+        pad = int(self._dropdown_icon_pad)
+        x = int(section_rect.right() - pad - size)
+        y = int(section_rect.center().y() - (size // 2))
+        return QRect(x, y, size, size)
+
+    def _is_over_dropdown_icon(self, pos: QPoint) -> bool:
+        try:
+            col = int(self.logicalIndexAt(pos))
+        except Exception:
+            return False
+        if col not in self._filterable_columns:
+            return False
+        x = int(self.sectionViewportPosition(int(col)))
+        w = int(self.sectionSize(int(col)))
+        sec_rect = QRect(x, 0, w, int(self.height()))
+        icon_rect = self._dropdown_rect_for_section(sec_rect)
+        return icon_rect.contains(pos)
+
+    def _is_over_resize_handle(self, pos: QPoint) -> bool:
+        try:
+            col = int(self.logicalIndexAt(pos))
+        except Exception:
+            return False
+        if col < 0:
+            return False
+
+        margin = int(self._resize_handle_margin)
+        x = int(self.sectionViewportPosition(int(col)))
+        w = int(self.sectionSize(int(col)))
+        left = x
+        right = x + w
+        px = int(pos.x())
+
+        if abs(px - right) <= margin:
+            return True
+        if col > 0 and abs(px - left) <= margin:
+            return True
+        return False
+
+    def paintSection(
+        self, painter: QPainter, rect, logical_index: int
+    ) -> None:  # noqa: N802
+        super().paintSection(painter, rect, int(logical_index))
+        try:
+            li = int(logical_index)
+        except Exception:
+            return
+        if li not in self._filterable_columns:
+            return
+        if int(rect.width()) < (
+            int(self._dropdown_icon_size) + int(self._dropdown_icon_pad) * 2
+        ):
+            return
+        try:
+            if bool(self.isSectionHidden(li)):
+                return
+        except Exception:
+            pass
+        try:
+            icon_rect = self._dropdown_rect_for_section(QRect(rect))
+            icon = (
+                self._filter_icon
+                if int(li) in set(self._active_filtered_columns or set())
+                else self._dropdown_icon
+            )
+            pix = icon.pixmap(
+                QSize(int(self._dropdown_icon_size), int(self._dropdown_icon_size))
+            )
+            painter.drawPixmap(icon_rect, pix)
+        except Exception:
+            pass
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        try:
+            if event.button() == Qt.MouseButton.LeftButton:
+                pos = self._event_pos_to_point(event)
+                if pos is None:
+                    return super().mousePressEvent(event)
+                col = int(self.logicalIndexAt(pos))
+                if col in self._filterable_columns and not self._is_over_resize_handle(
+                    pos
+                ):
+                    x = int(self.sectionViewportPosition(int(col)))
+                    w = int(self.sectionSize(int(col)))
+                    sec_rect = QRect(x, 0, w, int(self.height()))
+                    icon_rect = self._dropdown_rect_for_section(sec_rect)
+                    if icon_rect.contains(pos):
+                        try:
+                            self.filter_icon_clicked.emit(int(col))
+                        except Exception:
+                            pass
+                        event.accept()
+                        return
+        except Exception:
+            pass
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        try:
+            pos = self._event_pos_to_point(event)
+            if pos is None:
+                return super().mouseMoveEvent(event)
+            if self._is_over_dropdown_icon(pos):
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+            elif self._is_over_resize_handle(pos):
+                self.setCursor(Qt.CursorShape.SplitHCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+        except Exception:
+            try:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            except Exception:
+                pass
+        return super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        try:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+        except Exception:
+            pass
+        super().leaveEvent(event)
+
+    def event(self, event) -> bool:  # noqa: N802
+        et = event.type()
+        if et == QEvent.Type.HoverMove:
+            try:
+                pos = event.position().toPoint()
+            except Exception:
+                try:
+                    pos = event.pos()
+                except Exception:
+                    pos = None
+
+            if pos is not None and self._is_over_dropdown_icon(pos):
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+            elif pos is not None and self._is_over_resize_handle(pos):
+                self.setCursor(Qt.CursorShape.SplitHCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            return True
+
+        if et in {QEvent.Type.HoverLeave, QEvent.Type.Leave}:
+            try:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            except Exception:
+                pass
+
+        return super().event(event)
+
+
+class _TableWidgetColumnFilterPopup(QFrame):
+    """Excel-like column filter popup: sort, search, ✅/❌ multi-select."""
+
+    _ROLE_RAW_VALUE = int(Qt.ItemDataRole.UserRole)
+    _ROLE_CHECKED = int(Qt.ItemDataRole.UserRole + 1)
+
+    def __init__(
+        self,
+        parent: QWidget,
+        *,
+        title: str,
+        values: list[str],
+        selected: set[str] | None,
+        on_apply,
+        on_clear,
+        on_sort_asc,
+        on_sort_desc,
+    ) -> None:
+        super().__init__(None)
+        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet(
+            "\n".join(
+                [
+                    f"QFrame {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
+                    f"QLineEdit {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; padding: 6px 10px; }}",
+                    f"QTreeWidget {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; }}",
+                    f"QTreeWidget::item {{ padding: 4px 10px; }}",
+                    f"QTreeWidget::item:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                    f"QPushButton {{ background-color: white; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; padding: 6px 10px; }}",
+                    f"QPushButton:hover {{ background-color: {HOVER_ROW_BG_COLOR}; }}",
+                ]
+            )
+        )
+
+        self._title = str(title or "")
+        self._all_values = [
+            str(v or "").strip() for v in (values or []) if str(v or "").strip()
+        ]
+        self._on_apply = on_apply
+        self._on_clear = on_clear
+        self._on_sort_asc = on_sort_asc
+        self._on_sort_desc = on_sort_desc
+
+        self._busy = False
+        self._value_items: dict[str, QTreeWidgetItem] = {}
+        self._item_all: QTreeWidgetItem | None = None
+        self._selected_initial: set[str] | None = None
+        if selected is None:
+            self._selected_initial = None
+        else:
+            self._selected_initial = set(
+                str(v or "").strip()
+                for v in (selected or set())
+                if str(v or "").strip()
+            )
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
+
+        sort_row = QHBoxLayout()
+        sort_row.setContentsMargins(0, 0, 0, 0)
+        sort_row.setSpacing(8)
+
+        self.btn_sort_asc = QPushButton("Sắp xếp tăng dần")
+        self.btn_sort_desc = QPushButton("Sắp xếp giảm dần")
+        try:
+            self.btn_sort_asc.setIcon(QIcon(resource_path(ICON_SMALL_TO_LARGE)))
+            self.btn_sort_desc.setIcon(QIcon(resource_path(ICON_BIG_TO_SMALL)))
+            self.btn_sort_asc.setIconSize(QSize(16, 16))
+            self.btn_sort_desc.setIconSize(QSize(16, 16))
+        except Exception:
+            pass
+
+        sort_row.addWidget(self.btn_sort_asc, 1)
+        sort_row.addWidget(self.btn_sort_desc, 1)
+        root.addLayout(sort_row)
+
+        self.inp_search = QLineEdit(self)
+        self.inp_search.setPlaceholderText("Tìm kiếm...")
+        try:
+            self.inp_search.addAction(
+                QIcon(resource_path(ICON_SEARCH)),
+                QLineEdit.ActionPosition.LeadingPosition,
+            )
+        except Exception:
+            pass
+        root.addWidget(self.inp_search)
+
+        self.tree = QTreeWidget(self)
+        self.tree.setHeaderHidden(True)
+        self.tree.setRootIsDecorated(False)
+        self.tree.setIndentation(0)
+        self.tree.setItemsExpandable(False)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        root.addWidget(self.tree, 1)
+
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)
+        btn_row.setSpacing(8)
+
+        self.btn_clear = QPushButton("Xoá bộ lọc")
+        self.btn_ok = QPushButton("Đồng ý")
+        self.btn_cancel = QPushButton("Hủy")
+        btn_row.addWidget(self.btn_clear)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self.btn_ok)
+        btn_row.addWidget(self.btn_cancel)
+        root.addLayout(btn_row)
+
+        # Keep it compact but scrollable
+        self.setMinimumWidth(300)
+        self.resize(300, 520)
+
+        self._populate()
+
+        try:
+            self.btn_sort_asc.clicked.connect(self._on_sort_asc_clicked)
+            self.btn_sort_desc.clicked.connect(self._on_sort_desc_clicked)
+            self.inp_search.textChanged.connect(self._apply_search)
+            self.tree.itemClicked.connect(self._on_item_clicked)
+            self.btn_clear.clicked.connect(self._clear)
+            self.btn_ok.clicked.connect(self._apply)
+            self.btn_cancel.clicked.connect(self.close)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _label_for(value: str, checked: bool) -> str:
+        return f"{'✅' if checked else '❌'} {value}"
+
+    @staticmethod
+    def _set_checked(it: QTreeWidgetItem, checked: bool, raw_value: str) -> None:
+        it.setData(0, _TableWidgetColumnFilterPopup._ROLE_RAW_VALUE, str(raw_value))
+        it.setData(0, _TableWidgetColumnFilterPopup._ROLE_CHECKED, 1 if checked else 0)
+        it.setText(
+            0,
+            _TableWidgetColumnFilterPopup._label_for(str(raw_value), bool(checked)),
+        )
+
+    @staticmethod
+    def _is_checked(it: QTreeWidgetItem) -> bool:
+        try:
+            return (
+                int(it.data(0, _TableWidgetColumnFilterPopup._ROLE_CHECKED) or 0) == 1
+            )
+        except Exception:
+            return False
+
+    def _populate(self) -> None:
+        self.tree.clear()
+        self._value_items.clear()
+
+        current = self._selected_initial
+        if current is None:
+            selected_values = set(self._all_values)
+        else:
+            selected_values = set(current)
+
+        self._busy = True
+        try:
+            it_all = QTreeWidgetItem(self.tree, [""])
+            it_all.setFlags(
+                it_all.flags()
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+            )
+            _TableWidgetColumnFilterPopup._set_checked(
+                it_all, bool(current is None), "(Chọn tất cả)"
+            )
+            self._item_all = it_all
+
+            for v in self._all_values:
+                it = QTreeWidgetItem(self.tree, [""])
+                it.setFlags(
+                    it.flags()
+                    | Qt.ItemFlag.ItemIsEnabled
+                    | Qt.ItemFlag.ItemIsSelectable
+                )
+                checked = str(v) in selected_values
+                _TableWidgetColumnFilterPopup._set_checked(it, bool(checked), str(v))
+                self._value_items[str(v)] = it
+        finally:
+            self._busy = False
+
+    def _sync_select_all_indicator(self) -> None:
+        it_all = self._item_all
+        if it_all is None:
+            return
+        all_checked = True
+        for it in self._value_items.values():
+            if not _TableWidgetColumnFilterPopup._is_checked(it):
+                all_checked = False
+                break
+        self._busy = True
+        try:
+            _TableWidgetColumnFilterPopup._set_checked(
+                it_all, bool(all_checked), "(Chọn tất cả)"
+            )
+        finally:
+            self._busy = False
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
+        if self._busy or item is None:
+            return
+        raw = str(item.data(0, Qt.ItemDataRole.UserRole) or "")
+        if raw == "(Chọn tất cả)":
+            want_check = not _TableWidgetColumnFilterPopup._is_checked(item)
+            self._busy = True
+            try:
+                _TableWidgetColumnFilterPopup._set_checked(
+                    item, bool(want_check), "(Chọn tất cả)"
+                )
+                for v, it in self._value_items.items():
+                    _TableWidgetColumnFilterPopup._set_checked(
+                        it, bool(want_check), str(v)
+                    )
+            finally:
+                self._busy = False
+            return
+
+        v = str(item.data(0, Qt.ItemDataRole.UserRole) or "").strip()
+        if not v:
+            return
+        next_state = not _TableWidgetColumnFilterPopup._is_checked(item)
+        self._busy = True
+        try:
+            _TableWidgetColumnFilterPopup._set_checked(item, bool(next_state), v)
+        finally:
+            self._busy = False
+        self._sync_select_all_indicator()
+
+    def _collect_selected(self) -> set[str]:
+        selected: set[str] = set()
+        for v, it in self._value_items.items():
+            if _TableWidgetColumnFilterPopup._is_checked(it):
+                selected.add(str(v).strip())
+        return {v for v in selected if v}
+
+    def _apply_search(self, text: str) -> None:
+        q = _norm_text(text)
+        for v, it in self._value_items.items():
+            it.setHidden(bool(q) and (q not in _norm_text(v)))
+
+    def _on_sort_asc_clicked(self) -> None:
+        try:
+            self._on_sort_asc()
+        except Exception:
+            pass
+
+    def _on_sort_desc_clicked(self) -> None:
+        try:
+            self._on_sort_desc()
+        except Exception:
+            pass
+
+    def _clear(self) -> None:
+        try:
+            self._on_clear()
+        finally:
+            self.close()
+
+    def _apply(self) -> None:
+        try:
+            selected = self._collect_selected()
+            all_values = set(self._all_values)
+            if selected == all_values:
+                self._on_apply(None)
+            else:
+                self._on_apply(set(selected))
+        finally:
+            self.close()
 
 
 def _to_alignment_flag(align: str) -> Qt.AlignmentFlag:
@@ -492,6 +1009,11 @@ class ScheduleWorkView(QWidget):
                         else ""
                     )
                 ),
+                "filters": (
+                    self.content.right.get_column_filters_payload()
+                    if hasattr(self.content.right, "get_column_filters_payload")
+                    else {}
+                ),
                 "table": self._capture_table(self.content.right.table),
             },
             "temp": {
@@ -512,6 +1034,11 @@ class ScheduleWorkView(QWidget):
                         is not None
                         else ""
                     )
+                ),
+                "filters": (
+                    self.content.temp.get_column_filters_payload()
+                    if hasattr(self.content.temp, "get_column_filters_payload")
+                    else {}
                 ),
                 "table": self._capture_table(self.content.temp.table),
             },
@@ -654,6 +1181,12 @@ class ScheduleWorkView(QWidget):
                     self.content.right._set_header_check_text(header_txt)
             except Exception:
                 pass
+            try:
+                self.content.right.set_column_filters_payload(
+                    (state.get("right") or {}).get("filters")
+                )
+            except Exception:
+                pass
 
             # Temp panel
             try:
@@ -701,6 +1234,37 @@ class ScheduleWorkView(QWidget):
                     self.content.temp._set_header_check_text(header_txt)
             except Exception:
                 pass
+            try:
+                self.content.temp.set_column_filters_payload(
+                    (state.get("temp") or {}).get("filters")
+                )
+            except Exception:
+                pass
+
+            def _apply_filters_when_ready() -> None:
+                try:
+                    t1 = getattr(self.content.right.table, "_restore_state_timer", None)
+                    t2 = getattr(self.content.temp.table, "_restore_state_timer", None)
+                    if (t1 is not None and t1.isActive()) or (
+                        t2 is not None and t2.isActive()
+                    ):
+                        QTimer.singleShot(30, _apply_filters_when_ready)
+                        return
+                except Exception:
+                    pass
+                try:
+                    self.content.right._apply_column_filters()
+                except Exception:
+                    pass
+                try:
+                    self.content.temp._apply_column_filters()
+                except Exception:
+                    pass
+
+            try:
+                QTimer.singleShot(0, _apply_filters_when_ready)
+            except Exception:
+                pass
         finally:
             _block_all(False)
 
@@ -732,7 +1296,7 @@ def _mk_combo(parent: QWidget | None = None, height: int = 32) -> QComboBox:
     cb.setStyleSheet(
         "\n".join(
             [
-                f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 6px; }}",
+                f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 0px; }}",
                 f"QComboBox:focus {{ border: 1px solid {COLOR_BORDER}; }}",
             ]
         )
@@ -747,7 +1311,7 @@ def _mk_line_edit(parent: QWidget | None = None, height: int = 32) -> QLineEdit:
     le.setStyleSheet(
         "\n".join(
             [
-                f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 6px; }}",
+                f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 0px; }}",
                 f"QLineEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
             ]
         )
@@ -779,8 +1343,8 @@ def _mk_date_edit(parent: QWidget | None = None, height: int = 32) -> QDateEdit:
                 [
                     f"QCalendarWidget QWidget {{ color: {COLOR_TEXT_PRIMARY}; }}",
                     f"QCalendarWidget QToolButton {{ color: {COLOR_TEXT_PRIMARY}; background: transparent; border: 0px; padding: 0 6px; }}",
-                    f"QCalendarWidget QSpinBox {{ color: {COLOR_TEXT_PRIMARY}; background: {INPUT_COLOR_BG}; border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 0 6px; }}",
-                    f"QCalendarWidget QComboBox {{ color: {COLOR_TEXT_PRIMARY}; background: {INPUT_COLOR_BG}; border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 0 6px; }}",
+                    f"QCalendarWidget QSpinBox {{ color: {COLOR_TEXT_PRIMARY}; background: {INPUT_COLOR_BG}; border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 0 6px; }}",
+                    f"QCalendarWidget QComboBox {{ color: {COLOR_TEXT_PRIMARY}; background: {INPUT_COLOR_BG}; border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 0 6px; }}",
                     "QCalendarWidget QToolButton::menu-indicator { image: none; }",
                 ]
             )
@@ -792,7 +1356,7 @@ def _mk_date_edit(parent: QWidget | None = None, height: int = 32) -> QDateEdit:
     de.setStyleSheet(
         "\n".join(
             [
-                f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 6px; }}",
+                f"QDateEdit {{ border: 1px solid {COLOR_BORDER}; background: {INPUT_COLOR_BG}; padding: 0 8px; border-radius: 0px; }}",
                 f"QDateEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
             ]
         )
@@ -812,7 +1376,7 @@ def _mk_btn_outline(
     btn.setStyleSheet(
         "\n".join(
             [
-                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                 "QPushButton::icon { margin-right: 10px; }",
                 f"QPushButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_LIGHT}; }}",
             ]
@@ -833,7 +1397,7 @@ def _mk_btn_primary(
     btn.setStyleSheet(
         "\n".join(
             [
-                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 6px; }}",
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 0px; }}",
                 "QPushButton::icon { margin-right: 10px; }",
                 f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
             ]
@@ -1396,6 +1960,31 @@ class MainRight(QWidget):
             ]
         )
 
+        # Column filters (Excel-like)
+        self._column_filters: dict[int, set[str] | None] = {}
+        self._column_filters_norm: dict[int, set[str] | None] = {}
+        self._filter_popup: _TableWidgetColumnFilterPopup | None = None
+        filterable_cols = {
+            int(self.COL_EMP_CODE),
+            int(self.COL_MCC_CODE),
+            int(self.COL_FULL_NAME),
+            int(self.COL_DEPARTMENT),
+            int(self.COL_TITLE),
+            int(self.COL_SCHEDULE),
+        }
+        self._filterable_cols = set(filterable_cols)
+
+        try:
+            hh_filter = _TableWidgetFilterHeaderView(
+                filterable_columns=filterable_cols,
+                parent=self.table,
+            )
+            self.table.setHorizontalHeader(hh_filter)
+            self._filter_header = hh_filter
+            hh_filter.filter_icon_clicked.connect(self._on_filter_icon_clicked)
+        except Exception:
+            self._filter_header = None
+
         # Header toggle-all for checkbox column
         try:
             self._set_header_check_text("❌")
@@ -1552,6 +2141,246 @@ class MainRight(QWidget):
             ui_settings_bus.changed.connect(self.apply_ui_settings)
         except Exception:
             pass
+
+    def get_column_filters_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        for col, sel in (self._column_filters or {}).items():
+            if sel is None:
+                continue
+            payload[str(int(col))] = sorted([str(v) for v in sel])
+        return payload
+
+    def _persist_filters_to_cached_state(self) -> None:
+        """Keep filter state stable across view/table recreations."""
+        try:
+            state = _SCHEDULE_WORK_STATE.get("view")
+            if not isinstance(state, dict):
+                state = {}
+                _SCHEDULE_WORK_STATE["view"] = state
+            right = state.get("right")
+            if not isinstance(right, dict):
+                right = {}
+                state["right"] = right
+            right["filters"] = self.get_column_filters_payload()
+        except Exception:
+            pass
+
+    def set_column_filters_payload(self, payload: object) -> None:
+        self._column_filters = {}
+        self._column_filters_norm = {}
+        if isinstance(payload, dict):
+            for k, v in payload.items():
+                try:
+                    col = int(k)
+                except Exception:
+                    continue
+                if v is None:
+                    continue
+                if isinstance(v, (list, tuple, set)):
+                    raw_set = set(str(x or "") for x in v)
+                    self._column_filters[int(col)] = raw_set
+                    self._column_filters_norm[int(col)] = set(
+                        _norm_text(x) for x in raw_set
+                    )
+                else:
+                    raw_set = {str(v or "")}
+                    self._column_filters[int(col)] = raw_set
+                    self._column_filters_norm[int(col)] = set(
+                        _norm_text(x) for x in raw_set
+                    )
+        try:
+            self._apply_column_filters()
+        except Exception:
+            pass
+
+    def _get_cell_text(self, row: int, col: int) -> str:
+        it = self.table.item(int(row), int(col))
+        return str(it.text() or "") if it is not None else ""
+
+    def _row_passes_filters(self, row: int, *, except_col: int | None = None) -> bool:
+        for col, sel_norm in (self._column_filters_norm or {}).items():
+            c = int(col)
+            if except_col is not None and int(except_col) == c:
+                continue
+            if sel_norm is None:
+                continue
+            if len(sel_norm) == 0:
+                return False
+            raw = self._get_cell_text(int(row), int(c))
+            if _norm_text(raw) not in sel_norm:
+                return False
+        return True
+
+    def _apply_column_filters(self) -> None:
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            for r in range(int(self.table.rowCount())):
+                ok = self._row_passes_filters(int(r))
+                try:
+                    self.table.setRowHidden(int(r), not bool(ok))
+                except Exception:
+                    pass
+        finally:
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+
+        # Update header icons (dropdown -> filter.svg) based on active filters.
+        try:
+            hh = getattr(self, "_filter_header", None)
+            if hh is not None and hasattr(hh, "set_active_filtered_columns"):
+                active: set[int] = set()
+                for c, sel in (self._column_filters or {}).items():
+                    if sel is not None:
+                        active.add(int(c))
+                hh.set_active_filtered_columns(active)
+        except Exception:
+            pass
+        try:
+            self.table.viewport().update()
+        except Exception:
+            pass
+
+        # Persist filters so switching table won't reset.
+        try:
+            self._persist_filters_to_cached_state()
+        except Exception:
+            pass
+
+    def _collect_values_for_column(self, col: int) -> list[str]:
+        values: set[str] = set()
+        for r in range(int(self.table.rowCount())):
+            if not self._row_passes_filters(int(r), except_col=int(col)):
+                continue
+            values.add(self._get_cell_text(int(r), int(col)))
+        return sorted(list(values), key=lambda s: _norm_text(s))
+
+    def _on_filter_icon_clicked(self, col: int) -> None:
+        if int(col) == int(self.COL_CHECK) or int(col) == int(self.COL_ID):
+            return
+        try:
+            if bool(self.table.isColumnHidden(int(col))):
+                return
+        except Exception:
+            pass
+
+        try:
+            if self._filter_popup is not None:
+                self._filter_popup.close()
+        except Exception:
+            pass
+
+        header = self.table.horizontalHeader()
+        try:
+            # Anchor the popup next to the dropdown icon (not the whole column).
+            x = int(header.sectionViewportPosition(int(col)))
+            w = int(header.sectionSize(int(col)))
+            sec_rect = QRect(x, 0, w, int(header.height()))
+            icon_rect = None
+            try:
+                icon_rect = header._dropdown_rect_for_section(sec_rect)  # type: ignore[attr-defined]
+            except Exception:
+                icon_rect = None
+
+            if icon_rect is None:
+                size = 14
+                pad = 6
+                icon_rect = QRect(
+                    int(sec_rect.right() - pad - size),
+                    int(sec_rect.center().y() - (size // 2)),
+                    int(size),
+                    int(size),
+                )
+            pos = header.viewport().mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+        except Exception:
+            pos = self.mapToGlobal(self.rect().bottomLeft())
+
+        title = ""
+        values = self._collect_values_for_column(int(col))
+        selected = (self._column_filters or {}).get(int(col))
+
+        def _apply(sel: set[str] | None) -> None:
+            # None means select all => no filter
+            if sel is None:
+                self._column_filters[int(col)] = None
+                self._column_filters_norm[int(col)] = None
+            else:
+                raw_set = set(sel)
+                self._column_filters[int(col)] = raw_set
+                self._column_filters_norm[int(col)] = set(
+                    _norm_text(x) for x in raw_set
+                )
+            self._apply_column_filters()
+            try:
+                self._persist_filters_to_cached_state()
+            except Exception:
+                pass
+
+        def _clear() -> None:
+            self._column_filters[int(col)] = None
+            self._column_filters_norm[int(col)] = None
+            self._apply_column_filters()
+            try:
+                self._persist_filters_to_cached_state()
+            except Exception:
+                pass
+
+        def _sort_asc() -> None:
+            try:
+                self.table.sortItems(int(col), Qt.SortOrder.AscendingOrder)
+            except Exception:
+                pass
+            self._apply_column_filters()
+
+        def _sort_desc() -> None:
+            try:
+                self.table.sortItems(int(col), Qt.SortOrder.DescendingOrder)
+            except Exception:
+                pass
+            self._apply_column_filters()
+
+        self._filter_popup = _TableWidgetColumnFilterPopup(
+            self,
+            title=title,
+            values=values,
+            selected=selected,
+            on_apply=_apply,
+            on_clear=_clear,
+            on_sort_asc=_sort_asc,
+            on_sort_desc=_sort_desc,
+        )
+        try:
+            screen = (
+                self.window().windowHandle().screen()
+                if self.window() and self.window().windowHandle()
+                else None
+            )
+            if screen:
+                sg = screen.availableGeometry()
+                p = QPoint(int(pos.x()), int(pos.y()))
+                x = p.x()
+                y = p.y()
+                if x + self._filter_popup.width() > sg.right():
+                    x = max(
+                        int(sg.left()), int(sg.right() - self._filter_popup.width())
+                    )
+                if y + self._filter_popup.height() > sg.bottom():
+                    y = max(
+                        int(sg.top()), int(sg.bottom() - self._filter_popup.height())
+                    )
+                self._filter_popup.move(QPoint(x, y))
+            else:
+                self._filter_popup.move(pos)
+        except Exception:
+            try:
+                self._filter_popup.move(pos)
+            except Exception:
+                pass
+        self._filter_popup.show()
 
     def apply_ui_settings(self) -> None:
         try:
@@ -1964,6 +2793,11 @@ class MainRight(QWidget):
         except Exception:
             pass
 
+        try:
+            self._apply_column_filters()
+        except Exception:
+            pass
+
     def cancel_render(self) -> None:
         try:
             if self._render_timer is not None and self._render_timer.isActive():
@@ -2132,6 +2966,14 @@ class MainRight(QWidget):
                 except Exception:
                     pass
 
+                # Apply filtering during chunked render so it is visible immediately.
+                try:
+                    self.table.setRowHidden(
+                        int(r), not bool(self._row_passes_filters(int(r)))
+                    )
+                except Exception:
+                    pass
+
                 self._render_index += 1
 
                 if (time.perf_counter() - start) >= budget_s:
@@ -2176,6 +3018,11 @@ class MainRight(QWidget):
             # Fit once after render completes (prevents column jitter).
             try:
                 self._fit_columns_to_viewport()
+            except Exception:
+                pass
+
+            try:
+                self._apply_column_filters()
             except Exception:
                 pass
 
@@ -2258,6 +3105,7 @@ class MainRight(QWidget):
         self._set_header_check_text("✅" if (any_rows and all_checked) else "❌")
 
     def _on_header_clicked(self, section: int) -> None:
+        # Clicking the check column header toggles all ✅/❌.
         if int(section) != int(self.COL_CHECK):
             return
         try:
@@ -2467,6 +3315,29 @@ class TempScheduleContent(QWidget):
                 "Lịch làm việc",
             ]
         )
+
+        # Column filters (Excel-like)
+        self._column_filters: dict[int, set[str] | None] = {}
+        self._column_filters_norm: dict[int, set[str] | None] = {}
+        self._filter_popup: _TableWidgetColumnFilterPopup | None = None
+        filterable_cols = {
+            int(self.COL_EMP_CODE),
+            int(self.COL_FULL_NAME),
+            int(self.COL_FROM_DATE),
+            int(self.COL_TO_DATE),
+            int(self.COL_SCHEDULE),
+        }
+        self._filterable_cols = set(filterable_cols)
+        try:
+            hh_filter = _TableWidgetFilterHeaderView(
+                filterable_columns=filterable_cols,
+                parent=self.table,
+            )
+            self.table.setHorizontalHeader(hh_filter)
+            self._filter_header = hh_filter
+            hh_filter.filter_icon_clicked.connect(self._on_filter_icon_clicked)
+        except Exception:
+            self._filter_header = None
 
         # Header toggle-all for checkbox column
         try:
@@ -2929,6 +3800,11 @@ class TempScheduleContent(QWidget):
         except Exception:
             pass
 
+        try:
+            self._apply_column_filters()
+        except Exception:
+            pass
+
     def cancel_render(self) -> None:
         try:
             if self._render_timer is not None and self._render_timer.isActive():
@@ -3056,6 +3932,14 @@ class TempScheduleContent(QWidget):
                 except Exception:
                     pass
 
+                # Apply filtering during chunked render so it is visible immediately.
+                try:
+                    self.table.setRowHidden(
+                        int(r), not bool(self._row_passes_filters(int(r)))
+                    )
+                except Exception:
+                    pass
+
                 self._render_index += 1
                 if (time.perf_counter() - start) >= budget_s:
                     break
@@ -3100,6 +3984,250 @@ class TempScheduleContent(QWidget):
                 self._fit_columns_to_viewport()
             except Exception:
                 pass
+
+            try:
+                self._apply_column_filters()
+            except Exception:
+                pass
+
+    def get_column_filters_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        for col, sel in (self._column_filters or {}).items():
+            if sel is None:
+                continue
+            payload[str(int(col))] = sorted([str(v) for v in sel])
+        return payload
+
+    def _persist_filters_to_cached_state(self) -> None:
+        """Keep filter state stable across view/table recreations."""
+        try:
+            state = _SCHEDULE_WORK_STATE.get("view")
+            if not isinstance(state, dict):
+                state = {}
+                _SCHEDULE_WORK_STATE["view"] = state
+            temp = state.get("temp")
+            if not isinstance(temp, dict):
+                temp = {}
+                state["temp"] = temp
+            temp["filters"] = self.get_column_filters_payload()
+        except Exception:
+            pass
+
+    def set_column_filters_payload(self, payload: object) -> None:
+        self._column_filters = {}
+        self._column_filters_norm = {}
+        if isinstance(payload, dict):
+            for k, v in payload.items():
+                try:
+                    col = int(k)
+                except Exception:
+                    continue
+                if v is None:
+                    continue
+                if isinstance(v, (list, tuple, set)):
+                    raw_set = set(str(x or "") for x in v)
+                    self._column_filters[int(col)] = raw_set
+                    self._column_filters_norm[int(col)] = set(
+                        _norm_text(x) for x in raw_set
+                    )
+                else:
+                    raw_set = {str(v or "")}
+                    self._column_filters[int(col)] = raw_set
+                    self._column_filters_norm[int(col)] = set(
+                        _norm_text(x) for x in raw_set
+                    )
+        try:
+            self._apply_column_filters()
+        except Exception:
+            pass
+
+    def _get_cell_text(self, row: int, col: int) -> str:
+        it = self.table.item(int(row), int(col))
+        return str(it.text() or "") if it is not None else ""
+
+    def _row_passes_filters(self, row: int, *, except_col: int | None = None) -> bool:
+        for col, sel_norm in (self._column_filters_norm or {}).items():
+            c = int(col)
+            if except_col is not None and int(except_col) == c:
+                continue
+            if sel_norm is None:
+                continue
+            if len(sel_norm) == 0:
+                return False
+            raw = self._get_cell_text(int(row), int(c))
+            if _norm_text(raw) not in sel_norm:
+                return False
+        return True
+
+    def _apply_column_filters(self) -> None:
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            for r in range(int(self.table.rowCount())):
+                ok = self._row_passes_filters(int(r))
+                try:
+                    self.table.setRowHidden(int(r), not bool(ok))
+                except Exception:
+                    pass
+        finally:
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+
+        # Update header icons (dropdown -> filter.svg) based on active filters.
+        try:
+            hh = getattr(self, "_filter_header", None)
+            if hh is not None and hasattr(hh, "set_active_filtered_columns"):
+                active: set[int] = set()
+                for c, sel in (self._column_filters or {}).items():
+                    if sel is not None:
+                        active.add(int(c))
+                hh.set_active_filtered_columns(active)
+        except Exception:
+            pass
+        try:
+            self.table.viewport().update()
+        except Exception:
+            pass
+
+        # Persist filters so switching table won't reset.
+        try:
+            self._persist_filters_to_cached_state()
+        except Exception:
+            pass
+
+    def _collect_values_for_column(self, col: int) -> list[str]:
+        values: set[str] = set()
+        for r in range(int(self.table.rowCount())):
+            if not self._row_passes_filters(int(r), except_col=int(col)):
+                continue
+            values.add(self._get_cell_text(int(r), int(col)))
+        return sorted(list(values), key=lambda s: _norm_text(s))
+
+    def _on_filter_icon_clicked(self, col: int) -> None:
+        if int(col) == int(self.COL_CHECK) or int(col) == int(self.COL_ID):
+            return
+        try:
+            if bool(self.table.isColumnHidden(int(col))):
+                return
+        except Exception:
+            pass
+
+        try:
+            if self._filter_popup is not None:
+                self._filter_popup.close()
+        except Exception:
+            pass
+
+        header = self.table.horizontalHeader()
+        try:
+            # Anchor the popup next to the dropdown icon (not the whole column).
+            x = int(header.sectionViewportPosition(int(col)))
+            w = int(header.sectionSize(int(col)))
+            sec_rect = QRect(x, 0, w, int(header.height()))
+            icon_rect = None
+            try:
+                icon_rect = header._dropdown_rect_for_section(sec_rect)  # type: ignore[attr-defined]
+            except Exception:
+                icon_rect = None
+
+            if icon_rect is None:
+                size = 14
+                pad = 6
+                icon_rect = QRect(
+                    int(sec_rect.right() - pad - size),
+                    int(sec_rect.center().y() - (size // 2)),
+                    int(size),
+                    int(size),
+                )
+            pos = header.viewport().mapToGlobal(icon_rect.bottomLeft() + QPoint(0, 2))
+        except Exception:
+            pos = self.mapToGlobal(self.rect().bottomLeft())
+
+        title = ""
+        values = self._collect_values_for_column(int(col))
+        selected = (self._column_filters or {}).get(int(col))
+
+        def _apply(sel: set[str] | None) -> None:
+            if sel is None:
+                self._column_filters[int(col)] = None
+                self._column_filters_norm[int(col)] = None
+            else:
+                raw_set = set(sel)
+                self._column_filters[int(col)] = raw_set
+                self._column_filters_norm[int(col)] = set(
+                    _norm_text(x) for x in raw_set
+                )
+            self._apply_column_filters()
+            try:
+                self._persist_filters_to_cached_state()
+            except Exception:
+                pass
+
+        def _clear() -> None:
+            self._column_filters[int(col)] = None
+            self._column_filters_norm[int(col)] = None
+            self._apply_column_filters()
+            try:
+                self._persist_filters_to_cached_state()
+            except Exception:
+                pass
+
+        def _sort_asc() -> None:
+            try:
+                self.table.sortItems(int(col), Qt.SortOrder.AscendingOrder)
+            except Exception:
+                pass
+            self._apply_column_filters()
+
+        def _sort_desc() -> None:
+            try:
+                self.table.sortItems(int(col), Qt.SortOrder.DescendingOrder)
+            except Exception:
+                pass
+            self._apply_column_filters()
+
+        self._filter_popup = _TableWidgetColumnFilterPopup(
+            self,
+            title=title,
+            values=values,
+            selected=selected,
+            on_apply=_apply,
+            on_clear=_clear,
+            on_sort_asc=_sort_asc,
+            on_sort_desc=_sort_desc,
+        )
+        try:
+            screen = (
+                self.window().windowHandle().screen()
+                if self.window() and self.window().windowHandle()
+                else None
+            )
+            if screen:
+                sg = screen.availableGeometry()
+                p = QPoint(int(pos.x()), int(pos.y()))
+                x = p.x()
+                y = p.y()
+                if x + self._filter_popup.width() > sg.right():
+                    x = max(
+                        int(sg.left()), int(sg.right() - self._filter_popup.width())
+                    )
+                if y + self._filter_popup.height() > sg.bottom():
+                    y = max(
+                        int(sg.top()), int(sg.bottom() - self._filter_popup.height())
+                    )
+                self._filter_popup.move(QPoint(x, y))
+            else:
+                self._filter_popup.move(pos)
+        except Exception:
+            try:
+                self._filter_popup.move(pos)
+            except Exception:
+                pass
+        self._filter_popup.show()
 
     def get_selected_assignment_id(self) -> int | None:
         try:

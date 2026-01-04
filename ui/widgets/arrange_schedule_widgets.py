@@ -237,7 +237,7 @@ def _mk_combo(parent: QWidget | None = None, height: int = 32) -> QComboBox:
     cb.setStyleSheet(
         "\n".join(
             [
-                f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 6px; }}",
+                f"QComboBox {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 0px; }}",
                 f"QComboBox:focus {{ border: 1px solid {COLOR_BORDER}; }}",
             ]
         )
@@ -252,7 +252,7 @@ def _mk_line_edit(parent: QWidget | None = None, height: int = 32) -> QLineEdit:
     le.setStyleSheet(
         "\n".join(
             [
-                f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 6px; }}",
+                f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; border-radius: 0px; }}",
                 f"QLineEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
             ]
         )
@@ -272,7 +272,7 @@ def _mk_btn_outline(
     btn.setStyleSheet(
         "\n".join(
             [
-                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                 "QPushButton::icon { margin-right: 10px; }",
                 f"QPushButton:hover {{ background: {_BTN_HOVER_BG}; color: {COLOR_TEXT_LIGHT}; }}",
             ]
@@ -288,7 +288,7 @@ def _mk_btn_primary(text: str, height: int = 32) -> QPushButton:
     btn.setStyleSheet(
         "\n".join(
             [
-                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 6px; }}",
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; padding: 0 12px; border-radius: 0px; }}",
                 "QPushButton::icon { margin-right: 10px; }",
                 f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
             ]

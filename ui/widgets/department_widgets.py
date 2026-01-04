@@ -136,7 +136,7 @@ class TitleBar2(QWidget):
             btn.setStyleSheet(
                 "\n".join(
                     [
-                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 6px; }}",
+                        f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; padding: 0 10px; border-radius: 0px; }}",
                         "QPushButton::icon { margin-right: 10px; }",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER};color: #FFFFFF; }}",
                     ]
@@ -240,7 +240,7 @@ class MainContent(QWidget):
         self.text_guide.setReadOnly(True)
         self.text_guide.setFont(self._font_normal)
         self.text_guide.setStyleSheet(
-            f"QTextEdit {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px 8px; background: transparent; }}"
+            f"QTextEdit {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 6px 8px; background: transparent; }}"
         )
         self.text_guide.setPlainText(
             "📌 Ví dụ bạn có thể trả lời:\n\n"
@@ -287,7 +287,9 @@ class MainContent(QWidget):
         for k in list(by_parent.keys()):
             by_parent[k].sort(key=lambda x: x[0])
 
-        titles_by_department: dict[int | None, list[tuple[int, str]]] = defaultdict(list)
+        titles_by_department: dict[int | None, list[tuple[int, str]]] = defaultdict(
+            list
+        )
         for title_id, department_id, title_name in titles or []:
             title_id_i = int(title_id)
             dept_id_i = int(department_id) if department_id is not None else None
@@ -305,8 +307,12 @@ class MainContent(QWidget):
             title_children = titles_by_department.get(parent_id, [])
 
             combined: list[tuple[str, int, str]] = []
-            combined.extend([("dept", d_id, d_name) for (d_id, _p, d_name) in dept_children])
-            combined.extend([("title", t_id, t_name) for (t_id, t_name) in title_children])
+            combined.extend(
+                [("dept", d_id, d_name) for (d_id, _p, d_name) in dept_children]
+            )
+            combined.extend(
+                [("title", t_id, t_name) for (t_id, t_name) in title_children]
+            )
 
             for idx, (node_type, node_id, node_name) in enumerate(combined):
                 is_last = idx == (len(combined) - 1)
@@ -371,7 +377,9 @@ class MainContent(QWidget):
             node_type = "dept"
             node_id = 0
 
-        self._last_selected_id = node_id if (node_type == "dept" and node_id > 0) else None
+        self._last_selected_id = (
+            node_id if (node_type == "dept" and node_id > 0) else None
+        )
 
     def _apply_item_font(self, item: QTreeWidgetItem, selected: bool) -> None:
         font = self._font_semibold if selected else self._font_normal
@@ -428,7 +436,12 @@ class MainContent(QWidget):
             parent_id = None
 
         if node_type == "dept":
-            return {"type": "dept", "id": node_id, "name": node_name, "parent_id": parent_id}
+            return {
+                "type": "dept",
+                "id": node_id,
+                "name": node_name,
+                "parent_id": parent_id,
+            }
 
         return {
             "type": "title",
