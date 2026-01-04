@@ -101,7 +101,7 @@ class HolidayDialog(QDialog):
         self.input_holiday_date.setStyleSheet(
             "\n".join(
                 [
-                    f"QDateEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QDateEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QDateEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )
@@ -117,7 +117,7 @@ class HolidayDialog(QDialog):
         self.input_holiday_info.setStyleSheet(
             "\n".join(
                 [
-                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )

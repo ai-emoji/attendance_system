@@ -81,7 +81,7 @@ class ArrangeScheduleDialog(QDialog):
             lw.setStyleSheet(
                 "\n".join(
                     [
-                        f"QListWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
+                        f"QListWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
                         "QListWidget::item { padding: 8px; }",
                         f"QListWidget::item:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
                         "QListWidget::item:focus { outline: none; }",
@@ -213,7 +213,7 @@ class ArrangeScheduleDialog(QDialog):
         self.tree_selected.setStyleSheet(
             "\n".join(
                 [
-                    f"QTreeWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
+                    f"QTreeWidget {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 6px; color: {COLOR_TEXT_PRIMARY}; }}",
                     "QTreeWidget::item { padding: 6px; }",
                     f"QTreeWidget::item:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; }}",
                     "QTreeWidget::item:focus { outline: none; }",
@@ -234,7 +234,7 @@ class ArrangeScheduleDialog(QDialog):
 
         btn_style = "\n".join(
             [
-                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; color: {COLOR_TEXT_PRIMARY}; padding: 0 10px; border-radius: 6px; }}",
+                f"QPushButton {{ border: 1px solid {COLOR_BORDER}; background: transparent; color: {COLOR_TEXT_PRIMARY}; padding: 0 10px; border-radius: 0px; }}",
                 f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_TEXT_LIGHT}; border: 1px solid {COLOR_BORDER}; }}",
             ]
         )

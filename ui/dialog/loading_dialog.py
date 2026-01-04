@@ -45,13 +45,13 @@ class LoadingDialog(QDialog):
             """
             QProgressBar {
                 border: 1px solid rgba(0,0,0,0.15);
-                border-radius: 6px;
+                border-radius: 0px;
                 background: rgba(0,0,0,0.06);
                 height: 16px;
             }
             QProgressBar::chunk {
                 background: %s;
-                border-radius: 6px;
+                border-radius: 0px;
             }
             """
             % (COLOR_BUTTON_PRIMARY,)

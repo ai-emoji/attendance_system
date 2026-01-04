@@ -83,6 +83,7 @@ from core.resource import (
 )
 
 from core.ui_settings import get_schedule_work_table_ui, ui_settings_bus
+from PySide6.QtGui import QAction
 
 
 _BTN_HOVER_BG = COLOR_BUTTON_PRIMARY_HOVER
@@ -402,13 +403,30 @@ class _TableWidgetColumnFilterPopup(QFrame):
 
         self.inp_search = QLineEdit(self)
         self.inp_search.setPlaceholderText("Tìm kiếm...")
+        self.inp_search.setMinimumHeight(32)
+
+        # NOTE: When a QLineEdit has a stylesheet with padding, the leading action
+        # can appear "missing" (clipped/overlapped). Use a QAction + text margins.
+        search_icon = QIcon(resource_path(ICON_SEARCH))
         try:
-            self.inp_search.addAction(
-                QIcon(resource_path(ICON_SEARCH)),
+            act = self.inp_search.addAction(
+                search_icon,
                 QLineEdit.ActionPosition.LeadingPosition,
             )
         except Exception:
+            act = None
+            try:
+                act = QAction(search_icon, "", self.inp_search)
+                self.inp_search.addAction(act, QLineEdit.ActionPosition.LeadingPosition)
+            except Exception:
+                pass
+
+        # Reserve space so the icon isn't hidden by padding / text drawing
+        try:
+            self.inp_search.setTextMargins(28, 0, 0, 0)
+        except Exception:
             pass
+
         root.addWidget(self.inp_search)
 
         self.tree = QTreeWidget(self)
@@ -1482,6 +1500,23 @@ class TitleBar2(QWidget):
         self.inp_search.setPlaceholderText("Nhập mã NV hoặc tên nhân viên...")
         self.inp_search.setMinimumWidth(260)
 
+        # Add search icon inside the line edit (leading)
+        try:
+            search_icon = QIcon(resource_path(ICON_SEARCH))
+            try:
+                self.inp_search.addAction(
+                    search_icon,
+                    QLineEdit.ActionPosition.LeadingPosition,
+                )
+            except Exception:
+                act = QAction(search_icon, "", self.inp_search)
+                self.inp_search.addAction(act, QLineEdit.ActionPosition.LeadingPosition)
+
+            # Reserve space so the icon isn't hidden by padding / text drawing
+            self.inp_search.setTextMargins(0, 0, 0, 0)
+        except Exception:
+            pass
+
         # Auto-search (debounced) instead of a dedicated Search button.
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
@@ -1490,6 +1525,10 @@ class TitleBar2(QWidget):
         self.btn_refresh = _mk_btn_outline("Làm mới", ICON_REFRESH, height=32)
         self.btn_delete = _mk_btn_outline("Xóa lịch NV", ICON_DELETE, height=32)
         self.btn_settings = _mk_btn_outline("Cài đặt", None, height=32)
+        try:
+            self.btn_settings.hide()
+        except Exception:
+            pass
 
         self.total_icon = QLabel("")
         self.total_icon.setFixedSize(18, 18)

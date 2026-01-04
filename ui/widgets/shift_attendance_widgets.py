@@ -522,6 +522,17 @@ class MainContent1(QWidget):
         self.inp_search_text = _mk_line_edit(self)
         self.inp_search_text.setPlaceholderText("Tìm kiếm...")
 
+        # Add search icon inside the line edit (leading position)
+        try:
+            search_icon = QIcon.fromTheme("edit-find")
+            if not search_icon.isNull():
+                action = self.inp_search_text.addAction(
+                    search_icon, QLineEdit.ActionPosition.LeadingPosition
+                )
+                action.setEnabled(False)  # purely decorative
+        except Exception:
+            pass
+
         self.btn_refresh = _mk_btn_outline("Làm mới", ICON_REFRESH)
 
         # Filter: employment status (default: Đi làm)

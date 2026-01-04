@@ -52,6 +52,9 @@ class EmployeeListDialog(QDialog):
 
         self.cbo_search_by = QComboBox()
         self.cbo_search_by.setFixedHeight(32)
+        self.cbo_search_by.setStyleSheet(
+            "border-radius: 0px; border: 1px solid black; padding: 0 10px;"
+        )
         self.cbo_search_by.addItem("STT", "stt")
         self.cbo_search_by.addItem("Mã NV", "employee_code")
         self.cbo_search_by.addItem("Họ và tên", "full_name")
@@ -60,10 +63,26 @@ class EmployeeListDialog(QDialog):
         self.inp_search_text = QLineEdit()
         self.inp_search_text.setPlaceholderText("Tìm kiếm...")
         self.inp_search_text.setFixedHeight(32)
+        self.inp_search_text.setStyleSheet(
+            "border-radius: 0px; border: 1px solid black; padding: 0 10px;"
+        )
+
+        # icon tìm kiếm (leading icon trong QLineEdit)
+        try:
+            self.inp_search_text.addAction(
+                QIcon(resource_path("assets/images/search.svg")),
+                QLineEdit.ActionPosition.LeadingPosition,
+            )
+        except Exception:
+            pass
 
         self.cbo_employment_status = QComboBox()
         self.cbo_employment_status.setFixedHeight(32)
+        self.cbo_employment_status.setStyleSheet(
+            "border-radius: 0px; border: 1px solid black; padding: 0 10px;"
+        )
         self.cbo_employment_status.addItem("Hiện trạng", "")
+        self.cbo_employment_status.setFixedHeight(30)
         self.cbo_employment_status.addItem("Đi làm", "1")
         self.cbo_employment_status.addItem("Nghỉ thai sản", "2")
         self.cbo_employment_status.addItem("Đã nghỉ việc", "3")
@@ -72,6 +91,9 @@ class EmployeeListDialog(QDialog):
         self.btn_refresh = QPushButton("Làm mới")
         self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_refresh.setFixedHeight(32)
+        self.btn_refresh.setStyleSheet(
+            "background-color: white; border-radius: 0px; border: 1px solid black; padding: 0 10px;"
+        )
         try:
             self.btn_refresh.setIcon(QIcon(resource_path("assets/images/refresh.svg")))
             self.btn_refresh.setIconSize(QSize(18, 18))
@@ -81,10 +103,14 @@ class EmployeeListDialog(QDialog):
         self.btn_export = QPushButton("Xuất danh sách")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export.setFixedHeight(32)
+        self.btn_export.setStyleSheet(
+            "background-color: white; border-radius: 0px; border: 1px solid black; padding: 0 10px;"
+        )
         self.btn_export.setIcon(QIcon(resource_path(ICON_EXCEL)))
         self.btn_export.setIconSize(QSize(18, 18))
 
         self.label_total = QLabel("Tổng: 0")
+        self.label_total.setStyleSheet("border-radius: 0px;")
         self.label_total.setAlignment(
             Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
         )

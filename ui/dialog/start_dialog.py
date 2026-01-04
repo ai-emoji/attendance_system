@@ -101,8 +101,8 @@ class StartDialog(QDialog):
         self._bar.setStyleSheet(
             "\n".join(
                 [
-                    f"QProgressBar {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; background: {MAIN_CONTENT_BG_COLOR}; height: 16px; }}",
-                    f"QProgressBar::chunk {{ background: {COLOR_BUTTON_PRIMARY}; border-radius: 6px; }}",
+                    f"QProgressBar {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; background: {MAIN_CONTENT_BG_COLOR}; height: 16px; }}",
+                    f"QProgressBar::chunk {{ background: {COLOR_BUTTON_PRIMARY}; border-radius: 0px; }}",
                 ]
             )
         )

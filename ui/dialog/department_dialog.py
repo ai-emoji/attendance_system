@@ -11,7 +11,7 @@ Yêu cầu:
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer, Qt, QSize
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -44,7 +44,9 @@ from core.resource import (
     INPUT_COLOR_BORDER_FOCUS,
     INPUT_HEIGHT_DEFAULT,
     INPUT_WIDTH_DEFAULT,
+    ICON_DROPDOWN,
     UI_FONT,
+    resource_path,
 )
 
 
@@ -85,6 +87,8 @@ class DepartmentDialog(QDialog):
         if FONT_WEIGHT_SEMIBOLD >= 500:
             font_button.setWeight(QFont.Weight.DemiBold)
 
+        dropdown_url = resource_path(ICON_DROPDOWN).replace("\\", "/")
+
         form_widget = QWidget(self)
         form_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -107,7 +111,7 @@ class DepartmentDialog(QDialog):
         self.input_department_name.setStyleSheet(
             "\n".join(
                 [
-                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )
@@ -127,8 +131,10 @@ class DepartmentDialog(QDialog):
         self.combo_parent.setStyleSheet(
             "\n".join(
                 [
-                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 28px 0 8px; border-radius: 0px; }}",
                     f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
+                    f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 24px; border-left: 0px; }}",
+                    f'QComboBox::down-arrow {{ image: url("{dropdown_url}"); width: 14px; height: 14px; }}',
                 ]
             )
         )
@@ -149,14 +155,18 @@ class DepartmentDialog(QDialog):
         self.combo_scope.setFont(font_normal)
         self.combo_scope.setFixedHeight(INPUT_HEIGHT_DEFAULT)
         self.combo_scope.setMinimumWidth(INPUT_WIDTH_DEFAULT)
-        self.combo_scope.setToolTip("Chọn: Phòng ban hoặc Chức danh (mặc định chưa chọn).")
+        self.combo_scope.setToolTip(
+            "Chọn: Phòng ban hoặc Chức danh (mặc định chưa chọn)."
+        )
         self.combo_scope.setIconSize(QSize(18, 18))
         self.combo_scope.setCursor(Qt.CursorShape.PointingHandCursor)
         self.combo_scope.setStyleSheet(
             "\n".join(
                 [
-                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 28px 0 8px; border-radius: 0px; }}",
                     f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
+                    f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 24px; border-left: 0px; }}",
+                    f'QComboBox::down-arrow {{ image: url("{dropdown_url}"); width: 14px; height: 14px; }}',
                 ]
             )
         )
@@ -268,9 +278,6 @@ class DepartmentDialog(QDialog):
 
         for k in list(by_parent.keys()):
             by_parent[k].sort(key=lambda x: x[0])
-
-        from core.resource import resource_path
-        from PySide6.QtGui import QIcon
 
         dept_qicon = QIcon(resource_path("assets/images/department.svg"))
 
@@ -392,7 +399,6 @@ class DepartmentDialog(QDialog):
         self.input_department_name.setCursorPosition(
             len(self.input_department_name.text())
         )
-
 
     def _ensure_title_case(self, line_edit: QLineEdit) -> None:
         if self._is_formatting_text:

@@ -62,6 +62,7 @@ from typing import Any
 
 from core.ui_settings import get_employee_table_ui, ui_settings_bus
 from core.db_connection_bus import db_connection_bus
+from PySide6.QtGui import QColor, QPainter
 
 from core.resource import (
     BG_TITLE_1_HEIGHT,
@@ -2253,11 +2254,33 @@ class MainContent(QWidget):
         self.cbo_search_by.addItem("Mã NV", "employee_code")
         self.cbo_search_by.addItem("Họ và tên", "full_name")
         self.cbo_search_by.setCurrentIndex(0)
+        self.cbo_search_by.setStyleSheet(
+            "QComboBox { border: 1px solid black; padding: 0 10px; border-radius: 0px; }"
+        )
 
         self.inp_search_text = QLineEdit()
         self.inp_search_text.setPlaceholderText("Tìm kiếm...")
         self.inp_search_text.setFixedHeight(32)
         self.inp_search_text.setFont(font_normal)
+        try:
+            base_icon = QIcon(resource_path(ICON_SEARCH))
+            pm = base_icon.pixmap(QSize(16, 16))
+
+            p = QPainter(pm)
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            p.fillRect(pm.rect(), QColor(COLOR_TEXT_PRIMARY))
+            p.end()
+
+            act = self.inp_search_text.addAction(
+                QIcon(pm),
+                QLineEdit.ActionPosition.LeadingPosition,
+            )
+            try:
+                act.setToolTip("Tìm kiếm")
+            except Exception:
+                pass
+        except Exception:
+            pass
 
         self.btn_export = QPushButton("Xuất danh sách")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)

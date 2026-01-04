@@ -163,21 +163,21 @@ class EmployeeDialog(QDialog):
 
         input_style = "\n".join(
             [
-                f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                 f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
             ]
         )
 
         combo_style = "\n".join(
             [
-                f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                 f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
             ]
         )
 
         date_style = "\n".join(
             [
-                f"QDateEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                f"QDateEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                 f"QDateEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
             ]
         )
@@ -269,7 +269,7 @@ class EmployeeDialog(QDialog):
         self.spin_children.setStyleSheet(
             "\n".join(
                 [
-                    f"QSpinBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QSpinBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QSpinBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )

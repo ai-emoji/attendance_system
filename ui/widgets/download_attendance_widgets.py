@@ -295,6 +295,25 @@ class TitleBar2(QWidget):
         self.inp_search_text = _mk_line_edit()
         self.inp_search_text.setPlaceholderText("Tìm kiếm...")
 
+        # Icon tìm kiếm (leading icon trong QLineEdit)
+        try:
+            search_icon = QIcon(resource_path("assets/images/search.svg"))
+            act = self.inp_search_text.addAction(
+                search_icon, QLineEdit.ActionPosition.LeadingPosition
+            )
+            act.setEnabled(False)  # chỉ để hiển thị
+            # chừa chỗ cho icon
+            self.inp_search_text.setStyleSheet(
+                "\n".join(
+                    [
+                        f"QLineEdit {{ border: 1px solid {COLOR_BORDER}; background: #FFFFFF; padding: 0 8px; padding-left: 5px; border-radius: 0px; }}",
+                        f"QLineEdit:focus {{ border: 1px solid {COLOR_BORDER}; }}",
+                    ]
+                )
+            )
+        except Exception:
+            pass
+
         self.label_total = _mk_label("Tổng: 0")
 
         self.total_icon = QLabel("")
@@ -439,6 +458,10 @@ class TitleBar2(QWidget):
 
             for b in (self.btn_hhmm, self.btn_hhmmss, self.btn_download):
                 b.setFixedHeight(bh)
+                try:
+                    b.setCursor(Qt.CursorShape.PointingHandCursor)
+                except Exception:
+                    pass
             self.btn_download.setFixedWidth(int(ui.download_button_width))
             self.btn_hhmm.setFixedWidth(int(ui.time_button_width))
             self.btn_hhmmss.setFixedWidth(int(ui.time_button_width))

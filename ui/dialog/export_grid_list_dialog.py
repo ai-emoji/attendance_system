@@ -319,7 +319,7 @@ class ExportGridListDialog(QDialog):
             w.setStyleSheet(
                 "\n".join(
                     [
-                        f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                        f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                         f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                     ]
                 )
@@ -341,7 +341,7 @@ class ExportGridListDialog(QDialog):
         self.input_note.setStyleSheet(
             "\n".join(
                 [
-                    f"QTextEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 6px 8px; border-radius: 6px; }}",
+                    f"QTextEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 6px 8px; border-radius: 0px; }}",
                     f"QTextEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )
@@ -426,7 +426,7 @@ class ExportGridListDialog(QDialog):
             b.setStyleSheet(
                 "\n".join(
                     [
-                        f"QPushButton {{ background: {COLOR_BG_HEADER}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; border-radius: 6px; }}",
+                        f"QPushButton {{ background: {COLOR_BG_HEADER}; color: {COLOR_TEXT_PRIMARY}; border: 1px solid {COLOR_BORDER}; border-radius: 0px; }}",
                         f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY}; color: #FFFFFF; }}",
                         f"QPushButton:hover {{ background: {COLOR_BUTTON_PRIMARY_HOVER}; color: {COLOR_BG_HEADER}; }}",
                     ]
@@ -523,7 +523,7 @@ class ExportGridListDialog(QDialog):
         self.cbo_export.setStyleSheet(
             "\n".join(
                 [
-                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                     f"QComboBox QAbstractItemView {{ background: {INPUT_COLOR_BG}; selection-background-color: {INPUT_COLOR_BG}; selection-color: {COLOR_TEXT_PRIMARY}; outline: 0px; }}",
                 ]

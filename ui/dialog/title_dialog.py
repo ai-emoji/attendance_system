@@ -105,7 +105,7 @@ class TitleDialog(QDialog):
         self.input_title_name.setStyleSheet(
             "\n".join(
                 [
-                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 6px; }}",
+                    f"QLineEdit {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; border-radius: 0px; }}",
                     f"QLineEdit:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 ]
             )
@@ -123,7 +123,7 @@ class TitleDialog(QDialog):
         combo_style = "\n".join(
             [
                 # Chừa chỗ bên phải cho nút dropdown
-                f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; padding-right: 30px; border-radius: 6px; }}",
+                f"QComboBox {{ background: {INPUT_COLOR_BG}; border: 1px solid {INPUT_COLOR_BORDER}; padding: 0 8px; padding-right: 30px; border-radius: 0px; }}",
                 f"QComboBox:focus {{ border: 1px solid {INPUT_COLOR_BORDER_FOCUS}; }}",
                 f"QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: top right; width: 26px; border-left: 1px solid {INPUT_COLOR_BORDER}; background: {INPUT_COLOR_BG}; }}",
                 f'QComboBox::down-arrow {{ image: url("{dropdown_icon_url}"); width: 10px; height: 10px; }}',

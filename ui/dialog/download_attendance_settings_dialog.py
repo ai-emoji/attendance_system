@@ -207,7 +207,7 @@ class DownloadAttendanceSettingsDialog(QDialog):
         self.btn_visible.setStyleSheet(
             "\n".join(
                 [
-                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; border-radius: 6px; padding: 6px 10px; color: {COLOR_TEXT_LIGHT}; }}",
+                    f"QPushButton {{ border: 1px solid {COLOR_BORDER}; border-radius: 0px; padding: 6px 10px; color: {COLOR_TEXT_LIGHT}; }}",
                     f"QPushButton:hover {{ color: {COLOR_TEXT_LIGHT}; }}",
                     # Checked = show
                     f"QPushButton:checked {{ background: {COLOR_BUTTON_PRIMARY}; color: {COLOR_TEXT_LIGHT}; }}",
