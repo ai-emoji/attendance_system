@@ -112,6 +112,22 @@ def _norm_text(v: object) -> str:
     return s.casefold()
 
 
+def _sort_key_for_text(text: object) -> tuple[int, object]:
+    s = str(text or "").strip()
+    if not s:
+        return (2, "")
+    if s in {"✅", "❌"}:
+        return (0, 1 if s == "✅" else 0)
+    compact = s.replace(" ", "").replace(",", "")
+    try:
+        if compact and all((ch.isdigit() or ch in {"-", "."}) for ch in compact):
+            if any(ch.isdigit() for ch in compact):
+                return (0, float(compact))
+    except Exception:
+        pass
+    return (1, _norm_text(s))
+
+
 class _TableWidgetFilterHeaderView(QHeaderView):
     """HeaderView that draws a dropdown icon and emits a signal when it is clicked."""
 
@@ -2236,6 +2252,85 @@ class MainRight(QWidget):
         it = self.table.item(int(row), int(col))
         return str(it.text() or "") if it is not None else ""
 
+    def _sort_rows_by_column(self, col: int, *, ascending: bool) -> None:
+        try:
+            total_rows = int(self.table.rowCount())
+            total_cols = int(self.table.columnCount())
+        except Exception:
+            return
+        if total_rows <= 1 or total_cols <= 0:
+            return
+
+        rows: list[
+            tuple[tuple[int, object], int, list[QTableWidgetItem | None], int]
+        ] = []
+        try:
+            for r in range(total_rows):
+                key = _sort_key_for_text(self._get_cell_text(r, int(col)))
+                items: list[QTableWidgetItem | None] = []
+                for c in range(total_cols):
+                    it = self.table.item(int(r), int(c))
+                    try:
+                        items.append(it.clone() if it is not None else None)
+                    except Exception:
+                        items.append(None)
+                try:
+                    rh = int(self.table.rowHeight(int(r)))
+                except Exception:
+                    rh = ROW_HEIGHT
+                rows.append((key, int(r), items, rh))
+        except Exception:
+            return
+
+        rows_sorted = sorted(
+            rows,
+            key=lambda t: (t[0], t[1]),
+            reverse=(not bool(ascending)),
+        )
+
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            try:
+                self.table.blockSignals(True)
+            except Exception:
+                pass
+
+            try:
+                self.table.setSortingEnabled(False)
+            except Exception:
+                pass
+
+            try:
+                self.table.setRowCount(0)
+                self.table.setRowCount(len(rows_sorted))
+            except Exception:
+                return
+
+            for r, (_k, _old_r, items, rh) in enumerate(rows_sorted):
+                for c, it in enumerate(items):
+                    if it is None:
+                        continue
+                    try:
+                        self.table.setItem(int(r), int(c), it)
+                    except Exception:
+                        pass
+                try:
+                    self.table.setRowHeight(int(r), int(rh))
+                except Exception:
+                    pass
+        finally:
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+
     def _row_passes_filters(self, row: int, *, except_col: int | None = None) -> bool:
         for col, sel_norm in (self._column_filters_norm or {}).items():
             c = int(col)
@@ -2369,17 +2464,11 @@ class MainRight(QWidget):
                 pass
 
         def _sort_asc() -> None:
-            try:
-                self.table.sortItems(int(col), Qt.SortOrder.AscendingOrder)
-            except Exception:
-                pass
+            self._sort_rows_by_column(int(col), ascending=True)
             self._apply_column_filters()
 
         def _sort_desc() -> None:
-            try:
-                self.table.sortItems(int(col), Qt.SortOrder.DescendingOrder)
-            except Exception:
-                pass
+            self._sort_rows_by_column(int(col), ascending=False)
             self._apply_column_filters()
 
         self._filter_popup = _TableWidgetColumnFilterPopup(
@@ -4084,6 +4173,85 @@ class TempScheduleContent(QWidget):
         it = self.table.item(int(row), int(col))
         return str(it.text() or "") if it is not None else ""
 
+    def _sort_rows_by_column(self, col: int, *, ascending: bool) -> None:
+        try:
+            total_rows = int(self.table.rowCount())
+            total_cols = int(self.table.columnCount())
+        except Exception:
+            return
+        if total_rows <= 1 or total_cols <= 0:
+            return
+
+        rows: list[
+            tuple[tuple[int, object], int, list[QTableWidgetItem | None], int]
+        ] = []
+        try:
+            for r in range(total_rows):
+                key = _sort_key_for_text(self._get_cell_text(r, int(col)))
+                items: list[QTableWidgetItem | None] = []
+                for c in range(total_cols):
+                    it = self.table.item(int(r), int(c))
+                    try:
+                        items.append(it.clone() if it is not None else None)
+                    except Exception:
+                        items.append(None)
+                try:
+                    rh = int(self.table.rowHeight(int(r)))
+                except Exception:
+                    rh = ROW_HEIGHT
+                rows.append((key, int(r), items, rh))
+        except Exception:
+            return
+
+        rows_sorted = sorted(
+            rows,
+            key=lambda t: (t[0], t[1]),
+            reverse=(not bool(ascending)),
+        )
+
+        try:
+            self.table.setUpdatesEnabled(False)
+        except Exception:
+            pass
+        try:
+            try:
+                self.table.blockSignals(True)
+            except Exception:
+                pass
+
+            try:
+                self.table.setSortingEnabled(False)
+            except Exception:
+                pass
+
+            try:
+                self.table.setRowCount(0)
+                self.table.setRowCount(len(rows_sorted))
+            except Exception:
+                return
+
+            for r, (_k, _old_r, items, rh) in enumerate(rows_sorted):
+                for c, it in enumerate(items):
+                    if it is None:
+                        continue
+                    try:
+                        self.table.setItem(int(r), int(c), it)
+                    except Exception:
+                        pass
+                try:
+                    self.table.setRowHeight(int(r), int(rh))
+                except Exception:
+                    pass
+        finally:
+            try:
+                self.table.blockSignals(False)
+            except Exception:
+                pass
+            try:
+                self.table.setUpdatesEnabled(True)
+            except Exception:
+                pass
+
     def _row_passes_filters(self, row: int, *, except_col: int | None = None) -> bool:
         for col, sel_norm in (self._column_filters_norm or {}).items():
             c = int(col)
@@ -4216,17 +4384,11 @@ class TempScheduleContent(QWidget):
                 pass
 
         def _sort_asc() -> None:
-            try:
-                self.table.sortItems(int(col), Qt.SortOrder.AscendingOrder)
-            except Exception:
-                pass
+            self._sort_rows_by_column(int(col), ascending=True)
             self._apply_column_filters()
 
         def _sort_desc() -> None:
-            try:
-                self.table.sortItems(int(col), Qt.SortOrder.DescendingOrder)
-            except Exception:
-                pass
+            self._sort_rows_by_column(int(col), ascending=False)
             self._apply_column_filters()
 
         self._filter_popup = _TableWidgetColumnFilterPopup(

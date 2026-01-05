@@ -168,6 +168,46 @@ class ScheduleWorkService:
                 continue
         return processed
 
+    def apply_schedule_to_employee(
+        self,
+        *,
+        employee_id: int,
+        schedule_id: int,
+        effective_from: str | None = None,
+    ) -> tuple[bool, str, int | None]:
+        """Apply a default schedule to a single employee.
+
+        Returns (ok, message, assignment_id).
+        """
+
+        if not employee_id:
+            return False, "Vui lòng chọn nhân viên.", None
+        if not schedule_id or int(schedule_id) <= 0:
+            return False, "Vui lòng chọn Lịch làm việc.", None
+
+        eff = str(effective_from or date.today().isoformat())
+        try:
+            self._repo.upsert_employee_schedule_assignment(
+                employee_id=int(employee_id),
+                schedule_id=int(schedule_id),
+                effective_from=eff,
+                effective_to=None,
+                note=None,
+            )
+
+            assignment_id = self._repo.get_assignment_id_by_employee_from(
+                employee_id=int(employee_id),
+                effective_from=eff,
+            )
+            return True, "Đã cập nhật lịch làm việc.", assignment_id
+        except Exception:
+            logger.exception(
+                "apply_schedule_to_employee thất bại (employee_id=%s, schedule_id=%s)",
+                employee_id,
+                schedule_id,
+            )
+            return False, "Không thể cập nhật lịch làm việc. Vui lòng thử lại.", None
+
     def get_employee_schedule_name_map(self, employee_ids: list[int]) -> dict[int, str]:
         ids: list[int] = []
         for x in employee_ids or []:
